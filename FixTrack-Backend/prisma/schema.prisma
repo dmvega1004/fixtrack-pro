@@ -1,0 +1,417 @@
+// ============================================================
+// FixTrack Pro - schema.prisma (Multi-tenant, con Repuestos y OrdenUnificada)
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// -------------------------
+// TENANCY - Empresa (Tenant)
+// -------------------------
+model Empresa {
+  id        Int      @id @default(autoincrement())
+  nombre    String
+  nit       String?  @unique
+  direccion String?
+  telefono  String?
+  email     String?
+  creadoEn  DateTime @default(now())
+
+  usuarios  Usuario[]
+  clientes  Cliente[]
+  equipos   Equipo[]
+  ordenes   OrdenTrabajo[]
+  repuestos Repuesto[]
+  tickets   Ticket[]
+  adjuntos  Adjunto[]
+
+  movimientosInventario RepuestoMovimiento[]
+
+  catalogos  Catalogo[]
+  configuraciones Configuracion[]
+
+
+}
+
+// -------------------------
+// USUARIOS
+// -------------------------
+
+model Usuario {
+  id            Int      @id @default(autoincrement())
+  empresaId     Int
+  nombre        String
+  email         String   @unique
+  password      String
+  rol           Rol
+  telefono      String?
+  activo        Boolean  @default(true)
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+  empresa       Empresa  @relation(fields: [empresaId], references: [id])
+
+  // relaciones existentes
+  ordenesAsignadas OrdenTrabajo[]  @relation("Orden_Tecnico")
+  statusHistory    StatusHistory[]
+
+  // 👇 CAMPO NUEVO QUE FALTABA
+  movimientosCreados RepuestoMovimiento[]
+
+  // ➕ AÑADIR ESTO
+  adjuntos Adjunto[]
+
+  ticketsAsignados Ticket[]    @relation("Usuario_Tickets")
+  ticketMensajes TicketMensaje[]
+}
+
+enum Rol {
+  ADMIN
+  TECNICO
+  RECEPCION
+  CONTABILIDAD
+}
+
+// -------------------------
+// CLIENTES
+// -------------------------
+
+model Cliente {
+  id        Int            @id @default(autoincrement())
+  empresaId Int
+  nombre    String
+  contacto  String?
+  telefono  String?
+  direccion String?
+  email     String?
+  creadoEn  DateTime       @default(now())
+  empresa   Empresa        @relation(fields: [empresaId], references: [id])
+  equipos   Equipo[]
+  ordenes   OrdenTrabajo[]
+  tickets   Ticket[]
+}
+
+// -------------------------
+// TIPOS DE EQUIPO
+// -------------------------
+
+model TipoEquipo {
+  id      Int      @id @default(autoincrement())
+  nombre  String   @unique
+  equipos Equipo[]
+}
+
+// -------------------------
+// EQUIPOS
+// -------------------------
+
+model Equipo {
+  id                  Int            @id @default(autoincrement())
+  empresaId           Int
+  nombre              String
+  tipoEquipoId        Int
+  clienteId           Int
+  marca               String?
+  modelo              String?
+  serie               String?
+  codigoQR            String?        @unique
+  ubicacion           String?
+  notas               String?
+  fechaInstalacion    DateTime?
+  ultimoMantenimiento DateTime?
+  estado              EstadoEquipo   @default(ACTIVO)
+  creadoEn            DateTime       @default(now())
+  actualizadoEn       DateTime       @updatedAt
+  empresa             Empresa        @relation(fields: [empresaId], references: [id])
+  tipoEquipo          TipoEquipo     @relation(fields: [tipoEquipoId], references: [id])
+  cliente             Cliente        @relation(fields: [clienteId], references: [id])
+  ordenes             OrdenTrabajo[]
+  tickets Ticket[]
+}
+
+enum EstadoEquipo {
+  ACTIVO
+  INACTIVO
+  BAJA
+  EN_REPARACION
+}
+
+// -------------------------
+// ORDEN DE TRABAJO (Unificada)
+// -------------------------
+
+model OrdenTrabajo {
+  id            Int             @id @default(autoincrement())
+  empresaId     Int
+  codigo        String          @unique // e.g. ORD-000123
+  tipo          TipoOrden
+  clienteId     Int
+  equipoId      Int? // asignado; null si aun no asignada
+  tecnicoId     Int? // asignado; null si aun no asignada
+  titulo        String
+  descripcion   String
+  diagnostico   String?
+  observaciones String?
+  prioridad     Prioridad       @default(MEDIA)
+  estado        EstadoOrden     @default(PENDIENTE)
+  fechaInicio   DateTime        @default(now())
+  fechaFin      DateTime?
+  costoEstimado Float?
+  costoFinal    Float?
+  empresa       Empresa         @relation(fields: [empresaId], references: [id])
+  cliente       Cliente         @relation(fields: [clienteId], references: [id])
+  equipo        Equipo?         @relation(fields: [equipoId], references: [id])
+  tecnico       Usuario?        @relation("Orden_Tecnico", fields: [tecnicoId], references: [id])
+  adjuntos      Adjunto[]
+  repuestoUso   RepuestoOrden[]
+  statusHistory StatusHistory[]
+  tickets Ticket[]
+  creadoEn      DateTime        @default(now())
+  actualizadoEn DateTime        @updatedAt
+
+  @@index([empresaId])
+  @@index([clienteId])
+  @@index([equipoId])
+}
+
+enum TipoOrden {
+  PREVENTIVO
+  CORRECTIVO
+  INSTALACION
+}
+
+enum Prioridad {
+  BAJA
+  MEDIA
+  ALTA
+  URGENTE
+}
+
+enum EstadoOrden {
+  PENDIENTE
+  EN_PROCESO
+  FINALIZADA
+  CANCELADA
+}
+
+// -------------------------
+// ADJUNTOS (evidencias) - vinculados a OrdenTrabajo
+// -------------------------
+
+model Adjunto {
+  id        Int      @id @default(autoincrement())
+  empresaId Int
+  ordenId   Int?
+  url       String
+  tipo      String?
+  nombre    String?
+  creadoEn  DateTime @default(now())
+
+  empresa Empresa       @relation(fields: [empresaId], references: [id])
+  orden   OrdenTrabajo? @relation(fields: [ordenId], references: [id])
+
+  // ➕ NUEVA RELACIÓN CORRECTA
+  creadoPorId Int?
+  creadoPor   Usuario? @relation(fields: [creadoPorId], references: [id])
+
+  @@index([empresaId])
+  @@index([ordenId])
+}
+
+// -------------------------
+// HISTORIAL DE ESTADOS (Auditoría simple por orden)
+// -------------------------
+
+model StatusHistory {
+  id             Int          @id @default(autoincrement())
+  ordenId        Int
+  usuarioId      Int?
+  estadoAnterior String?
+  estadoNuevo    String
+  comentario     String?
+  creadoEn       DateTime     @default(now())
+  orden          OrdenTrabajo @relation(fields: [ordenId], references: [id])
+  usuario        Usuario?     @relation(fields: [usuarioId], references: [id])
+}
+
+// -------------------------
+// REPUESTOS, MOVIMIENTOS Y RELACIÓN CON ORDEN
+// -------------------------
+
+model Repuesto {
+  id            Int      @id @default(autoincrement())
+  empresaId     Int
+  sku           String?  @unique
+  nombre        String
+  descripcion   String?
+  stock         Int      @default(0)
+  precioUnit    Float
+  stockMinimo   Int?     @default(0)
+  costoPromedio Float    @default(0)
+  estado        Boolean  @default(true) // Soft delete agregado
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  empresa     Empresa              @relation(fields: [empresaId], references: [id])
+  repuestosEn RepuestoOrden[]
+  movimientos RepuestoMovimiento[] // Relación agregada
+
+  @@index([empresaId])
+}
+
+model RepuestoOrden {
+  id         Int      @id @default(autoincrement())
+  ordenId    Int
+  repuestoId Int
+  cantidad   Int      @default(1)
+  unitPrice  Float
+  subtotal   Float
+  creadoEn   DateTime @default(now())
+
+  orden    OrdenTrabajo @relation(fields: [ordenId], references: [id])
+  repuesto Repuesto     @relation(fields: [repuestoId], references: [id])
+
+  @@index([ordenId])
+  @@index([repuestoId])
+}
+
+model RepuestoMovimiento {
+  id          Int            @id @default(autoincrement())
+  empresaId   Int
+  repuestoId  Int
+  tipo        MovimientoTipo
+  cantidad    Int
+  unitCost    Float          @default(0)
+  nota        String?
+  creadoPorId Int?
+  creadoEn    DateTime       @default(now())
+
+  repuesto  Repuesto @relation(fields: [repuestoId], references: [id])
+  empresa   Empresa  @relation(fields: [empresaId], references: [id])
+  creadoPor Usuario? @relation(fields: [creadoPorId], references: [id])
+
+  @@index([empresaId])
+  @@index([repuestoId])
+}
+
+enum MovimientoTipo {
+  INGRESO
+  SALIDA
+  AJUSTE
+}
+
+// -------------------------
+// TICKETS (solicitudes iniciales) - opcional, también multitenant
+// -------------------------
+
+// --------------------------------------
+// MÓDULO DE TICKETS (HELPDESK)
+// --------------------------------------
+
+enum TicketEstado {
+  ABIERTO
+  EN_PROCESO
+  ESPERA_CLIENTE
+  RESUELTO
+  CERRADO
+}
+
+enum TicketPrioridad {
+  BAJA
+  MEDIA
+  ALTA
+  URGENTE
+}
+
+model Ticket {
+  id              Int       @id @default(autoincrement())
+  empresaId       Int
+  clienteId       Int
+  equipoId        Int?
+  tecnicoId       Int?
+  ordenId         Int?
+
+  codigo          String    // Ej: TKT-001
+  asunto          String
+  descripcion     String?
+
+  estado          TicketEstado    @default(ABIERTO)
+  prioridad       TicketPrioridad @default(MEDIA)
+
+  fechaCreacion   DateTime  @default(now())
+  fechaCierre     DateTime?
+
+  // Relaciones
+  empresa         Empresa   @relation(fields: [empresaId], references: [id])
+  cliente         Cliente   @relation(fields: [clienteId], references: [id])
+  equipo          Equipo?   @relation(fields: [equipoId], references: [id])
+  tecnico         Usuario?  @relation("Usuario_Tickets", fields: [tecnicoId], references: [id])
+  orden           OrdenTrabajo? @relation(fields: [ordenId], references: [id])
+
+  mensajes        TicketMensaje[]
+
+  @@unique([empresaId, codigo])
+  @@index([clienteId])
+  @@index([tecnicoId])
+  @@index([estado])
+  @@index([prioridad])
+}
+
+model TicketMensaje {
+  id              Int       @id @default(autoincrement())
+  ticketId        Int
+  usuarioId       Int
+  mensaje         String
+  esInterno       Boolean   @default(false)
+  leido           Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+
+  ticket          Ticket    @relation(fields: [ticketId], references: [id])
+  usuario         Usuario   @relation(fields: [usuarioId], references: [id])
+
+  @@index([ticketId])
+  @@index([usuarioId])
+}
+
+enum EstadoTicket {
+  ABIERTO
+  ASIGNADO
+  EN_PROCESO
+  FINALIZADO
+  CANCELADO
+}
+// --------------------------------------
+// CONFIGURACIÓN Y CATÁLOGOS (PASO 12)
+// --------------------------------------
+
+// Para listas desplegables (Ej: Marcas, Categorías, Unidades)
+model Catalogo {
+  id          Int      @id @default(autoincrement())
+  empresaId   Int
+  tipo        String   // Ej: "MARCA_EQUIPO", "CATEGORIA_REPUESTO"
+  valor       String   // Ej: "HP", "Cables", "Metros"
+  descripcion String?
+  activo      Boolean  @default(true)
+  
+  empresa     Empresa  @relation(fields: [empresaId], references: [id])
+
+  @@index([empresaId, tipo])
+}
+
+// Para configuraciones globales (Ej: IVA, Moneda)
+model Configuracion {
+  id          Int      @id @default(autoincrement())
+  empresaId   Int
+  clave       String   // Ej: "PORCENTAJE_IVA", "MONEDA"
+  valor       String   // Ej: "0.19", "COP"
+  descripcion String?
+
+  empresa     Empresa  @relation(fields: [empresaId], references: [id])
+
+  @@unique([empresaId, clave]) // Clave única por empresa
+}

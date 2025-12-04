@@ -1,0 +1,297 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+      "title": "FixTrack Pro API - FASE 2",
+      "version": "1.0.0",
+      "description": "API REST Multi-Tenant para la gestión de Órdenes de Trabajo, Inventario y Helpdesk."
+    },
+    "servers": [
+      {
+        "url": "http://localhost:3000/api"
+      }
+    ],
+    "components": {
+      "securitySchemes": {
+        "bearerAuth": {
+          "type": "http",
+          "scheme": "bearer",
+          "bearerFormat": "JWT"
+        }
+      },
+      "schemas": {
+        "AuthResponse": {
+          "type": "object",
+          "properties": {
+            "token": { "type": "string" },
+            "usuario": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "integer" },
+                "nombre": { "type": "string" },
+                "email": { "type": "string" },
+                "rol": { "type": "string" }
+              }
+            }
+          }
+        },
+        "OrdenTrabajoInput": {
+          "type": "object",
+          "required": ["clienteId", "titulo", "tipo"],
+          "properties": {
+            "clienteId": { "type": "integer" },
+            "equipoId": { "type": "integer", "nullable": true },
+            "titulo": { "type": "string" },
+            "descripcion": { "type": "string" },
+            "prioridad": {
+              "type": "string",
+              "enum": ["BAJA", "MEDIA", "ALTA"]
+            },
+            "tipo": {
+              "type": "string",
+              "enum": ["CORRECTIVO", "PREVENTIVO"]
+            },
+            "observaciones": { "type": "string" }
+          }
+        },
+        "TicketInput": {
+          "type": "object",
+          "required": ["clienteId", "asunto"],
+          "properties": {
+            "clienteId": { "type": "integer" },
+            "equipoId": { "type": "integer", "nullable": true },
+            "asunto": { "type": "string" },
+            "descripcion": { "type": "string" },
+            "prioridad": {
+              "type": "string",
+              "enum": ["BAJA", "MEDIA", "ALTA", "URGENTE"]
+            }
+          }
+        },
+        "TicketMensajeInput": {
+          "type": "object",
+          "required": ["mensaje"],
+          "properties": {
+            "mensaje": { "type": "string" },
+            "esInterno": { "type": "boolean", "default": false }
+          }
+        },
+        "ErrorResponse": {
+          "type": "object",
+          "properties": {
+            "success": { "type": "boolean", "example": false },
+            "error": { "type": "string" }
+          }
+        }
+      }
+    },
+    "security": [
+      {
+        "bearerAuth": []
+      }
+    ],
+    "paths": {
+      "/auth/login": {
+        "post": {
+          "summary": "Login de usuario",
+          "description": "Autentica al usuario y devuelve un JWT.",
+          "operationId": "loginUsuario",
+          "security": [],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["email", "password"],
+                  "properties": {
+                    "email": { "type": "string" },
+                    "password": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Login exitoso",
+              "content": {
+                "application/json": {
+                  "schema": { "$ref": "#/components/schemas/AuthResponse" }
+                }
+              }
+            },
+            "401": {
+              "description": "Credenciales inválidas",
+              "content": {
+                "application/json": {
+                  "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                }
+              }
+            }
+          }
+        }
+      },
+  
+      "/ordenes": {
+        "get": {
+          "summary": "Listar órdenes de trabajo",
+          "operationId": "listarOrdenes",
+          "parameters": [
+            { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+            { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 10 } },
+            { "name": "estado", "in": "query", "schema": { "type": "string" } }
+          ],
+          "responses": {
+            "200": { "description": "Listado de órdenes" },
+            "401": { "description": "No autorizado" }
+          }
+        },
+        "post": {
+          "summary": "Crear una nueva orden de trabajo",
+          "operationId": "crearOrden",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/OrdenTrabajoInput" }
+              }
+            }
+          },
+          "responses": {
+            "201": { "description": "Orden creada" },
+            "500": {
+              "description": "Error en el servidor",
+              "content": {
+                "application/json": {
+                  "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                }
+              }
+            }
+          }
+        }
+      },
+  
+      "/ordenes/{id}": {
+        "get": {
+          "summary": "Obtener detalle de una orden",
+          "operationId": "detalleOrden",
+          "parameters": [
+            { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+          ],
+          "responses": {
+            "200": { "description": "Detalle de la orden" },
+            "404": { "description": "Orden no encontrada" }
+          }
+        }
+      },
+  
+      "/ordenes/{id}/estado": {
+        "patch": {
+          "summary": "Cambiar estado de una OT",
+          "operationId": "cambiarEstadoOT",
+          "parameters": [
+            { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "estado": { "type": "string" },
+                    "comentario": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": { "description": "Estado actualizado" }
+          }
+        }
+      },
+  
+      "/ordenes/{id}/repuestos": {
+        "post": {
+          "summary": "Agregar repuesto a la OT",
+          "operationId": "agregarRepuestoOT",
+          "parameters": [
+            { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["repuestoId", "cantidad"],
+                  "properties": {
+                    "repuestoId": { "type": "integer" },
+                    "cantidad": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": { "description": "Repuesto agregado" }
+          }
+        }
+      },
+  
+      "/tickets": {
+        "post": {
+          "summary": "Crear un nuevo ticket",
+          "operationId": "crearTicket",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TicketInput" }
+              }
+            }
+          },
+          "responses": {
+            "201": { "description": "Ticket creado" }
+          }
+        }
+      },
+  
+      "/tickets/{id}": {
+        "get": {
+          "summary": "Obtener detalle del ticket",
+          "operationId": "detalleTicket",
+          "parameters": [
+            { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+          ],
+          "responses": {
+            "200": { "description": "Detalle obtenido" },
+            "404": { "description": "Ticket no encontrado" }
+          }
+        }
+      },
+  
+      "/tickets/{id}/mensajes": {
+        "post": {
+          "summary": "Agregar mensaje al ticket",
+          "operationId": "agregarMensajeTicket",
+          "parameters": [
+            { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TicketMensajeInput" }
+              }
+            }
+          },
+          "responses": {
+            "201": { "description": "Mensaje agregado" }
+          }
+        }
+      }
+    }
+  }
+  

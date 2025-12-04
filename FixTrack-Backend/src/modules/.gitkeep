@@ -1,0 +1,8 @@
+# Módulos del sistema
+# Cada módulo seguirá la estructura:
+# - controller.js
+# - service.js
+# - repository.js
+# - validation.js
+# - routes.js
+# - types.js
