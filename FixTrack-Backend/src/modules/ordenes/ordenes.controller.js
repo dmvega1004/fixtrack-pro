@@ -25,8 +25,22 @@ class OrdenesController {
    */
   async crear(req, res, next) {
     try {
+      // Filtrar campos no deseados del cuerpo de la solicitud
+      const camposValidos = [
+        'clienteId', 'equipoId', 'tecnicoId', 'tituloProblema', 'descripcionProblema',
+        'titulo', 'descripcion', 'diagnosticoTecnico', 'tipo', 'prioridad',
+        'fechaInicio', 'observaciones', 'costoEstimado'
+      ];
+
+      const datosFiltrados = Object.keys(req.body)
+        .filter((key) => camposValidos.includes(key))
+        .reduce((obj, key) => {
+          obj[key] = req.body[key];
+          return obj;
+        }, {});
+
       const nuevaOrden = await ordenesService.crearOrden(
-        req.body,
+        datosFiltrados,
         req.user.empresaId,
         req.user.id
       );
@@ -60,21 +74,66 @@ class OrdenesController {
   }
 
   /**
+   * GET /api/ordenes/:id/factura
+   * Genera y descarga la factura en PDF de la orden
+   */
+  async descargarFactura(req, res, next) {
+    try {
+      const pdfBuffer = await ordenesService.generateInvoicePDF(req.params.id, req.user.empresaId);
+
+      const filename = `factura-${req.params.id}.pdf`;
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.status(200).send(pdfBuffer);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * PUT /api/ordenes/:id
    * Actualiza una orden (diagnóstico, observaciones, etc.)
    */
   async actualizar(req, res, next) {
     try {
-      const { diagnostico, observaciones, titulo, descripcion, costoEstimado } = req.body;
+      const {
+        // Paso1
+        tituloProblema,
+        descripcionProblema,
+        // compatibilidad
+        titulo,
+        descripcion,
+        // Paso2
+        diagnosticoTecnico,
+        trabajoRealizado,
+        horasManoObra,
+        costoManoObra,
+        fotosUrl,
+        // Paso3
+        estado,
+        notasCliente,
+        firmaClienteUrl,
+        observaciones,
+        costoEstimado,
+      } = req.body;
 
       const ordenActualizada = await ordenesService.actualizarOrden(
         req.params.id,
         req.user.empresaId,
         {
-          diagnostico,
-          observaciones,
+          tituloProblema,
+          descripcionProblema,
           titulo,
           descripcion,
+          diagnosticoTecnico,
+          trabajoRealizado,
+          horasManoObra,
+          costoManoObra,
+          fotosUrl,
+          estado,
+          notasCliente,
+          firmaClienteUrl,
+          observaciones,
           costoEstimado,
         }
       );
@@ -205,6 +264,26 @@ class OrdenesController {
         success: true,
         message: 'Repuesto eliminado de la orden exitosamente',
         data: resultado,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * DELETE /api/ordenes/:id
+   * Elimina una orden de trabajo y todos sus registros relacionados
+   */
+  async eliminar(req, res, next) {
+    try {
+      const { id } = req.params;
+      const empresaId = req.user.empresaId;
+
+      await ordenesService.eliminarOrden(id, empresaId);
+
+      res.status(200).json({
+        success: true,
+        message: 'Orden eliminada correctamente',
       });
     } catch (error) {
       next(error);

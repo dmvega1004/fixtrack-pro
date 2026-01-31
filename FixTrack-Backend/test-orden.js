@@ -135,12 +135,12 @@ async function probarOrdenes() {
     });
     console.log(`✅ Estado actualizado: ${estadoProceso.data.estado}\n`);
 
-    // 9. Cambiar estado a FINALIZADA
-    console.log('9️⃣ Cambiando estado a FINALIZADA...');
+    // 9. Cambiar estado a TERMINADO
+    console.log('9️⃣ Cambiando estado a TERMINADO...');
     const estadoFinal = await request(`/ordenes/${orden.id}/estado`, {
       method: 'PATCH',
       headers: authHeaders,
-      body: JSON.stringify({ estado: 'FINALIZADA', comentario: 'Trabajo completado' }),
+      body: JSON.stringify({ estado: 'TERMINADO', comentario: 'Trabajo completado' }),
     });
     console.log(`✅ Estado final: ${estadoFinal.data.estado}\n`);
 

@@ -6,6 +6,7 @@ import { MainLayout } from '@/components/layout/MainLayout'
 import DashboardPage from '@/pages/DashboardPage'
 import UsersPage from '@/pages/UsersPage'
 import ClientsPage from '@/pages/ClientsPage'
+import OrdenesPage from '@/pages/OrdenesPage'
 
 export const AppRouter = () => {
   return (
@@ -25,9 +26,9 @@ export const AppRouter = () => {
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="usuarios" element={<UsersPage />} />
             <Route path="clientes" element={<ClientsPage />} />
+            <Route path="ordenes" element={<OrdenesPage />} />
 
             {/* MÓDULOS FUTUROS */}
-            <Route path="ordenes" element={<h2 className="p-8 text-2xl">Órdenes de Trabajo (Próximamente)</h2>} />
             <Route path="inventario" element={<h2 className="p-8 text-2xl">Inventario (Próximamente)</h2>} />
             <Route path="configuracion" element={<h2 className="p-8 text-2xl">Configuración (Próximamente)</h2>} />
 

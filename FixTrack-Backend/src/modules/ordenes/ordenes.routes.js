@@ -56,4 +56,18 @@ router.delete(
   ordenesController.quitarRepuesto.bind(ordenesController)
 )
 
+// DESCARGA factura PDF (ADMIN, RECEPCION, TÉCNICO)
+router.get(
+  '/:id/factura',
+  authorize('ADMIN', 'RECEPCION', 'TECNICO'),
+  ordenesController.descargarFactura.bind(ordenesController)
+)
+
+// ELIMINAR orden (solo ADMIN)
+router.delete(
+  '/:id',
+  authorize('ADMIN'),
+  ordenesController.eliminar.bind(ordenesController)
+)
+
 module.exports = router

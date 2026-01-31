@@ -11,32 +11,47 @@ class ClientesService {
    * @returns {Promise<Array>} Lista de clientes
    */
   async listarClientes(empresaId) {
-    const clientes = await prisma.cliente.findMany({
-      where: {
-        empresaId, // Filtro multi-tenant
-      },
-      include: {
-        empresa: {
-          select: {
-            id: true,
-            nombre: true,
-            nit: true,
-          },
-        },
-        _count: {
-          select: {
-            equipos: true,
-            ordenes: true,
-            tickets: true,
-          },
-        },
-      },
-      orderBy: {
-        creadoEn: 'desc',
-      },
-    });
+    // Convertir empresaId a entero y validar
+    const empresaIdInt = parseInt(empresaId, 10);
+    if (isNaN(empresaIdInt)) {
+      console.error(`[ERROR] empresaId inválido: ${empresaId}`);
+      return [];
+    }
 
-    return clientes;
+    console.log(`[INFO] Listando clientes para Empresa ID: ${empresaIdInt}`);
+
+    try {
+      const clientes = await prisma.cliente.findMany({
+        where: {
+          empresaId: empresaIdInt, // Filtro multi-tenant
+        },
+        include: {
+          empresa: {
+            select: {
+              id: true,
+              nombre: true,
+              nit: true,
+            },
+          },
+          _count: {
+            select: {
+              equipos: true,
+              ordenes: true,
+              tickets: true,
+            },
+          },
+        },
+        orderBy: {
+          creadoEn: 'desc',
+        },
+      });
+
+      console.log(`[INFO] Clientes obtenidos: ${clientes.length}`);
+      return clientes;
+    } catch (error) {
+      console.error(`[ERROR] Error al listar clientes:`, error);
+      return [];
+    }
   }
 
   /**
@@ -86,37 +101,52 @@ class ClientesService {
    * @returns {Promise<Object>} Cliente creado
    */
   async crearCliente(datosCliente, empresaId) {
+    // Convertir empresaId a entero y validar
+    const empresaIdInt = parseInt(empresaId, 10);
+    if (isNaN(empresaIdInt)) {
+      throw new Error(`[ERROR] empresaId inválido: ${empresaId}`);
+    }
+
+    console.log(
+      `[INFO] Creando cliente para Empresa ID: ${empresaIdInt} con datos:`,
+      datosCliente
+    );
+
     const { nombre, contacto, telefono, direccion, email } = datosCliente;
 
-    // Crear cliente (empresaId asignado automáticamente)
-    const nuevoCliente = await prisma.cliente.create({
-      data: {
-        nombre,
-        contacto,
-        telefono,
-        direccion,
-        email,
-        empresaId, // Asignado automáticamente del usuario autenticado
-      },
-      include: {
-        empresa: {
-          select: {
-            id: true,
-            nombre: true,
-            nit: true,
+    try {
+      const nuevoCliente = await prisma.cliente.create({
+        data: {
+          nombre,
+          contacto,
+          telefono,
+          direccion,
+          email,
+          empresaId: empresaIdInt, // Asignado como entero
+        },
+        include: {
+          empresa: {
+            select: {
+              id: true,
+              nombre: true,
+              nit: true,
+            },
+          },
+          _count: {
+            select: {
+              equipos: true,
+              ordenes: true,
+            },
           },
         },
-        _count: {
-          select: {
-            equipos: true,
-            ordenes: true,
-            tickets: true,
-          },
-        },
-      },
-    });
+      });
 
-    return nuevoCliente;
+      console.log(`[INFO] Cliente creado exitosamente:`, nuevoCliente);
+      return nuevoCliente;
+    } catch (error) {
+      console.error(`[ERROR] Error al crear cliente:`, error);
+      throw error;
+    }
   }
 
   /**

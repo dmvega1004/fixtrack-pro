@@ -1,8 +1,11 @@
 const prisma = require('../../config/database');
 const repuestosService = require('../repuestos/repuestos.service');
+const PDFDocument = require('pdfkit');
+const http = require('http');
+const https = require('https');
 
-const ESTADOS_PERMITIDOS = ['PENDIENTE', 'EN_PROCESO', 'FINALIZADA', 'CANCELADA'];
-const ESTADOS_CERRADOS = ['FINALIZADA', 'CANCELADA']; // Estados que "congelan" la orden
+const ESTADOS_PERMITIDOS = ['PENDIENTE', 'EN_PROCESO', 'TERMINADO', 'CANCELADA'];
+const ESTADOS_CERRADOS = ['TERMINADO', 'CANCELADA']; // Estados que "congelan" la orden
 const TIPOS_ORDEN = ['PREVENTIVO', 'CORRECTIVO', 'INSTALACION'];
 const PRIORIDADES = ['BAJA', 'MEDIA', 'ALTA', 'URGENTE'];
 const ROLES_TECNICOS = ['ADMIN', 'TECNICO'];
@@ -33,15 +36,19 @@ class OrdenesService {
    * Valida que un cliente pertenezca a la empresa
    */
   async validarCliente(clienteId, empresaId) {
+    console.log(`Validando cliente con ID: ${clienteId} para la empresa ID: ${empresaId}`);
     const cliente = await prisma.cliente.findFirst({
       where: { id: parseInt(clienteId, 10), empresaId },
     });
 
     if (!cliente) {
+      console.error(`Cliente no encontrado o no pertenece a la empresa. Cliente ID: ${clienteId}, Empresa ID: ${empresaId}`);
       const error = new Error('Cliente no encontrado o no pertenece a tu empresa');
       error.status = 404;
       throw error;
     }
+
+    console.log(`Cliente validado exitosamente: ${JSON.stringify(cliente)}`);
     return cliente;
   }
 
@@ -201,76 +208,94 @@ class OrdenesService {
    * Crea una nueva orden de trabajo
    */
   async crearOrden(datosOrden, empresaId, usuarioId) {
+    // 1. Extraemos SOLO los campos que necesitamos y conocemos
+    // Filtrar campos no deseados del objeto datosOrden
+    const camposValidos = [
+      'clienteId', 'equipoId', 'tecnicoId', 'tituloProblema', 'descripcionProblema',
+      'titulo', 'descripcion', 'diagnosticoTecnico', 'tipo', 'prioridad',
+      'fechaInicio', 'observaciones', 'costoEstimado'
+    ];
+
+    const datosOrdenFiltrados = Object.keys(datosOrden)
+      .filter((key) => camposValidos.includes(key))
+      .reduce((obj, key) => {
+        obj[key] = datosOrden[key];
+        return obj;
+      }, {});
+
+    // Desestructurar los campos filtrados
     const {
       clienteId,
       equipoId,
       tecnicoId,
+      tituloProblema,
+      descripcionProblema,
       titulo,
       descripcion,
-      diagnostico,
+      diagnosticoTecnico,
       tipo,
       prioridad,
       fechaInicio,
       observaciones,
       costoEstimado,
-    } = datosOrden;
+    } = datosOrdenFiltrados;
 
+    // 2. Validaciones de negocio
     if (!clienteId) {
       const error = new Error('El cliente es obligatorio');
       error.status = 400;
       throw error;
     }
 
-    if (!descripcion) {
-      const error = new Error('La descripción del trabajo es obligatoria');
+    const descFinal = descripcionProblema || descripcion;
+    const tituloFinal = tituloProblema || titulo;
+
+    if (!descFinal) {
+      const error = new Error('La descripción del problema es obligatoria');
       error.status = 400;
       throw error;
     }
 
-    if (tipo && !TIPOS_ORDEN.includes(tipo)) {
-      const error = new Error(`Tipo de orden inválido. Valores permitidos: ${TIPOS_ORDEN.join(', ')}`);
+    if (!tituloFinal) {
+      const error = new Error('El título del problema es obligatorio');
       error.status = 400;
       throw error;
     }
 
-    if (prioridad && !PRIORIDADES.includes(prioridad)) {
-      const error = new Error(`Prioridad inválida. Valores permitidos: ${PRIORIDADES.join(', ')}`);
-      error.status = 400;
-      throw error;
-    }
-
+    // 3. Validaciones de existencia
     await this.validarCliente(clienteId, empresaId);
     await this.validarEquipo(equipoId, empresaId);
     await this.validarTecnico(tecnicoId, empresaId);
 
     const codigo = await this.generarCodigoOrden(empresaId);
 
+    // 4. Inserción limpia en la base de datos
+    // NOTA: No usamos "...datosOrden" para evitar que campos como "existe" se filtren
+    // Filtrar campos válidos para evitar propagación de campos no deseados como "existe"
+    const datosOrdenFiltradosFinal = {
+      codigo,
+      empresaId: parseInt(empresaId, 10),
+      clienteId: parseInt(clienteId, 10),
+      equipoId: equipoId ? parseInt(equipoId, 10) : null,
+      tecnicoId: tecnicoId ? parseInt(tecnicoId, 10) : null,
+      tituloProblema: tituloFinal,
+      descripcionProblema: descFinal,
+      titulo: tituloFinal, // Mantenemos ambos por tu schema
+      descripcion: descFinal,
+      diagnosticoTecnico: diagnosticoTecnico || null,
+      observaciones: observaciones || null,
+      tipo: tipo || 'CORRECTIVO',
+      prioridad: prioridad || 'MEDIA',
+      fechaInicio: fechaInicio ? new Date(fechaInicio) : new Date(),
+      costoEstimado: costoEstimado ? parseFloat(costoEstimado) : null,
+    };
+
     const nuevaOrden = await prisma.ordenTrabajo.create({
-      data: {
-        codigo,
-        empresaId,
-        clienteId: parseInt(clienteId, 10),
-        equipoId: equipoId ? parseInt(equipoId, 10) : null,
-        tecnicoId: tecnicoId ? parseInt(tecnicoId, 10) : null,
-        titulo,
-        descripcion,
-        diagnostico: diagnostico || null,
-        observaciones,
-        tipo: tipo || 'CORRECTIVO',
-        prioridad: prioridad || 'MEDIA',
-        fechaInicio: fechaInicio ? new Date(fechaInicio) : new Date(), // Automático si no viene
-        costoEstimado,
-      },
+      data: datosOrdenFiltradosFinal,
       include: {
-        cliente: {
-          select: { id: true, nombre: true },
-        },
-        equipo: {
-          select: { id: true, nombre: true, codigoQR: true },
-        },
-        tecnico: {
-          select: { id: true, nombre: true, email: true },
-        },
+        cliente: { select: { id: true, nombre: true } },
+        equipo: { select: { id: true, nombre: true, codigoQR: true } },
+        tecnico: { select: { id: true, nombre: true, email: true } },
       },
     });
 
@@ -278,7 +303,7 @@ class OrdenesService {
     await prisma.statusHistory.create({
       data: {
         ordenId: nuevaOrden.id,
-        usuarioId,
+        usuarioId: parseInt(usuarioId, 10),
         estadoAnterior: null,
         estadoNuevo: nuevaOrden.estado,
         comentario: 'Orden creada',
@@ -288,6 +313,49 @@ class OrdenesService {
     return nuevaOrden;
   }
 
+  /**
+   * Actualiza una orden de forma segura
+   */
+  async actualizarOrden(id, empresaId, datosActualizacion) {
+    const orden = await prisma.ordenTrabajo.findFirst({
+      where: { id: parseInt(id, 10), empresaId },
+    });
+
+    if (!orden) {
+      const error = new Error('Orden no encontrada');
+      error.status = 404;
+      throw error;
+    }
+
+    // Filtramos manualmente los datos para que no entre basura como "existe"
+    const dataClean = {};
+    const camposPermitidos = [
+      'tituloProblema', 'descripcionProblema', 'titulo', 'descripcion',
+      'diagnosticoTecnico', 'trabajoRealizado', 'horasManoObra', 
+      'costoManoObra', 'fotosUrl', 'estado', 'notasCliente', 
+      'firmaClienteUrl', 'costoEstimado', 'observaciones', 'prioridad'
+    ];
+
+    camposPermitidos.forEach(campo => {
+      if (datosActualizacion[campo] !== undefined) {
+        if (campo === 'horasManoObra' || campo === 'costoManoObra' || campo === 'costoEstimado') {
+          dataClean[campo] = parseFloat(datosActualizacion[campo]) || 0;
+        } else {
+          dataClean[campo] = datosActualizacion[campo];
+        }
+      }
+    });
+
+    return await prisma.ordenTrabajo.update({
+      where: { id: orden.id },
+      data: dataClean,
+      include: {
+        cliente: true,
+        equipo: true,
+        tecnico: { select: { id: true, nombre: true, email: true } },
+      }
+    });
+  }
   /**
    * Obtiene detalle de una orden por ID
    */
@@ -368,10 +436,22 @@ class OrdenesService {
     }
 
     const datosUpdate = {};
-    if (datosActualizacion.diagnostico !== undefined) datosUpdate.diagnostico = datosActualizacion.diagnostico;
-    if (datosActualizacion.observaciones !== undefined) datosUpdate.observaciones = datosActualizacion.observaciones;
+    // Paso1
+    if (datosActualizacion.tituloProblema !== undefined) datosUpdate.tituloProblema = datosActualizacion.tituloProblema;
+    if (datosActualizacion.descripcionProblema !== undefined) datosUpdate.descripcionProblema = datosActualizacion.descripcionProblema;
+    // Compatibilidad
     if (datosActualizacion.titulo !== undefined) datosUpdate.titulo = datosActualizacion.titulo;
     if (datosActualizacion.descripcion !== undefined) datosUpdate.descripcion = datosActualizacion.descripcion;
+    // Paso2
+    if (datosActualizacion.diagnosticoTecnico !== undefined) datosUpdate.diagnosticoTecnico = datosActualizacion.diagnosticoTecnico;
+    if (datosActualizacion.trabajoRealizado !== undefined) datosUpdate.trabajoRealizado = datosActualizacion.trabajoRealizado;
+    if (datosActualizacion.horasManoObra !== undefined) datosUpdate.horasManoObra = parseFloat(datosActualizacion.horasManoObra) || 0;
+    if (datosActualizacion.costoManoObra !== undefined) datosUpdate.costoManoObra = parseFloat(datosActualizacion.costoManoObra) || 0;
+    if (datosActualizacion.fotosUrl !== undefined) datosUpdate.fotosUrl = datosActualizacion.fotosUrl;
+    // Paso3
+    if (datosActualizacion.estado !== undefined) datosUpdate.estado = datosActualizacion.estado;
+    if (datosActualizacion.notasCliente !== undefined) datosUpdate.notasCliente = datosActualizacion.notasCliente;
+    if (datosActualizacion.firmaClienteUrl !== undefined) datosUpdate.firmaClienteUrl = datosActualizacion.firmaClienteUrl;
     if (datosActualizacion.costoEstimado !== undefined) datosUpdate.costoEstimado = datosActualizacion.costoEstimado;
 
     const ordenActualizada = await prisma.ordenTrabajo.update({
@@ -428,7 +508,7 @@ class OrdenesService {
 
     const datosUpdate = { estado: nuevoEstado };
     
-    // Si se cierra la orden (FINALIZADA o CANCELADA), registrar fechaFin
+    // Si se cierra la orden (TERMINADO o CANCELADA), registrar fechaFin
     if (ESTADOS_CERRADOS.includes(nuevoEstado) && !orden.fechaFin) {
       datosUpdate.fechaFin = new Date();
     }
@@ -673,6 +753,153 @@ class OrdenesService {
     });
 
     return { eliminado: true, repuestoId: repuestoOrden.repuestoId, cantidad: repuestoOrden.cantidad };
+  }
+
+  /**
+   * Genera un PDF con la factura de la orden y devuelve un Buffer
+   */
+  async generateInvoicePDF(id, empresaId) {
+    // Reutiliza la obtención de orden para validar existencia y permisos
+    const orden = await this.obtenerOrdenPorId(id, empresaId);
+
+    const doc = new PDFDocument({ size: 'A4', margin: 50 });
+    const chunks = [];
+    doc.on('data', (chunk) => chunks.push(chunk));
+
+    const finished = new Promise((resolve, reject) => {
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+    });
+
+    // HEADER / TITULO
+    doc.fontSize(18).text(`Factura Orden de Trabajo #${orden.codigo}`, { align: 'center' });
+    doc.moveDown();
+
+    // Datos cliente y fechas
+    doc.fontSize(12).text(`Cliente: ${orden.cliente?.nombre || 'N/D'}`);
+    doc.text(`Código OT: ${orden.codigo}`);
+    doc.text(`Fecha inicio: ${orden.fechaInicio ? new Date(orden.fechaInicio).toLocaleString() : 'N/D'}`);
+    if (orden.fechaFin) doc.text(`Fecha fin: ${new Date(orden.fechaFin).toLocaleString()}`);
+    doc.moveDown();
+
+    // Resumen del trabajo
+    doc.fontSize(14).text('Resumen del Trabajo', { underline: true });
+    doc.moveDown(0.5);
+    doc.fontSize(12).text(orden.trabajoRealizado || orden.diagnosticoTecnico || 'No informado');
+    doc.moveDown();
+
+    // Repuestos
+    doc.fontSize(14).text('Repuestos', { underline: true });
+    doc.moveDown(0.5);
+
+    let repuestosTotal = 0;
+    if (orden.repuestoUso && orden.repuestoUso.length > 0) {
+      orden.repuestoUso.forEach((item) => {
+        const nombre = item.repuesto?.nombre || 'Repuesto';
+        const cantidad = item.cantidad || 0;
+        const unitPrice = typeof item.unitPrice !== 'undefined' ? item.unitPrice : 0;
+        const subtotal = typeof item.subtotal !== 'undefined' ? item.subtotal : cantidad * unitPrice;
+        repuestosTotal += subtotal || 0;
+        doc.fontSize(12).text(`${nombre} — Cant: ${cantidad} — P.U.: ${unitPrice.toFixed(2)} — Subtotal: ${subtotal.toFixed(2)}`);
+      });
+    } else {
+      doc.fontSize(12).text('No se usaron repuestos en esta orden.');
+    }
+
+    doc.moveDown();
+
+    // Costos
+    const manoObra = parseFloat(orden.costoManoObra || 0);
+    // Preferir costoFinal si está calculado
+    const costoRepuestos = orden.costoFinal ? parseFloat(orden.costoFinal || 0) : repuestosTotal;
+    const total = (costoRepuestos || 0) + (manoObra || 0);
+
+    doc.fontSize(12).text(`Costo Mano de Obra: ${manoObra.toFixed(2)}`);
+    doc.text(`Costo Repuestos: ${costoRepuestos.toFixed(2)}`);
+    doc.moveDown(0.5);
+    doc.fontSize(14).text(`Total: ${total.toFixed(2)}`);
+
+    doc.moveDown();
+
+    // Firma del cliente (si existe)
+    if (orden.firmaClienteUrl) {
+      try {
+        const fetchImageBuffer = (url) => new Promise((resolve, reject) => {
+          try {
+            const parsed = new URL(url);
+            const client = parsed.protocol === 'https:' ? https : http;
+            client.get(url, (res) => {
+              const data = [];
+              res.on('data', (chunk) => data.push(chunk));
+              res.on('end', () => resolve(Buffer.concat(data)));
+              res.on('error', reject);
+            }).on('error', reject);
+          } catch (err) {
+            reject(err);
+          }
+        });
+
+        const imgBuf = await fetchImageBuffer(orden.firmaClienteUrl);
+        if (imgBuf && imgBuf.length > 0) {
+          doc.moveDown();
+          doc.fontSize(12).text('Firma cliente:');
+          doc.image(imgBuf, { width: 150 });
+        }
+      } catch (err) {
+        // Si falla la descarga/embedding de la imagen, continuar sin romper el PDF
+        console.warn('No se pudo incluir la imagen de firma:', err.message || err);
+      }
+    }
+
+    doc.end();
+
+    const buffer = await finished;
+    return buffer;
+  }
+
+  /**
+   * Elimina una orden de trabajo y todos sus registros relacionados
+   * CRÍTICO: Usa transacción para mantener integridad referencial
+   */
+  async eliminarOrden(id, empresaId) {
+    // 1. Validar que la orden exista y pertenezca a la empresa
+    const orden = await prisma.ordenTrabajo.findFirst({
+      where: {
+        id: parseInt(id, 10),
+        empresaId: parseInt(empresaId, 10),
+      },
+    });
+
+    if (!orden) {
+      const error = new Error('Orden no encontrada');
+      error.status = 404;
+      throw error;
+    }
+
+    // 2. Transacción para eliminar registros relacionados en orden correcto
+    await prisma.$transaction(async (tx) => {
+      // 2.1. Eliminar historial de estados
+      await tx.statusHistory.deleteMany({
+        where: { ordenId: orden.id },
+      });
+
+      // 2.2. Eliminar repuestos vinculados (RepuestoOrden)
+      await tx.repuestoOrden.deleteMany({
+        where: { ordenId: orden.id },
+      });
+
+      // 2.3. Eliminar adjuntos (archivos asociados)
+      await tx.adjunto.deleteMany({
+        where: { ordenId: orden.id },
+      });
+
+      // 2.4. Finalmente, eliminar la orden principal
+      await tx.ordenTrabajo.delete({
+        where: { id: orden.id },
+      });
+    });
+
+    return { eliminado: true, ordenId: orden.id };
   }
 }
 

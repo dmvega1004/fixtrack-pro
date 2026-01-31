@@ -153,12 +153,28 @@ model OrdenTrabajo {
   clienteId     Int
   equipoId      Int? // asignado; null si aun no asignada
   tecnicoId     Int? // asignado; null si aun no asignada
+  // Paso 1 - Refinado
+  tituloProblema      String
+  descripcionProblema String
+
+  // Campos legacy (mantener compatibilidad)
   titulo        String
   descripcion   String
-  diagnostico   String?
+
+  // Paso 2 - Diagnóstico y Ejecución
+  diagnosticoTecnico String?
+  trabajoRealizado   String?
+  horasManoObra      Float    @default(0)
+  costoManoObra      Float    @default(0)
+  fotosUrl           Json?
+
+  // Observaciones adicionales
   observaciones String?
   prioridad     Prioridad       @default(MEDIA)
   estado        EstadoOrden     @default(PENDIENTE)
+  // Paso 3 - Cierre
+  notasCliente   String?
+  firmaClienteUrl String?
   fechaInicio   DateTime        @default(now())
   fechaFin      DateTime?
   costoEstimado Float?
@@ -195,7 +211,7 @@ enum Prioridad {
 enum EstadoOrden {
   PENDIENTE
   EN_PROCESO
-  FINALIZADA
+  TERMINADO
   CANCELADA
 }
 

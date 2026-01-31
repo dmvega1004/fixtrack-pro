@@ -39,6 +39,8 @@ const authenticate = async (req, res, next) => {
       empresaId: decoded.empresaId, // CRÍTICO para multi-tenancy
     };
 
+    console.log(`[AUTH] Usuario ID: ${req.user.id}, Empresa ID: ${req.user.empresaId}`); // Depuración
+
     // 5. Continuar con el siguiente middleware
     next();
   } catch (error) {
