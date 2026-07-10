@@ -1,0 +1,84 @@
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseEnumPipe,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
+import { OrderStatus, Role, WorkOrder } from 'database';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
+import { CreateWorkOrderDto } from './dto/create-work-order.dto';
+import { UpdateWorkOrderDto } from './dto/update-work-order.dto';
+import { WorkOrdersService } from './work-orders.service';
+
+/**
+ * Este módulo recibe el @CurrentUser() COMPLETO (no solo companyId),
+ * porque el RBAC fino necesita también userId y role para decidir
+ * qué órdenes ve y qué campos puede tocar cada quien.
+ */
+@Controller('work-orders')
+export class WorkOrdersController {
+  constructor(private readonly workOrdersService: WorkOrdersService) {}
+
+  /** POST /work-orders — SOLO Admin y Coordinador crean/asignan órdenes */
+  @Roles(Role.ADMIN, Role.COORDINATOR)
+  @Post()
+  create(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateWorkOrderDto,
+  ): Promise<WorkOrder> {
+    return this.workOrdersService.create(user, dto);
+  }
+
+  /**
+   * GET /work-orders[?status=PENDING] — Admin/Coordinador ven todas las
+   * de su empresa; el Técnico SOLO las asignadas a él.
+   */
+  @Get()
+  findAll(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('status', new ParseEnumPipe(OrderStatus, { optional: true }))
+    status?: OrderStatus,
+  ): Promise<WorkOrder[]> {
+    return this.workOrdersService.findAll(user, status);
+  }
+
+  /** GET /work-orders/:id — 404 si es de otra empresa o de otro técnico */
+  @Get(':id')
+  findOne(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<WorkOrder> {
+    return this.workOrdersService.findOne(user, id);
+  }
+
+  /**
+   * PATCH /work-orders/:id — Admin/Coordinador: todo campo.
+   * Técnico: solo status y diagnosis de SUS órdenes (403 si intenta más).
+   */
+  @Patch(':id')
+  update(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateWorkOrderDto,
+  ): Promise<WorkOrder> {
+    return this.workOrdersService.update(user, id, dto);
+  }
+
+  /** DELETE /work-orders/:id — SOLO Administradores (RBAC) */
+  @Roles(Role.ADMIN)
+  @Delete(':id')
+  remove(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<WorkOrder> {
+    return this.workOrdersService.remove(user, id);
+  }
+}

@@ -1,0 +1,30 @@
+# --- Dependencias ---
+node_modules/
+
+# --- Variables de entorno (NUNCA subir credenciales a git) ---
+.env
+.env.*
+!.env.example
+
+# --- Builds y artefactos generados ---
+dist/
+build/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+
+# --- Prisma (cliente generado) ---
+generated/
+
+# --- Sistema operativo / editor ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# --- Logs ---
+*.log
+npm-debug.log*
+pnpm-debug.log*
