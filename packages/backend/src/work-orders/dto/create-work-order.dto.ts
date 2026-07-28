@@ -9,7 +9,9 @@ import {
 } from 'class-validator';
 
 /**
- * Solo ADMIN y COORDINATOR crean órdenes (RBAC en el controller).
+ * ADMIN, COORDINATOR y TECHNICIAN pueden crear órdenes (RBAC en el
+ * controller). Si quien crea es TECHNICIAN, el service ignora `userId` y
+ * autoasigna la orden a quien la crea.
  * El status NO se envía al crear: toda orden nace PENDING.
  */
 export class CreateWorkOrderDto {
@@ -23,11 +25,20 @@ export class CreateWorkOrderDto {
   @MaxLength(5000)
   diagnosis?: string;
 
+  /** Notas del servicio realizado, separadas del diagnóstico inicial. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(5000)
+  observations?: string;
+
   /** Equipo a intervenir. Se verifica que pertenezca a la empresa del token. */
   @IsUUID('4', { message: 'equipmentId debe ser un UUID válido' })
   equipmentId: string;
 
-  /** Técnico asignado (opcional al crear). Debe pertenecer a la empresa. */
+  /**
+   * Técnico asignado (opcional al crear). Debe pertenecer a la empresa.
+   * Ignorado si quien crea es un TECHNICIAN (siempre queda autoasignado).
+   */
   @IsOptional()
   @IsUUID('4', { message: 'userId debe ser un UUID válido' })
   userId?: string;

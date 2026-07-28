@@ -2,10 +2,13 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AttachmentsModule } from './attachments/attachments.module';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { ClientsModule } from './clients/clients.module';
+import { CloudinaryModule } from './cloudinary/cloudinary.module';
+import { CompanyModule } from './company/company.module';
 import { EquipmentsModule } from './equipments/equipments.module';
 import { PrismaModule } from './prisma.module';
 import { SparePartsModule } from './spare-parts/spare-parts.module';
@@ -16,7 +19,10 @@ import { WorkOrdersModule } from './work-orders/work-orders.module';
   imports: [
     PrismaModule,
     AuthModule,
+    AttachmentsModule,
     ClientsModule,
+    CloudinaryModule,
+    CompanyModule,
     EquipmentsModule,
     WorkOrdersModule,
     SparePartsModule,

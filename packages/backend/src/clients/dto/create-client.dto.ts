@@ -1,11 +1,19 @@
 import {
   IsEmail,
+  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
   Matches,
   MaxLength,
 } from 'class-validator';
+
+/**
+ * No se modela como enum de BD (Client.documentType es String? en el schema)
+ * para no requerir una migración si en el futuro aparece otro tipo de
+ * documento — la validación de los valores permitidos vive solo acá.
+ */
+export const DOCUMENT_TYPES = ['CC', 'NIT', 'CE', 'PASAPORTE'] as const;
 
 export class CreateClientDto {
   @IsString()
@@ -23,4 +31,20 @@ export class CreateClientDto {
     message: 'El teléfono solo admite dígitos, espacios y + ( ) . -',
   })
   phone?: string;
+
+  @IsOptional()
+  @IsIn(DOCUMENT_TYPES, {
+    message: 'documentType debe ser CC, NIT, CE o PASAPORTE',
+  })
+  documentType?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  documentNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  address?: string;
 }

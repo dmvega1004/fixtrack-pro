@@ -15,7 +15,8 @@ export class CreateSparePartDto {
   @IsNotEmpty({ message: 'El SKU es obligatorio' })
   @MaxLength(60)
   @Matches(/^[A-Za-z0-9._-]+$/, {
-    message: 'El SKU solo admite letras, números, puntos, guiones y guiones bajos',
+    message:
+      'El SKU solo admite letras, números, puntos, guiones y guiones bajos',
   })
   sku: string;
 

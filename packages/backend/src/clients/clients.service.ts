@@ -24,6 +24,9 @@ export class ClientsService {
         name: dto.name.trim(),
         email: dto.email?.toLowerCase().trim(),
         phone: dto.phone?.trim(),
+        documentType: dto.documentType,
+        documentNumber: dto.documentNumber?.trim(),
+        address: dto.address?.trim(),
         companyId, // candado: el cliente nace amarrado al tenant del token
       },
     });
@@ -67,6 +70,9 @@ export class ClientsService {
         name: dto.name?.trim(),
         email: dto.email?.toLowerCase().trim(),
         phone: dto.phone?.trim(),
+        documentType: dto.documentType,
+        documentNumber: dto.documentNumber?.trim(),
+        address: dto.address?.trim(),
       },
     });
   }

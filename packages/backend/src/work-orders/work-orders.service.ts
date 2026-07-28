@@ -36,7 +36,7 @@ const TERMINAL_STATUSES: OrderStatus[] = [
  *   userId, role) y aplican el candado companyId en cada consulta.
  * - TECHNICIAN: su filtro de visibilidad (userId = él mismo) se inyecta
  *   DENTRO del `where` de Prisma — una orden ajena es un 404, ni siquiera
- *   puede saber que existe. Y solo puede editar status y diagnosis.
+ *   puede saber que existe. Y solo puede editar status, diagnosis y observations.
  */
 @Injectable()
 export class WorkOrdersService {
@@ -49,22 +49,42 @@ export class WorkOrdersService {
     // Validación cruzada: el equipo debe pertenecer a MI empresa
     await this.ensureEquipmentBelongsToCompany(user.companyId, dto.equipmentId);
 
-    // Si se asigna técnico desde la creación, también debe ser de MI empresa
-    if (dto.userId) {
-      await this.ensureUserBelongsToCompany(user.companyId, dto.userId);
+    // RBAC: un Técnico que crea una orden queda SIEMPRE autoasignado, sin
+    // importar qué userId haya mandado en el body (no puede asignar a otros).
+    const assignedUserId =
+      user.role === Role.TECHNICIAN ? user.userId : dto.userId;
+
+    // Si Admin/Coordinador asignan a alguien, ese alguien debe ser de MI empresa
+    if (user.role !== Role.TECHNICIAN && assignedUserId) {
+      await this.ensureUserBelongsToCompany(user.companyId, assignedUserId);
     }
 
-    return this.prisma.workOrder.create({
-      data: {
-        description: dto.description.trim(),
-        diagnosis: dto.diagnosis?.trim(),
-        priority: dto.priority, // undefined → default MEDIUM
-        equipmentId: dto.equipmentId,
-        userId: dto.userId,
-        companyId: user.companyId, // candado
-        // status: toda orden nace PENDING (default de Prisma)
-      },
-      include: WORK_ORDER_INCLUDE,
+    // A prueba de concurrencia: el consecutivo se saca DENTRO de la misma
+    // transacción que crea la orden. El UPDATE con increment toma un lock
+    // de fila sobre Company hasta el commit, así que dos creaciones
+    // simultáneas para la misma empresa se serializan y nunca repiten
+    // número (el @@unique([companyId, orderNumber]) es el respaldo final).
+    return this.prisma.$transaction(async (tx) => {
+      const company = await tx.company.update({
+        where: { id: user.companyId },
+        data: { nextOrderNumber: { increment: 1 } },
+        select: { nextOrderNumber: true },
+      });
+
+      return tx.workOrder.create({
+        data: {
+          orderNumber: company.nextOrderNumber - 1,
+          description: dto.description.trim(),
+          diagnosis: dto.diagnosis?.trim(),
+          observations: dto.observations?.trim(),
+          priority: dto.priority, // undefined → default MEDIUM
+          equipmentId: dto.equipmentId,
+          userId: assignedUserId,
+          companyId: user.companyId, // candado
+          // status: toda orden nace PENDING (default de Prisma)
+        },
+        include: WORK_ORDER_INCLUDE,
+      });
     });
   }
 
@@ -116,7 +136,7 @@ export class WorkOrdersService {
       );
     }
 
-    // RBAC fino: el técnico solo puede tocar status y diagnosis
+    // RBAC fino: el técnico solo puede tocar status, diagnosis y observations
     if (user.role === Role.TECHNICIAN) {
       const forbiddenFields: string[] = [];
       if (dto.description !== undefined) forbiddenFields.push('description');
@@ -126,7 +146,7 @@ export class WorkOrdersService {
 
       if (forbiddenFields.length > 0) {
         throw new ForbiddenException(
-          `Como técnico solo puedes modificar status y diagnosis. ` +
+          `Como técnico solo puedes modificar status, diagnosis y observations. ` +
             `Campos no permitidos: ${forbiddenFields.join(', ')}`,
         );
       }
@@ -148,6 +168,7 @@ export class WorkOrdersService {
       data: {
         description: dto.description?.trim(),
         diagnosis: dto.diagnosis?.trim(),
+        observations: dto.observations?.trim(),
         status: dto.status,
         priority: dto.priority,
         equipmentId: dto.equipmentId,

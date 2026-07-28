@@ -1,0 +1,104 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { serverFetch } from "@/lib/api/server-fetch";
+import { HttpError } from "@/lib/api/http";
+import type { Client, DocumentType } from "@/lib/api/clients";
+import type { Equipment } from "@/lib/api/equipments";
+import type { Priority } from "@/components/shared/priority-badge";
+
+interface NewClientData {
+  name: string;
+  documentType?: DocumentType;
+  documentNumber?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+}
+
+interface NewEquipmentData {
+  brand: string;
+  model: string;
+  serialNumber?: string;
+}
+
+export type ClientSelection =
+  | { mode: "existing"; id: string }
+  | { mode: "new"; data: NewClientData };
+
+export type EquipmentSelection =
+  | { mode: "existing"; id: string }
+  | { mode: "new"; data: NewEquipmentData };
+
+export interface CreateOrderInput {
+  client: ClientSelection;
+  equipment: EquipmentSelection;
+  description: string;
+  priority: Priority;
+  userId?: string;
+}
+
+export interface CreateOrderResult {
+  ok: boolean;
+  message?: string;
+  orderId?: string;
+  orderNumber?: number;
+}
+
+interface CreatedWorkOrder {
+  id: string;
+  orderNumber: number;
+}
+
+/**
+ * Server Action que encadena las creaciones necesarias para dejar una orden
+ * lista: cliente (si es nuevo) → equipo (si es nuevo, colgado del cliente
+ * resultante) → orden. Cada paso ya trae su propio candado multi-tenant y
+ * validación cruzada en el backend; acá solo se propaga el id resultante
+ * de un paso al siguiente.
+ */
+export async function createWorkOrderChainedAction(
+  input: CreateOrderInput,
+): Promise<CreateOrderResult> {
+  try {
+    let clientId: string;
+    if (input.client.mode === "existing") {
+      clientId = input.client.id;
+    } else {
+      const client = await serverFetch<Client>("/clients", {
+        method: "POST",
+        body: input.client.data,
+      });
+      clientId = client.id;
+    }
+
+    let equipmentId: string;
+    if (input.equipment.mode === "existing") {
+      equipmentId = input.equipment.id;
+    } else {
+      const equipment = await serverFetch<Equipment>("/equipments", {
+        method: "POST",
+        body: { ...input.equipment.data, clientId },
+      });
+      equipmentId = equipment.id;
+    }
+
+    const order = await serverFetch<CreatedWorkOrder>("/work-orders", {
+      method: "POST",
+      body: {
+        description: input.description,
+        priority: input.priority,
+        equipmentId,
+        ...(input.userId ? { userId: input.userId } : {}),
+      },
+    });
+
+    revalidatePath("/ordenes");
+    return { ok: true, orderId: order.id, orderNumber: order.orderNumber };
+  } catch (error) {
+    if (error instanceof HttpError) {
+      return { ok: false, message: error.message };
+    }
+    throw error;
+  }
+}

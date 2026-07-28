@@ -22,6 +22,12 @@ async function bootstrap(): Promise<void> {
   // la conexión a la base de datos (onModuleDestroy) ante SIGTERM/SIGINT.
   app.enableShutdownHooks();
 
+  app.enableCors({
+    origin: process.env.FRONTEND_URL ?? 'http://localhost:3001',
+    credentials: true,
+    methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+  });
+
   await app.listen(process.env.PORT ?? 3000);
 }
 

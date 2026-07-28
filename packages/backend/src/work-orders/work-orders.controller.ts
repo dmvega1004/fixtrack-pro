@@ -27,8 +27,13 @@ import { WorkOrdersService } from './work-orders.service';
 export class WorkOrdersController {
   constructor(private readonly workOrdersService: WorkOrdersService) {}
 
-  /** POST /work-orders — SOLO Admin y Coordinador crean/asignan órdenes */
-  @Roles(Role.ADMIN, Role.COORDINATOR)
+  /**
+   * POST /work-orders — Admin/Coordinador crean y pueden asignar a cualquiera
+   * (o dejar sin asignar). Técnico también puede crear, pero SIEMPRE queda
+   * autoasignado: cualquier userId que envíe en el body se ignora (RBAC en
+   * el service).
+   */
+  @Roles(Role.ADMIN, Role.COORDINATOR, Role.TECHNICIAN)
   @Post()
   create(
     @CurrentUser() user: AuthenticatedUser,
@@ -61,7 +66,7 @@ export class WorkOrdersController {
 
   /**
    * PATCH /work-orders/:id — Admin/Coordinador: todo campo.
-   * Técnico: solo status y diagnosis de SUS órdenes (403 si intenta más).
+   * Técnico: solo status, diagnosis y observations de SUS órdenes (403 si intenta más).
    */
   @Patch(':id')
   update(

@@ -8,7 +8,7 @@ import { CreateWorkOrderDto } from './create-work-order.dto';
  * PENDING → IN_PROGRESS → COMPLETED → DELIVERED (o CANCELLED).
  *
  * Nota RBAC (aplicado en el service): un TECHNICIAN solo puede enviar
- * `status` y `diagnosis`; cualquier otro campo le devuelve 403.
+ * `status`, `diagnosis` y `observations`; cualquier otro campo le devuelve 403.
  */
 export class UpdateWorkOrderDto extends PartialType(CreateWorkOrderDto) {
   @IsOptional()
