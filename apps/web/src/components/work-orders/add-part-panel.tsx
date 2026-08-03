@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, type ChangeEvent, type FormEvent } from "react";
+import { useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { SparePart } from "@/lib/api/spare-parts";
+import { SPARE_PART_CATEGORY_LABELS } from "@/lib/spare-part-category";
 import { addPartAction } from "@/app/(dashboard)/ordenes/[id]/actions";
+import { ComboSelect } from "./combo-select";
 
 interface AddPartPanelProps {
   orderId: string;
@@ -17,9 +19,25 @@ interface AddPartPanelProps {
 export function AddPartPanel({ orderId, catalog }: AddPartPanelProps) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
-  const [sparePartId, setSparePartId] = useState(catalog[0]?.id ?? "");
+  const [sparePartId, setSparePartId] = useState<string | null>(
+    catalog[0]?.id ?? null,
+  );
   const [quantity, setQuantity] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
+
+  const comboItems = useMemo(
+    () =>
+      catalog.map((part) => ({
+        id: part.id,
+        label: part.name,
+        hint: `${part.sku} · ${
+          SPARE_PART_CATEGORY_LABELS[
+            part.category as keyof typeof SPARE_PART_CATEGORY_LABELS
+          ] ?? part.category
+        } · Stock: ${part.stock}`,
+      })),
+    [catalog],
+  );
 
   function handleQuantityChange(event: ChangeEvent<HTMLInputElement>) {
     setQuantity(Number(event.target.value));
@@ -67,18 +85,13 @@ export function AddPartPanel({ orderId, catalog }: AddPartPanelProps) {
     >
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="sparePartId">Repuesto</Label>
-        <select
-          id="sparePartId"
-          value={sparePartId}
-          onChange={(event) => setSparePartId(event.target.value)}
-          className="h-9 rounded-lg border border-border bg-background px-2.5 text-sm text-foreground"
-        >
-          {catalog.map((part) => (
-            <option key={part.id} value={part.id} disabled={part.stock === 0}>
-              {part.sku} — {part.name} (stock: {part.stock})
-            </option>
-          ))}
-        </select>
+        <ComboSelect
+          items={comboItems}
+          selectedId={sparePartId}
+          onSelect={setSparePartId}
+          placeholder="Buscar repuesto por nombre o SKU..."
+          emptyMessage="No se encontraron repuestos."
+        />
       </div>
 
       <div className="flex flex-col gap-1.5">

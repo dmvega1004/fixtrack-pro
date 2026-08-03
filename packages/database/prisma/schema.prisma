@@ -148,6 +148,9 @@ model SparePart {
   sku            String
   name           String
   description    String?
+  /// REPUESTO, EQUIPO, MATERIAL o CONSUMIBLE — validado en el DTO, no como
+  /// enum de BD (mismo patrón que Client.documentType).
+  category       String          @default("REPUESTO")
   stock          Int             @default(0)
   minStock       Int             @default(0)
   cost           Decimal         @db.Decimal(12, 2)

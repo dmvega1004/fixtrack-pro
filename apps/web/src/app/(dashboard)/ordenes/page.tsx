@@ -22,15 +22,21 @@ function parsePriority(value?: string): Priority | undefined {
 }
 
 interface OrdenesPageProps {
-  searchParams: Promise<{ status?: string; priority?: string }>;
+  searchParams: Promise<{ status?: string; priority?: string; unassigned?: string }>;
 }
 
 export default async function OrdenesPage({ searchParams }: OrdenesPageProps) {
   const params = await searchParams;
   const status = parseStatus(params.status);
   const priority = parsePriority(params.priority);
+  // Sin soporte en el backend para filtrar por "sin asignar": se aplica acá
+  // igual que priority, después del fetch. Enlazado desde el KPI de la home.
+  const unassignedOnly = params.unassigned === "true";
 
-  const workOrders = await getWorkOrders({ status, priority });
+  let workOrders = await getWorkOrders({ status, priority });
+  if (unassignedOnly) {
+    workOrders = workOrders.filter((order) => order.user === null);
+  }
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
@@ -40,6 +46,7 @@ export default async function OrdenesPage({ searchParams }: OrdenesPageProps) {
           <p className="text-sm text-muted-foreground">
             {workOrders.length}{" "}
             {workOrders.length === 1 ? "resultado" : "resultados"}
+            {unassignedOnly && " · sin asignar"}
           </p>
         </div>
         <Link
@@ -49,6 +56,15 @@ export default async function OrdenesPage({ searchParams }: OrdenesPageProps) {
           Nueva orden
         </Link>
       </div>
+
+      {unassignedOnly && (
+        <p className="text-sm text-muted-foreground">
+          Mostrando solo órdenes sin técnico asignado ·{" "}
+          <Link href="/ordenes" className="font-medium text-primary">
+            Quitar filtro
+          </Link>
+        </p>
+      )}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <StatusFilterChips currentStatus={status} currentPriority={params.priority} />

@@ -129,10 +129,18 @@
   }
 }
 
-/* Documento imprimible (orden de trabajo): márgenes correctos y fondo
-   blanco/tipografía negra sin importar el tema activo. */
+/* Documento imprimible (orden de trabajo): tamaño Carta fijo — sin esto,
+   el navegador usa el tamaño de papel que cada dispositivo considere por
+   defecto (un celular puede generar hojas más anchas que un desktop).
+   Sin margen de página: así Chrome no tiene dónde pintar su header/footer
+   automático (URL, fecha). El margen visual lo da el padding del propio
+   documento (ver WorkOrderPrintDocument, que también fija su ancho en mm
+   para no re-fluirse según el viewport), que además reserva espacio abajo
+   para nuestro pie de página fijo. Fondo blanco/tipografía negra sin
+   importar el tema activo. */
 @page {
-  margin: 12mm;
+  size: letter portrait;
+  margin: 0;
 }
 
 @media print {
@@ -148,4 +156,14 @@
 .print-color-exact {
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
+}
+
+/* Línea animada del marco guía en /escanear (estado "escaneando"). */
+@keyframes scan-line {
+  0%, 100% {
+    top: 8%;
+  }
+  50% {
+    top: 92%;
+  }
 }

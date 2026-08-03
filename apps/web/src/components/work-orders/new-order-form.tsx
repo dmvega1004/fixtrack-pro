@@ -61,6 +61,9 @@ interface NewOrderFormProps {
   equipments: Equipment[];
   technicians: Technician[];
   canAssign: boolean;
+  /** Preselección desde /ordenes/nueva?equipo=id (ej. desde la ficha de un equipo). */
+  initialClientId?: string;
+  initialEquipmentId?: string;
 }
 
 export function NewOrderForm({
@@ -68,11 +71,15 @@ export function NewOrderForm({
   equipments,
   technicians,
   canAssign,
+  initialClientId,
+  initialEquipmentId,
 }: NewOrderFormProps) {
   const router = useRouter();
 
   const [clientMode, setClientMode] = useState<"existing" | "new">("existing");
-  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(
+    initialClientId ?? null,
+  );
   const [newClient, setNewClient] = useState<NewClientDraft>(EMPTY_NEW_CLIENT);
 
   const [equipmentMode, setEquipmentMode] = useState<"existing" | "new">(
@@ -80,7 +87,7 @@ export function NewOrderForm({
   );
   const [selectedEquipmentId, setSelectedEquipmentId] = useState<
     string | null
-  >(null);
+  >(initialEquipmentId ?? null);
   const [newEquipment, setNewEquipment] =
     useState<NewEquipmentDraft>(EMPTY_NEW_EQUIPMENT);
 
@@ -93,7 +100,10 @@ export function NewOrderForm({
   const hasClient =
     clientMode === "existing"
       ? selectedClientId !== null
-      : newClient.name.trim() !== "";
+      : newClient.name.trim() !== "" &&
+        newClient.documentType !== "" &&
+        newClient.documentNumber.trim() !== "" &&
+        newClient.phone.trim() !== "";
 
   const activeClientId = clientMode === "existing" ? selectedClientId : null;
 
@@ -284,11 +294,12 @@ export function NewOrderForm({
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="documentType">Tipo de documento</Label>
+                  <Label htmlFor="documentType">Tipo de documento *</Label>
                   <select
                     id="documentType"
                     value={newClient.documentType}
                     onChange={updateNewClient("documentType")}
+                    required
                     className="h-9 rounded-lg border border-border bg-background px-2.5 text-sm text-foreground"
                   >
                     <option value="">Sin especificar</option>
@@ -300,21 +311,23 @@ export function NewOrderForm({
                   </select>
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="documentNumber">Número de documento</Label>
+                  <Label htmlFor="documentNumber">Número de documento *</Label>
                   <Input
                     id="documentNumber"
                     value={newClient.documentNumber}
                     onChange={updateNewClient("documentNumber")}
+                    required
                   />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="clientPhone">Teléfono</Label>
+                  <Label htmlFor="clientPhone">Teléfono *</Label>
                   <Input
                     id="clientPhone"
                     value={newClient.phone}
                     onChange={updateNewClient("phone")}
+                    required
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">

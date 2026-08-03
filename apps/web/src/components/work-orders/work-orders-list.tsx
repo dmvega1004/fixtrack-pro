@@ -1,16 +1,10 @@
 import Link from "next/link";
 import { StatusChip } from "@/components/shared/status-chip";
-import { PriorityBadge, type Priority } from "@/components/shared/priority-badge";
+import { PriorityBadge } from "@/components/shared/priority-badge";
 import { formatDate } from "@/lib/format/dates";
 import { formatOrderNumber } from "@/lib/format/order-number";
-import { cn } from "@/lib/utils";
+import { WorkOrderCard } from "./work-order-card";
 import type { WorkOrder } from "@/lib/api/work-orders";
-
-const PRIORITY_BORDER: Record<Priority, string> = {
-  HIGH: "border-l-4 border-red-500",
-  MEDIUM: "border-l-4 border-amber-500",
-  LOW: "border-l-4 border-gray-300",
-};
 
 interface WorkOrdersListProps {
   workOrders: WorkOrder[];
@@ -87,27 +81,7 @@ export function WorkOrdersList({ workOrders }: WorkOrdersListProps) {
 
       <div className="flex flex-col gap-3 md:hidden">
         {workOrders.map((order) => (
-          <Link
-            key={order.id}
-            href={`/ordenes/${order.id}`}
-            className={cn(
-              "flex flex-col gap-1 rounded-lg border border-border bg-card p-4 shadow-sm",
-              PRIORITY_BORDER[order.priority],
-            )}
-          >
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-blue-600">
-                {formatOrderNumber(order.orderNumber)}
-              </span>
-              <StatusChip status={order.status} />
-            </div>
-            <span className="text-sm font-medium">
-              {order.equipment.brand} {order.equipment.model}
-            </span>
-            <span className="text-sm text-muted-foreground">
-              {order.equipment.client.name}
-            </span>
-          </Link>
+          <WorkOrderCard key={order.id} order={order} />
         ))}
       </div>
     </>

@@ -114,8 +114,16 @@ export function WorkOrderPrintDocument({
 
   const clientMeta = documentLabel ? `${client.name} · ${documentLabel}` : client.name;
 
+  // Pie fijo de cada hoja impresa: sitio web (o correo/teléfono si no hay)
+  // + la atribución del producto. Nunca ambos vacíos: "Documento generado
+  // por FixTrack Pro" siempre está presente.
+  const footerContact = company.website || company.email || company.phone;
+  const printFooterText = footerContact
+    ? `${footerContact} · Documento generado por FixTrack Pro`
+    : "Documento generado por FixTrack Pro";
+
   return (
-    <div className="mx-auto w-full max-w-[210mm] bg-white p-6 text-neutral-900 sm:p-10 print:max-w-none print:p-0">
+    <div className="mx-auto w-full max-w-[210mm] bg-white p-6 text-neutral-900 sm:p-10 print:w-[216mm] print:max-w-none print:px-[14mm] print:pt-[12mm] print:pb-[18mm]">
       <header className="flex items-start gap-4">
         {company.logoUrl && (
           // eslint-disable-next-line @next/next/no-img-element -- logo remoto (Cloudinary), sin dominio fijo que declarar en next.config
@@ -278,10 +286,19 @@ export function WorkOrderPrintDocument({
           <SignatureBox title="Técnico responsable" />
           <SignatureBox title="Recibido por el cliente" />
         </div>
-        <p className="text-center text-[11px] text-neutral-400">
+        {/* En pantalla se ve acá; al imprimir la reemplaza el pie fijo de abajo,
+            que se repite en TODAS las hojas (esta solo aparecería en la última). */}
+        <p className="text-center text-[11px] text-neutral-400 print:hidden">
           Documento generado por FixTrack Pro
         </p>
       </footer>
+
+      {/* Pie fijo de impresión: position:fixed en contexto de impresión se
+          repite en cada hoja. Fondo blanco para que el contenido que cae
+          justo ahí no se le superponga (ver padding-bottom del contenedor). */}
+      <p className="hidden bg-white py-2 text-center text-[10px] text-neutral-400 print:fixed print:inset-x-0 print:bottom-0 print:z-10 print:block">
+        {printFooterText}
+      </p>
     </div>
   );
 }

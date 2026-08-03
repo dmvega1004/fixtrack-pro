@@ -25,23 +25,23 @@ export class CreateClientDto {
   @IsEmail({}, { message: 'El correo electrónico no es válido' })
   email?: string;
 
-  @IsOptional()
   @IsString()
+  @IsNotEmpty({ message: 'El teléfono es obligatorio' })
   @Matches(/^[+\d\s().-]{7,25}$/, {
     message: 'El teléfono solo admite dígitos, espacios y + ( ) . -',
   })
-  phone?: string;
+  phone: string;
 
-  @IsOptional()
+  @IsNotEmpty({ message: 'El tipo de documento es obligatorio' })
   @IsIn(DOCUMENT_TYPES, {
     message: 'documentType debe ser CC, NIT, CE o PASAPORTE',
   })
-  documentType?: string;
+  documentType: string;
 
-  @IsOptional()
   @IsString()
+  @IsNotEmpty({ message: 'El número de documento es obligatorio' })
   @MaxLength(30)
-  documentNumber?: string;
+  documentNumber: string;
 
   @IsOptional()
   @IsString()

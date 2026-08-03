@@ -26,6 +26,15 @@ export interface CreateClientInput {
   address?: string;
 }
 
+export interface UpdateClientInput {
+  name?: string;
+  email?: string;
+  phone?: string;
+  documentType?: DocumentType;
+  documentNumber?: string;
+  address?: string;
+}
+
 /** GET /clients. Cualquier rol autenticado ve los clientes de su empresa. */
 export function getClients(): Promise<Client[]> {
   return serverFetch<Client[]>("/clients");
@@ -39,4 +48,17 @@ export function getClient(id: string): Promise<Client> {
 /** POST /clients. Cualquier rol autenticado puede crear (los técnicos crean en campo). */
 export function createClient(dto: CreateClientInput): Promise<Client> {
   return serverFetch<Client>("/clients", { method: "POST", body: dto });
+}
+
+/** PATCH /clients/:id. Cualquier rol autenticado puede editar. */
+export function updateClient(id: string, dto: UpdateClientInput): Promise<Client> {
+  return serverFetch<Client>(`/clients/${id}`, { method: "PATCH", body: dto });
+}
+
+/**
+ * DELETE /clients/:id. Solo ADMIN (RBAC del backend). 409 si el cliente
+ * tiene equipos registrados (FK con onDelete: Restrict en Equipment.clientId).
+ */
+export function deleteClient(id: string): Promise<Client> {
+  return serverFetch<Client>(`/clients/${id}`, { method: "DELETE" });
 }

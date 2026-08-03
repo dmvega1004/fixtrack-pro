@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { OrderStatus } from "@/components/shared/status-chip";
 import type { Priority } from "@/components/shared/priority-badge";
 import { serverFetch } from "./server-fetch";
@@ -65,6 +66,11 @@ export async function getWorkOrders(
   return workOrders.filter((order) => order.priority === filters.priority);
 }
 
-export function getWorkOrder(id: string): Promise<WorkOrder> {
+/**
+ * cache() de React: si en el mismo render se llama con el mismo id desde
+ * varios lugares (ej. generateMetadata + la página), Next deduplica y solo
+ * pega una vez al backend.
+ */
+export const getWorkOrder = cache((id: string): Promise<WorkOrder> => {
   return serverFetch<WorkOrder>(`/work-orders/${id}`);
-}
+});

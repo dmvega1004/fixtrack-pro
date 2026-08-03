@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { getWorkOrder } from "@/lib/api/work-orders";
@@ -7,11 +8,36 @@ import { getClient } from "@/lib/api/clients";
 import { getCompany } from "@/lib/api/company";
 import { getPhotos } from "@/lib/api/attachments";
 import { HttpError } from "@/lib/api/http";
+import { formatOrderNumber } from "@/lib/format/order-number";
 import { WorkOrderPrintDocument } from "@/components/work-orders/print/work-order-print-document";
 import { PrintActions } from "@/components/work-orders/print/print-actions";
 
 interface ImprimirOrdenPageProps {
   params: Promise<{ id: string }>;
+}
+
+/**
+ * El título del documento es lo que Chrome sugiere como nombre de archivo
+ * al "Guardar como PDF". getWorkOrder está envuelto en cache() de React,
+ * así que esta llamada y la de la página de abajo se deduplican en una
+ * sola petición al backend dentro del mismo render.
+ */
+export async function generateMetadata({
+  params,
+}: ImprimirOrdenPageProps): Promise<Metadata> {
+  const { id } = await params;
+
+  try {
+    const order = await getWorkOrder(id);
+    return {
+      title: `${formatOrderNumber(order.orderNumber)} - ${order.equipment.client.name}`,
+    };
+  } catch (error) {
+    if (error instanceof HttpError) {
+      return { title: "Orden de trabajo" };
+    }
+    throw error;
+  }
 }
 
 /**

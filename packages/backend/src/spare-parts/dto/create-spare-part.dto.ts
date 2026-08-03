@@ -1,4 +1,5 @@
 import {
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsNumber,
@@ -8,6 +9,18 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+
+/**
+ * No se modela como enum de BD (SparePart.category es String con default
+ * en el schema) para no requerir una migración si aparece otra categoría
+ * — mismo patrón que Client.documentType.
+ */
+export const SPARE_PART_CATEGORIES = [
+  'REPUESTO',
+  'EQUIPO',
+  'MATERIAL',
+  'CONSUMIBLE',
+] as const;
 
 export class CreateSparePartDto {
   /** Identificador de inventario, único por empresa. Se normaliza a MAYÚSCULAS. */
@@ -29,6 +42,12 @@ export class CreateSparePartDto {
   @IsString()
   @MaxLength(500)
   description?: string;
+
+  @IsOptional()
+  @IsIn(SPARE_PART_CATEGORIES, {
+    message: 'category debe ser REPUESTO, EQUIPO, MATERIAL o CONSUMIBLE',
+  })
+  category?: string;
 
   @IsInt()
   @Min(0, { message: 'El stock no puede ser negativo' })
