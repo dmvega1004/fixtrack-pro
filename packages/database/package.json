@@ -5,7 +5,8 @@
   "main": "index.js",
   "types": "index.d.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "reset-pilot": "tsx scripts/reset-pilot.ts"
   },
   "keywords": [],
   "author": "",
@@ -13,11 +14,16 @@
   "devDependencies": {
     "@prisma/config": "^7.8.0",
     "@types/node": "^22.10.2",
+    "@types/pg": "^8.11.10",
     "dotenv": "^16.4.7",
-    "prisma": "^7.8.0"
+    "prisma": "^7.8.0",
+    "tsx": "^4.19.2"
   },
   "dependencies": {
-    "@prisma/client": "^7.8.0"
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "cloudinary": "^2.10.0",
+    "pg": "^8.21.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
