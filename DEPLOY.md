@@ -1,0 +1,81 @@
+# Despliegue de FixTrack Pro
+
+Monorepo pnpm con tres paquetes relevantes para producción:
+
+- `packages/backend` — API NestJS (se despliega en **Railway**).
+- `packages/database` — schema y migraciones de Prisma (usado por el backend en build/deploy, no se despliega solo).
+- `apps/web` — frontend Next.js (se despliega en **Vercel**).
+
+Orden de despliegue: **backend primero, luego frontend, luego actualizar `FRONTEND_URL` del backend con la URL real de Vercel** (ver paso 3).
+
+---
+
+## 1. Backend en Railway
+
+### Configuración del servicio
+
+- **Root Directory**: raíz del repo (el monorepo completo, no `packages/backend`) — el build necesita `pnpm-workspace.yaml` y el paquete `database` como hermano.
+- **Install Command**: `pnpm install --frozen-lockfile` (Railway lo detecta solo si usa Nixpacks con `pnpm-lock.yaml` presente; si no, configúralo explícito).
+- **Build Command**:
+  ```
+  pnpm --filter backend run build
+  ```
+  Este script ya encadena `pnpm --filter database run generate` (genera el cliente de Prisma) antes de `nest build`. Railway construye desde cero en cada deploy, así que el cliente de Prisma **no** puede asumirse cacheado — por eso el `generate` va dentro del propio script de build, no como paso manual aparte.
+- **Start Command**:
+  ```
+  pnpm --filter database run migrate:deploy && pnpm --filter backend run start:prod
+  ```
+  Railway no tiene una fase de "release" separada en todos los planes, así que las migraciones se aplican **encadenadas al comando de arranque**, antes de levantar el servidor. `migrate:deploy` ejecuta `prisma migrate deploy` — aplica migraciones ya generadas contra la base de producción, es idempotente (no hace nada si no hay migraciones pendientes) y **nunca** genera ni pide migraciones nuevas como sí haría `migrate dev`. Si falla (ej. migración rota), el comando corta con código de error y Railway no levanta el proceso viejo con schema desactualizado.
+- **Healthcheck Path**: `/health` (devuelve `200 { "status": "ok" }`, público, sin JWT — configúralo en Railway para que el servicio se marque "healthy" y los reinicios/deploys esperen esa señal).
+
+### Variables de entorno (Railway → Settings → Variables)
+
+Copia los nombres de `packages/backend/.env.example` y complétalos con valores reales de producción:
+
+| Variable | Notas |
+|---|---|
+| `DATABASE_URL` | Connection string de Postgres (Supabase) |
+| `JWT_SECRET` | Genera uno nuevo para producción, no reuses el de desarrollo |
+| `JWT_EXPIRES_IN` | Opcional, default `8h` |
+| `FRONTEND_URL` | **Provisional al desplegar backend** — ver paso 3 |
+| `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | Cuenta de Cloudinary |
+
+`PORT` **no** se configura manualmente: Railway la inyecta automáticamente y `main.ts` ya la lee de `process.env.PORT`.
+
+Railway provee HTTPS automático en el dominio `*.up.railway.app` (o el dominio custom que configures) — no requiere configuración adicional.
+
+---
+
+## 2. Frontend en Vercel
+
+### Configuración del proyecto
+
+- **Root Directory**: `apps/web` (Vercel detecta el `pnpm-workspace.yaml` en la raíz del repo y corre `pnpm install` desde ahí automáticamente).
+- **Build Command**: por defecto (`next build`, ya declarado en `apps/web/package.json`) — no requiere override.
+- **Output**: detectado automáticamente (framework Next.js).
+
+### Variables de entorno (Vercel → Settings → Environment Variables)
+
+| Variable | Notas |
+|---|---|
+| `BACKEND_URL` | URL pública del backend en Railway (ej. `https://fixtrack-backend.up.railway.app`). **Sin prefijo `NEXT_PUBLIC_`** — es server-only a propósito, ver `apps/web/.env.example`. |
+
+Vercel provee HTTPS automático en `*.vercel.app` y en dominios custom.
+
+---
+
+## 3. Orden de despliegue y `FRONTEND_URL`
+
+1. Despliega el backend en Railway primero, con `FRONTEND_URL` apuntando a un valor provisional (puede quedar con el default de desarrollo mientras tanto; CORS solo bloquearía llamadas *desde el navegador* al backend, que hoy no ocurren — todo el tráfico pasa por el proxy server-side de Next.js).
+2. Copia la URL pública que Railway asigna al backend.
+3. Despliega el frontend en Vercel con `BACKEND_URL` apuntando a esa URL de Railway.
+4. Copia la URL pública que Vercel asigna al frontend.
+5. Vuelve a Railway y actualiza `FRONTEND_URL` con la URL real de Vercel. Redeploy del backend para que tome la variable nueva (Railway no hace hot-reload de env vars sin redeploy).
+
+---
+
+## Notas de arquitectura relevantes para el despliegue
+
+- **Cookie de sesión**: la cookie `fixtrack_session` la emite el propio Next.js (Route Handler `apps/web/src/app/api/auth/login/route.ts`), es `httpOnly`, `sameSite: "lax"` y `secure` en producción. Nunca viaja al dominio del backend — el servidor de Next.js la lee y reenvía el JWT como header `Authorization: Bearer` (`apps/web/src/lib/api/server-fetch.ts`). Por eso **no** se necesita `sameSite: "none"` aunque backend y frontend vivan en dominios distintos: la cookie es de un solo dominio (el de Vercel).
+- **Imágenes de Cloudinary**: se muestran con `<img>` plano (fotos de OT, logo del tenant), no con `next/image`. El único uso de `next/image` es un asset local estático (`/brand/logo-sm.png`). Por eso `next.config.ts` no necesita `remotePatterns` hoy — si en el futuro se migra alguna imagen de Cloudinary a `next/image`, habrá que agregar el patrón remoto ahí.
+- **Rate limiting**: `POST /auth/login` está limitado a 5 intentos por minuto por IP (`@nestjs/throttler`, aplicado solo a esa ruta, no globalmente).

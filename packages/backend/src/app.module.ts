@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AttachmentsModule } from './attachments/attachments.module';
@@ -17,6 +18,10 @@ import { WorkOrdersModule } from './work-orders/work-orders.module';
 
 @Module({
   imports: [
+    // Registrado a nivel de app para que ThrottlerGuard esté disponible,
+    // pero NO se aplica como guard global: solo se usa explícitamente en
+    // AuthController.login para no arriesgar 429 en el resto de la API.
+    ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 20 }]),
     PrismaModule,
     AuthModule,
     AttachmentsModule,

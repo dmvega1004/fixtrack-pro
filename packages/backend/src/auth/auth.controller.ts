@@ -5,7 +5,9 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  UseGuards,
 } from '@nestjs/common';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { AuthResponse, AuthService } from './auth.service';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
@@ -24,8 +26,14 @@ export class AuthController {
     return this.authService.register(dto);
   }
 
-  /** POST /auth/login — devuelve el JWT (público, 200 en vez de 201) */
+  /**
+   * POST /auth/login — devuelve el JWT (público, 200 en vez de 201).
+   * Rate-limitado aparte del resto de la API: 5 intentos por minuto por IP,
+   * para frenar fuerza bruta sin arriesgar 429 en el resto de la app.
+   */
   @Public()
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @HttpCode(HttpStatus.OK)
   @Post('login')
   login(@Body() dto: LoginDto): Promise<AuthResponse> {

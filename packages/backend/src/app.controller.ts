@@ -12,4 +12,14 @@ export class AppController {
   async getHello(): Promise<string> {
     return this.appService.getHello();
   }
+
+  /**
+   * Health check para Railway y monitores externos: siempre 200 si el
+   * proceso está vivo, sin tocar la base de datos ni requerir token.
+   */
+  @Public()
+  @Get('health')
+  getHealth(): { status: 'ok' } {
+    return { status: 'ok' };
+  }
 }
