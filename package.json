@@ -10,6 +10,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "packageManager": "pnpm@11.5.1",
   "devEngines": {
     "packageManager": {
       "name": "pnpm",
