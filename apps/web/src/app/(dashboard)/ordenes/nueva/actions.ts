@@ -20,15 +20,21 @@ interface NewEquipmentData {
   brand: string;
   model: string;
   serialNumber?: string;
+  location?: string;
 }
 
 export type ClientSelection =
   | { mode: "existing"; id: string }
   | { mode: "new"; data: NewClientData };
 
+/**
+ * "none" = servicio locativo sin equipo asociado (sellado, limpieza,
+ * instalación de vitrinas, etc.) — la orden se crea solo con clientId.
+ */
 export type EquipmentSelection =
   | { mode: "existing"; id: string }
-  | { mode: "new"; data: NewEquipmentData };
+  | { mode: "new"; data: NewEquipmentData }
+  | { mode: "none" };
 
 export interface CreateOrderInput {
   client: ClientSelection;
@@ -72,23 +78,25 @@ export async function createWorkOrderChainedAction(
       clientId = client.id;
     }
 
-    let equipmentId: string;
+    let equipmentId: string | undefined;
     if (input.equipment.mode === "existing") {
       equipmentId = input.equipment.id;
-    } else {
+    } else if (input.equipment.mode === "new") {
       const equipment = await serverFetch<Equipment>("/equipments", {
         method: "POST",
         body: { ...input.equipment.data, clientId },
       });
       equipmentId = equipment.id;
     }
+    // mode "none": servicio locativo, equipmentId queda undefined
 
     const order = await serverFetch<CreatedWorkOrder>("/work-orders", {
       method: "POST",
       body: {
         description: input.description,
         priority: input.priority,
-        equipmentId,
+        clientId,
+        ...(equipmentId ? { equipmentId } : {}),
         ...(input.userId ? { userId: input.userId } : {}),
       },
     });

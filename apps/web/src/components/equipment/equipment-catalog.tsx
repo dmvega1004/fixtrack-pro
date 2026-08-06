@@ -18,7 +18,7 @@ export function EquipmentCatalog({ equipments }: EquipmentCatalogProps) {
   const [query, setQuery] = useState("");
 
   // Filtrado en memoria: el listado de equipos es de tamaño moderado por
-  // empresa. Busca por marca, modelo, serial o nombre del cliente.
+  // empresa. Busca por marca, modelo, serial, ubicación o nombre del cliente.
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     if (!normalized) return equipments;
@@ -27,6 +27,7 @@ export function EquipmentCatalog({ equipments }: EquipmentCatalogProps) {
         equipment.brand.toLowerCase().includes(normalized) ||
         equipment.model.toLowerCase().includes(normalized) ||
         equipment.serialNumber?.toLowerCase().includes(normalized) ||
+        equipment.location?.toLowerCase().includes(normalized) ||
         equipment.client.name.toLowerCase().includes(normalized),
     );
   }, [equipments, query]);
@@ -36,7 +37,7 @@ export function EquipmentCatalog({ equipments }: EquipmentCatalogProps) {
       <Input
         value={query}
         onChange={(event) => setQuery(event.target.value)}
-        placeholder="Buscar por marca, modelo, serial o cliente..."
+        placeholder="Buscar por marca, modelo, serial, ubicación o cliente..."
         className="max-w-sm"
       />
 
@@ -63,8 +64,15 @@ export function EquipmentCatalog({ equipments }: EquipmentCatalogProps) {
                   return (
                     <tr key={equipment.id} className="hover:bg-muted/50">
                       <td className="p-0">
-                        <Link href={href} className="block px-4 py-3 font-medium">
-                          {equipment.brand} {equipment.model}
+                        <Link href={href} className="block px-4 py-3">
+                          <span className="font-medium">
+                            {equipment.brand} {equipment.model}
+                          </span>
+                          {equipment.location && (
+                            <span className="block text-xs text-muted-foreground">
+                              {equipment.location}
+                            </span>
+                          )}
                         </Link>
                       </td>
                       <td className="p-0">
@@ -116,6 +124,11 @@ export function EquipmentCatalog({ equipments }: EquipmentCatalogProps) {
                 <span className="text-sm text-muted-foreground">
                   {equipment.client.name}
                 </span>
+                {equipment.location && (
+                  <span className="text-xs text-muted-foreground">
+                    {equipment.location}
+                  </span>
+                )}
                 <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
                   <span>{equipment.serialNumber ?? "Sin serial"}</span>
                   <span>

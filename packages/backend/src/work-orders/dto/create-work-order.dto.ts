@@ -31,9 +31,22 @@ export class CreateWorkOrderDto {
   @MaxLength(5000)
   observations?: string;
 
-  /** Equipo a intervenir. Se verifica que pertenezca a la empresa del token. */
+  /**
+   * Cliente dueño de la orden — vínculo principal y obligatorio. Se
+   * verifica que pertenezca a la empresa del token.
+   */
+  @IsUUID('4', { message: 'clientId debe ser un UUID válido' })
+  clientId: string;
+
+  /**
+   * Equipo a intervenir (opcional): la empresa también presta servicios
+   * locativos (sellado, limpieza, instalación) sin equipo asociado. Si
+   * se envía, se verifica que pertenezca a la empresa del token Y al
+   * cliente indicado en `clientId`.
+   */
+  @IsOptional()
   @IsUUID('4', { message: 'equipmentId debe ser un UUID válido' })
-  equipmentId: string;
+  equipmentId?: string;
 
   /**
    * Técnico asignado (opcional al crear). Debe pertenecer a la empresa.

@@ -25,8 +25,7 @@ export default async function ClientesPage() {
 
   const orderCounts = new Map<string, number>();
   for (const order of workOrders) {
-    const clientId = order.equipment.client.id;
-    orderCounts.set(clientId, (orderCounts.get(clientId) ?? 0) + 1);
+    orderCounts.set(order.clientId, (orderCounts.get(order.clientId) ?? 0) + 1);
   }
 
   const clientsWithCounts: ClientListItem[] = clients.map((client) => ({

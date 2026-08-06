@@ -1,6 +1,5 @@
-import type { WorkOrder } from "@/lib/api/work-orders";
+import type { WorkOrder, WorkOrderEquipment } from "@/lib/api/work-orders";
 import type { Client } from "@/lib/api/clients";
-import type { Equipment } from "@/lib/api/equipments";
 import type { Company } from "@/lib/api/company";
 import type { Attachment } from "@/lib/api/attachments";
 import type { WorkOrderPartsSummary } from "@/lib/api/work-order-parts";
@@ -16,7 +15,8 @@ const BRAND_BLUE = "#2563EB";
 
 interface WorkOrderPrintDocumentProps {
   order: WorkOrder;
-  equipment: Equipment;
+  /** Ausente en órdenes de servicio locativo — el bloque "Equipo" se omite. */
+  equipment: WorkOrderEquipment | null;
   client: Client;
   company: Company;
   partsSummary: WorkOrderPartsSummary;
@@ -169,15 +169,18 @@ export function WorkOrderPrintDocument({
         </div>
       </section>
 
-      <section className="mt-6 flex flex-col gap-3">
-        <SectionTitle>Equipo</SectionTitle>
-        <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
-          <Field label="Marca" value={equipment.brand} />
-          <Field label="Modelo" value={equipment.model} />
-          <Field label="Serial" value={equipment.serialNumber} />
-          <Field label="Código QR" value={equipment.qrCode} />
-        </div>
-      </section>
+      {equipment && (
+        <section className="mt-6 flex flex-col gap-3">
+          <SectionTitle>Equipo</SectionTitle>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
+            <Field label="Marca" value={equipment.brand} />
+            <Field label="Modelo" value={equipment.model} />
+            <Field label="Serial" value={equipment.serialNumber} />
+            <Field label="Ubicación" value={equipment.location} />
+            <Field label="Código QR" value={equipment.qrCode} />
+          </div>
+        </section>
+      )}
 
       <section className="mt-6 flex flex-col gap-4">
         <SectionTitle>Servicio realizado</SectionTitle>

@@ -35,9 +35,10 @@ export default async function ClienteDetallePage({ params }: ClienteDetallePageP
   const clientEquipments = equipments.filter((equipment) => equipment.clientId === client.id);
 
   // El backend no filtra por clientId en query: se pide todo lo visible para
-  // el rol actual y se filtra acá, igual que en la ficha de equipo.
+  // el rol actual y se filtra acá, igual que en la ficha de equipo. Incluye
+  // órdenes sin equipo (servicios locativos): clientId es el vínculo directo.
   const history = workOrders
-    .filter((order) => order.equipment.client.id === client.id)
+    .filter((order) => order.clientId === client.id)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   const documentLabel =
@@ -148,7 +149,9 @@ export default async function ClienteDetallePage({ params }: ClienteDetallePageP
                       {formatOrderNumber(order.orderNumber)}
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      {order.equipment.brand} {order.equipment.model}
+                      {order.equipment
+                        ? `${order.equipment.brand} ${order.equipment.model}`
+                        : "Servicio locativo"}
                     </span>
                   </div>
                   <span className="flex items-center gap-3">

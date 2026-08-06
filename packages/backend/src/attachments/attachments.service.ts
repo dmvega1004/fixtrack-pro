@@ -1,6 +1,8 @@
 import {
   ConflictException,
   Injectable,
+  InternalServerErrorException,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { Attachment, OrderStatus } from 'database';
@@ -26,6 +28,8 @@ const TERMINAL_STATUSES: OrderStatus[] = [
  */
 @Injectable()
 export class AttachmentsService {
+  private readonly logger = new Logger(AttachmentsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly workOrdersService: WorkOrdersService,
@@ -41,10 +45,28 @@ export class AttachmentsService {
     this.ensureNotTerminal(order.status);
     validateImageFile(file);
 
-    const uploaded = await this.cloudinary.uploadBuffer(file.buffer, {
-      folder: `fixtrack/${user.companyId}/orders/${workOrderId}`,
-      maxDimension: MAX_PHOTO_DIMENSION,
-    });
+    let uploaded;
+    try {
+      uploaded = await this.cloudinary.uploadBuffer(file.buffer, {
+        folder: `fixtrack/${user.companyId}/orders/${workOrderId}`,
+        maxDimension: MAX_PHOTO_DIMENSION,
+      });
+    } catch (error) {
+      // El detalle real (ej. credenciales de Cloudinary inválidas) queda en
+      // los logs del servidor — al usuario no le sirve verlo y podría
+      // filtrar configuración interna. Acá siempre se loguea para que el
+      // fallo no quede invisible detrás de un 500 genérico.
+      this.logger.error(
+        `Fallo al subir foto a Cloudinary (orden ${workOrderId}): ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new InternalServerErrorException(
+        'No se pudo subir la foto a nuestro proveedor de imágenes. ' +
+          'Intenta de nuevo en unos minutos; si el problema persiste, contacta al administrador.',
+      );
+    }
 
     return this.prisma.attachment.create({
       data: {

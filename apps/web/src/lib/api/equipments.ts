@@ -16,6 +16,8 @@ export interface Equipment {
   brand: string;
   model: string;
   serialNumber: string | null;
+  /** Ubicación física del equipo en la sede del cliente (multi-sede). */
+  location: string | null;
   qrCode: string;
   status: EquipmentStatus;
   clientId: string;
@@ -29,6 +31,7 @@ export interface CreateEquipmentInput {
   brand: string;
   model: string;
   serialNumber?: string;
+  location?: string;
   clientId: string;
   status?: EquipmentStatus;
 }
@@ -37,6 +40,7 @@ export interface UpdateEquipmentInput {
   brand?: string;
   model?: string;
   serialNumber?: string;
+  location?: string;
   clientId?: string;
   status?: EquipmentStatus;
 }

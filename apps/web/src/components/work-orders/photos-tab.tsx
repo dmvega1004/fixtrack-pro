@@ -7,6 +7,7 @@ import { Camera, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Attachment } from "@/lib/api/attachments";
 import { removePhotoAction } from "@/app/(dashboard)/ordenes/[id]/actions";
+import { compressImage } from "@/lib/image/compress-image";
 
 interface PhotosTabProps {
   orderId: string;
@@ -17,6 +18,9 @@ interface PhotosTabProps {
 interface UploadErrorBody {
   message?: string;
 }
+
+/** Debe reflejar MAX_IMAGE_SIZE_BYTES en packages/backend/src/cloudinary/image-upload.constants.ts */
+const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024;
 
 export function PhotosTab({
   orderId,
@@ -37,26 +41,50 @@ export function PhotosTab({
 
     setIsUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
+      const compressed = await compressImage(file);
 
-      const response = await fetch(`/api/upload/photos/${orderId}`, {
-        method: "POST",
-        body: formData,
-      });
+      if (compressed.size > MAX_UPLOAD_SIZE_BYTES) {
+        toast.error(
+          "La foto es demasiado grande incluso después de comprimirla (máx. 10MB). Prueba con otra foto.",
+        );
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("file", compressed);
+
+      let response: Response;
+      try {
+        response = await fetch(`/api/upload/photos/${orderId}`, {
+          method: "POST",
+          body: formData,
+        });
+      } catch (networkError) {
+        console.error("Error de red al subir la foto:", networkError);
+        toast.error(
+          "No se pudo subir la foto: sin conexión a internet o el servidor no respondió. Intenta de nuevo.",
+        );
+        return;
+      }
+
       const data: unknown = await response.json().catch(() => null);
 
       if (!response.ok) {
         const message = (data as UploadErrorBody | null)?.message;
-        toast.error(message ?? "No se pudo subir la foto");
+        console.error(
+          `Subida de foto falló (HTTP ${response.status}):`,
+          message ?? data,
+        );
+        toast.error(message ?? "No se pudo subir la foto. Intenta de nuevo.");
         return;
       }
 
       setPhotos((current) => [data as Attachment, ...current]);
       toast.success("Foto agregada");
       router.refresh();
-    } catch {
-      toast.error("No se pudo subir la foto");
+    } catch (error) {
+      console.error("Error inesperado al subir la foto:", error);
+      toast.error("No se pudo subir la foto. Intenta de nuevo.");
     } finally {
       setIsUploading(false);
     }
@@ -135,7 +163,6 @@ export function PhotosTab({
             ref={inputRef}
             type="file"
             accept="image/*"
-            capture="environment"
             onChange={(event) => void handleFileChange(event)}
             className="hidden"
           />

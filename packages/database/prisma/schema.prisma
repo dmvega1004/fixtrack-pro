@@ -91,6 +91,7 @@ model Client {
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
   equipments     Equipment[]
+  workOrders     WorkOrder[]
 
   @@index([companyId])
   @@index([companyId, documentNumber])
@@ -101,6 +102,10 @@ model Equipment {
   brand        String
   model        String
   serialNumber String?
+  /// Ubicación física del equipo en la sede del cliente (ej. "CC La Cuesta,
+  /// Piedecuesta — Local AME2170 Americanino"). Un cliente puede tener
+  /// varias sedes; este campo identifica dónde está instalado ESTE equipo.
+  location     String?
   qrCode       String          @unique @default(uuid())
   status       EquipmentStatus @default(ACTIVE)
   clientId     String
@@ -126,8 +131,14 @@ model WorkOrder {
   observations String?
   status       OrderStatus     @default(PENDING)
   priority     Priority        @default(MEDIUM)
-  equipmentId  String
-  equipment    Equipment       @relation(fields: [equipmentId], references: [id])
+  /// Cliente dueño de la orden — vínculo principal. Toda orden pertenece a
+  /// un cliente; el equipo es opcional (ver equipmentId).
+  clientId     String
+  client       Client          @relation(fields: [clientId], references: [id])
+  /// Equipo a intervenir. Opcional: la empresa también presta servicios
+  /// locativos (sellado, limpieza, instalación) sin equipo asociado.
+  equipmentId  String?
+  equipment    Equipment?      @relation(fields: [equipmentId], references: [id])
   userId       String?
   user         User?           @relation(fields: [userId], references: [id])
   companyId    String
@@ -139,6 +150,7 @@ model WorkOrder {
 
   @@unique([companyId, orderNumber])
   @@index([companyId])
+  @@index([clientId])
   @@index([equipmentId])
   @@index([userId])
 }

@@ -32,6 +32,7 @@ export class EquipmentsService {
         brand: dto.brand.trim(),
         model: dto.model.trim(),
         serialNumber: dto.serialNumber?.trim(),
+        location: dto.location?.trim(),
         status: dto.status, // undefined → Prisma aplica el default ACTIVE
         clientId: dto.clientId,
         companyId, // candado: el equipo nace amarrado al tenant del token
@@ -101,6 +102,7 @@ export class EquipmentsService {
         brand: dto.brand?.trim(),
         model: dto.model?.trim(),
         serialNumber: dto.serialNumber?.trim(),
+        location: dto.location?.trim(),
         status: dto.status,
         clientId: dto.clientId,
       },

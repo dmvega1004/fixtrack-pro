@@ -37,12 +37,23 @@ export function WorkOrdersList({ workOrders }: WorkOrdersListProps) {
                 </td>
                 <td className="p-0">
                   <Link href={href} className="flex flex-col px-4 py-3">
-                    <span>
-                      {order.equipment.brand} {order.equipment.model}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {order.equipment.client.name}
-                    </span>
+                    {order.equipment ? (
+                      <>
+                        <span>
+                          {order.equipment.brand} {order.equipment.model}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {order.client.name}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span>{order.client.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          Servicio locativo
+                        </span>
+                      </>
+                    )}
                   </Link>
                 </td>
                 <td className="p-0">

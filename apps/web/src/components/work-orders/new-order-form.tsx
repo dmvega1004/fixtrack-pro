@@ -39,6 +39,7 @@ interface NewEquipmentDraft {
   brand: string;
   model: string;
   serialNumber: string;
+  location: string;
 }
 
 const EMPTY_NEW_CLIENT: NewClientDraft = {
@@ -54,6 +55,7 @@ const EMPTY_NEW_EQUIPMENT: NewEquipmentDraft = {
   brand: "",
   model: "",
   serialNumber: "",
+  location: "",
 };
 
 interface NewOrderFormProps {
@@ -82,9 +84,9 @@ export function NewOrderForm({
   );
   const [newClient, setNewClient] = useState<NewClientDraft>(EMPTY_NEW_CLIENT);
 
-  const [equipmentMode, setEquipmentMode] = useState<"existing" | "new">(
-    "existing",
-  );
+  const [equipmentMode, setEquipmentMode] = useState<
+    "existing" | "new" | "none"
+  >("existing");
   const [selectedEquipmentId, setSelectedEquipmentId] = useState<
     string | null
   >(initialEquipmentId ?? null);
@@ -117,9 +119,6 @@ export function NewOrderForm({
 
   const canPickExistingEquipment =
     clientMode === "existing" && equipmentsForClient.length > 0;
-  const effectiveEquipmentMode: "existing" | "new" = canPickExistingEquipment
-    ? equipmentMode
-    : "new";
 
   const clientComboItems = useMemo(
     () =>
@@ -152,14 +151,17 @@ export function NewOrderForm({
   function handleSelectClient(id: string) {
     setSelectedClientId(id);
     setSelectedEquipmentId(null);
-    setEquipmentMode("existing");
+    const hasEquipment = equipments.some(
+      (equipment) => equipment.client.id === id,
+    );
+    setEquipmentMode(hasEquipment ? "existing" : "new");
   }
 
   function handleClientModeChange(mode: "existing" | "new") {
     setClientMode(mode);
     setSelectedClientId(null);
     setSelectedEquipmentId(null);
-    setEquipmentMode("existing");
+    setEquipmentMode("new");
     if (mode === "new") {
       setNewClient(EMPTY_NEW_CLIENT);
     }
@@ -184,9 +186,11 @@ export function NewOrderForm({
   }
 
   const equipmentValid =
-    effectiveEquipmentMode === "existing"
-      ? selectedEquipmentId !== null
-      : newEquipment.brand.trim() !== "" && newEquipment.model.trim() !== "";
+    equipmentMode === "none"
+      ? true
+      : equipmentMode === "existing"
+        ? selectedEquipmentId !== null
+        : newEquipment.brand.trim() !== "" && newEquipment.model.trim() !== "";
 
   const isFormValid =
     hasClient &&
@@ -216,16 +220,19 @@ export function NewOrderForm({
           } as const);
 
     const equipmentPayload =
-      effectiveEquipmentMode === "existing"
-        ? ({ mode: "existing", id: selectedEquipmentId! } as const)
-        : ({
-            mode: "new",
-            data: {
-              brand: newEquipment.brand.trim(),
-              model: newEquipment.model.trim(),
-              serialNumber: newEquipment.serialNumber.trim() || undefined,
-            },
-          } as const);
+      equipmentMode === "none"
+        ? ({ mode: "none" } as const)
+        : equipmentMode === "existing"
+          ? ({ mode: "existing", id: selectedEquipmentId! } as const)
+          : ({
+              mode: "new",
+              data: {
+                brand: newEquipment.brand.trim(),
+                model: newEquipment.model.trim(),
+                serialNumber: newEquipment.serialNumber.trim() || undefined,
+                location: newEquipment.location.trim() || undefined,
+              },
+            } as const);
 
     const result = await createWorkOrderChainedAction({
       client: clientPayload,
@@ -364,8 +371,8 @@ export function NewOrderForm({
             </p>
           ) : (
             <>
-              {canPickExistingEquipment && (
-                <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
+                {canPickExistingEquipment && (
                   <Button
                     type="button"
                     variant={equipmentMode === "existing" ? "default" : "outline"}
@@ -374,26 +381,43 @@ export function NewOrderForm({
                   >
                     Equipo existente
                   </Button>
-                  <Button
-                    type="button"
-                    variant={equipmentMode === "new" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setEquipmentMode("new")}
-                  >
-                    Crear equipo nuevo
-                  </Button>
-                </div>
-              )}
+                )}
+                <Button
+                  type="button"
+                  variant={equipmentMode === "new" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setEquipmentMode("new")}
+                >
+                  Crear equipo nuevo
+                </Button>
+                <Button
+                  type="button"
+                  variant={equipmentMode === "none" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setEquipmentMode("none")}
+                >
+                  Servicio sin equipo (locativo)
+                </Button>
+              </div>
 
               {clientMode === "existing" &&
-                equipmentsForClient.length === 0 && (
+                equipmentsForClient.length === 0 &&
+                equipmentMode !== "none" && (
                   <p className="text-xs text-muted-foreground">
                     Este cliente no tiene equipos registrados. Completa los
-                    datos del equipo nuevo.
+                    datos del equipo nuevo o elige &quot;Servicio sin equipo&quot;.
                   </p>
                 )}
 
-              {effectiveEquipmentMode === "existing" ? (
+              {equipmentMode === "none" && (
+                <p className="rounded-lg border border-dashed border-border p-3 text-sm text-muted-foreground">
+                  La orden quedará asociada solo al cliente — para servicios
+                  locativos como sellado de paredes, limpieza de fachada,
+                  cambio de bombillos o instalación de vitrinas.
+                </p>
+              )}
+
+              {equipmentMode === "existing" && (
                 <ComboSelect
                   items={equipmentComboItems}
                   selectedId={selectedEquipmentId}
@@ -401,7 +425,9 @@ export function NewOrderForm({
                   placeholder="Buscar equipo por marca o modelo..."
                   emptyMessage="No se encontraron equipos."
                 />
-              ) : (
+              )}
+
+              {equipmentMode === "new" && (
                 <div className="flex flex-col gap-3">
                   <div className="grid grid-cols-2 gap-3">
                     <div className="flex flex-col gap-1.5">
@@ -429,6 +455,15 @@ export function NewOrderForm({
                       id="serialNumber"
                       value={newEquipment.serialNumber}
                       onChange={updateNewEquipment("serialNumber")}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="equipmentLocation">Ubicación</Label>
+                    <Input
+                      id="equipmentLocation"
+                      value={newEquipment.location}
+                      onChange={updateNewEquipment("location")}
+                      placeholder="Ej. CC La Cuesta, Piedecuesta — Local AME2170 Americanino"
                     />
                   </div>
                   <p className="text-xs text-muted-foreground">

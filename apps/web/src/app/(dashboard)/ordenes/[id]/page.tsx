@@ -79,15 +79,29 @@ export default async function OrdenDetallePage({
         <p className="line-clamp-2 text-sm">{order.description}</p>
 
         <div className="flex flex-col gap-0.5 rounded-lg border border-border bg-card p-4 text-sm">
-          <span className="font-medium">
-            {order.equipment.brand} {order.equipment.model}
-          </span>
-          <span className="text-muted-foreground">
-            {order.equipment.client.name}
-          </span>
-          <span className="mt-1 text-xs text-muted-foreground">
-            Código QR: {order.equipment.qrCode}
-          </span>
+          {order.equipment ? (
+            <>
+              <span className="font-medium">
+                {order.equipment.brand} {order.equipment.model}
+              </span>
+              <span className="text-muted-foreground">{order.client.name}</span>
+              {order.equipment.location && (
+                <span className="text-xs text-muted-foreground">
+                  {order.equipment.location}
+                </span>
+              )}
+              <span className="mt-1 text-xs text-muted-foreground">
+                Código QR: {order.equipment.qrCode}
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="font-medium">{order.client.name}</span>
+              <span className="w-fit rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                Servicio locativo
+              </span>
+            </>
+          )}
         </div>
       </div>
 

@@ -3,7 +3,6 @@ import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { getWorkOrder } from "@/lib/api/work-orders";
 import { getWorkOrderParts } from "@/lib/api/work-order-parts";
-import { getEquipment } from "@/lib/api/equipments";
 import { getClient } from "@/lib/api/clients";
 import { getCompany } from "@/lib/api/company";
 import { getPhotos } from "@/lib/api/attachments";
@@ -30,7 +29,7 @@ export async function generateMetadata({
   try {
     const order = await getWorkOrder(id);
     return {
-      title: `${formatOrderNumber(order.orderNumber)} - ${order.equipment.client.name}`,
+      title: `${formatOrderNumber(order.orderNumber)} - ${order.client.name}`,
     };
   } catch (error) {
     if (error instanceof HttpError) {
@@ -64,9 +63,8 @@ export default async function ImprimirOrdenPage({
     throw error;
   }
 
-  const [equipment, client, company, partsSummary, photos] = await Promise.all([
-    getEquipment(order.equipmentId),
-    getClient(order.equipment.client.id),
+  const [client, company, partsSummary, photos] = await Promise.all([
+    getClient(order.client.id),
     getCompany(),
     getWorkOrderParts(id),
     getPhotos(id),
@@ -76,7 +74,7 @@ export default async function ImprimirOrdenPage({
     <div className="min-h-svh bg-neutral-100 pb-24 print:bg-white print:pb-0">
       <WorkOrderPrintDocument
         order={order}
-        equipment={equipment}
+        equipment={order.equipment}
         client={client}
         company={company}
         partsSummary={partsSummary}

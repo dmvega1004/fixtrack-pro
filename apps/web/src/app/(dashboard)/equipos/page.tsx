@@ -17,6 +17,7 @@ export default async function EquiposPage() {
   // actual (el backend ya restringe qué órdenes ve cada rol).
   const orderCounts = new Map<string, number>();
   for (const order of workOrders) {
+    if (!order.equipmentId) continue; // servicio locativo: sin equipo asociado
     orderCounts.set(
       order.equipmentId,
       (orderCounts.get(order.equipmentId) ?? 0) + 1,

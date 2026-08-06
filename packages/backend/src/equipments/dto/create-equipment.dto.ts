@@ -24,6 +24,12 @@ export class CreateEquipmentDto {
   @MaxLength(120)
   serialNumber?: string;
 
+  /** Ubicación física del equipo en la sede del cliente (multi-sede). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  location?: string;
+
   /**
    * Cliente propietario del equipo. El servicio verifica que este
    * cliente pertenezca a la empresa del token (validación cruzada

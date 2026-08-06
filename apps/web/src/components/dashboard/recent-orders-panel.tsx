@@ -36,8 +36,9 @@ export function RecentOrdersPanel({ orders }: RecentOrdersPanelProps) {
                 <div className="flex min-w-0 flex-col gap-0.5">
                   <span className="font-medium">{formatOrderNumber(order.orderNumber)}</span>
                   <span className="truncate text-xs text-muted-foreground">
-                    {order.equipment.brand} {order.equipment.model} ·{" "}
-                    {order.equipment.client.name}
+                    {order.equipment
+                      ? `${order.equipment.brand} ${order.equipment.model} · ${order.client.name}`
+                      : `${order.client.name} · Servicio locativo`}
                   </span>
                 </div>
                 <StatusChip status={order.status} />

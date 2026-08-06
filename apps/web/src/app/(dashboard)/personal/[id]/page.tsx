@@ -102,8 +102,9 @@ export default async function EmpleadoDetallePage({ params }: EmpleadoDetallePag
                     <div className="flex flex-col gap-0.5">
                       <span className="font-medium">{formatOrderNumber(order.orderNumber)}</span>
                       <span className="text-xs text-muted-foreground">
-                        {order.equipment.brand} {order.equipment.model} ·{" "}
-                        {order.equipment.client.name}
+                        {order.equipment
+                          ? `${order.equipment.brand} ${order.equipment.model} · ${order.client.name}`
+                          : `${order.client.name} · Servicio locativo`}
                       </span>
                     </div>
                     <span className="flex items-center gap-3">

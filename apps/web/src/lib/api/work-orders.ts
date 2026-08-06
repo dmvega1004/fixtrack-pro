@@ -14,8 +14,9 @@ export interface WorkOrderEquipment {
   id: string;
   brand: string;
   model: string;
+  serialNumber: string | null;
+  location: string | null;
   qrCode: string;
-  client: WorkOrderClient;
 }
 
 export interface WorkOrderAssignee {
@@ -32,12 +33,17 @@ export interface WorkOrder {
   observations: string | null;
   status: OrderStatus;
   priority: Priority;
-  equipmentId: string;
+  /** Cliente dueño de la orden — vínculo principal, siempre presente. */
+  clientId: string;
+  /** Equipo a intervenir. Ausente en servicios locativos (sin equipo). */
+  equipmentId: string | null;
   userId: string | null;
   companyId: string;
   createdAt: string;
   updatedAt: string;
-  equipment: WorkOrderEquipment;
+  client: WorkOrderClient;
+  /** null cuando la orden es un servicio locativo sin equipo asociado. */
+  equipment: WorkOrderEquipment | null;
   user: WorkOrderAssignee | null;
 }
 

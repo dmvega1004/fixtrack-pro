@@ -10,15 +10,22 @@ import { PrismaService } from '../prisma.service';
 import { CreateWorkOrderDto } from './dto/create-work-order.dto';
 import { UpdateWorkOrderDto } from './dto/update-work-order.dto';
 
-/** Relaciones que acompañan a cada orden en las respuestas. */
+/**
+ * Relaciones que acompañan a cada orden en las respuestas. `client` es el
+ * vínculo principal (siempre presente); `equipment` es opcional — las
+ * órdenes de servicio locativo no tienen equipo asociado y el campo llega
+ * como `null` a los consumidores.
+ */
 const WORK_ORDER_INCLUDE = {
+  client: { select: { id: true, name: true } },
   equipment: {
     select: {
       id: true,
       brand: true,
       model: true,
+      serialNumber: true,
+      location: true,
       qrCode: true,
-      client: { select: { id: true, name: true } },
     },
   },
   user: { select: { id: true, name: true, email: true } },
@@ -46,8 +53,18 @@ export class WorkOrdersService {
     user: AuthenticatedUser,
     dto: CreateWorkOrderDto,
   ): Promise<WorkOrder> {
-    // Validación cruzada: el equipo debe pertenecer a MI empresa
-    await this.ensureEquipmentBelongsToCompany(user.companyId, dto.equipmentId);
+    // Validación cruzada: el cliente debe pertenecer a MI empresa
+    await this.ensureClientBelongsToCompany(user.companyId, dto.clientId);
+
+    // Si hay equipo, debe ser de MI empresa Y del cliente indicado
+    // (coherencia: no se puede colgar la orden de un equipo de otro cliente).
+    if (dto.equipmentId) {
+      await this.ensureEquipmentBelongsToClient(
+        user.companyId,
+        dto.equipmentId,
+        dto.clientId,
+      );
+    }
 
     // RBAC: un Técnico que crea una orden queda SIEMPRE autoasignado, sin
     // importar qué userId haya mandado en el body (no puede asignar a otros).
@@ -78,6 +95,7 @@ export class WorkOrdersService {
           diagnosis: dto.diagnosis?.trim(),
           observations: dto.observations?.trim(),
           priority: dto.priority, // undefined → default MEDIUM
+          clientId: dto.clientId,
           equipmentId: dto.equipmentId,
           userId: assignedUserId,
           companyId: user.companyId, // candado
@@ -141,6 +159,7 @@ export class WorkOrdersService {
       const forbiddenFields: string[] = [];
       if (dto.description !== undefined) forbiddenFields.push('description');
       if (dto.priority !== undefined) forbiddenFields.push('priority');
+      if (dto.clientId !== undefined) forbiddenFields.push('clientId');
       if (dto.equipmentId !== undefined) forbiddenFields.push('equipmentId');
       if (dto.userId !== undefined) forbiddenFields.push('userId');
 
@@ -153,10 +172,17 @@ export class WorkOrdersService {
     }
 
     // Validación cruzada de relaciones si Admin/Coordinador las cambia
+    if (dto.clientId) {
+      await this.ensureClientBelongsToCompany(user.companyId, dto.clientId);
+    }
+    // Coherencia equipo/cliente: si cambia el equipo (o solo el cliente, con
+    // un equipo ya existente en la orden), el equipo resultante debe ser del
+    // cliente resultante.
     if (dto.equipmentId) {
-      await this.ensureEquipmentBelongsToCompany(
+      await this.ensureEquipmentBelongsToClient(
         user.companyId,
         dto.equipmentId,
+        dto.clientId ?? workOrder.clientId,
       );
     }
     if (dto.userId) {
@@ -171,6 +197,7 @@ export class WorkOrdersService {
         observations: dto.observations?.trim(),
         status: dto.status,
         priority: dto.priority,
+        clientId: dto.clientId,
         equipmentId: dto.equipmentId,
         userId: dto.userId,
       },
@@ -187,19 +214,47 @@ export class WorkOrdersService {
     });
   }
 
-  /** Validación cruzada multi-tenant de la relación WorkOrder → Equipment. */
-  private async ensureEquipmentBelongsToCompany(
+  /** Validación cruzada multi-tenant de la relación WorkOrder → Client. */
+  private async ensureClientBelongsToCompany(
+    companyId: string,
+    clientId: string,
+  ): Promise<void> {
+    const client = await this.prisma.client.findFirst({
+      where: { id: clientId, companyId }, // candado
+      select: { id: true },
+    });
+
+    if (!client) {
+      throw new NotFoundException(
+        `Cliente ${clientId} no encontrado en tu empresa`,
+      );
+    }
+  }
+
+  /**
+   * Validación cruzada multi-tenant + de coherencia de la relación
+   * WorkOrder → Equipment: el equipo debe ser de MI empresa Y del cliente
+   * indicado (no se puede colgar la orden de un equipo de otro cliente).
+   */
+  private async ensureEquipmentBelongsToClient(
     companyId: string,
     equipmentId: string,
+    clientId: string,
   ): Promise<void> {
     const equipment = await this.prisma.equipment.findFirst({
       where: { id: equipmentId, companyId }, // candado
-      select: { id: true },
+      select: { id: true, clientId: true },
     });
 
     if (!equipment) {
       throw new NotFoundException(
         `Equipo ${equipmentId} no encontrado en tu empresa`,
+      );
+    }
+
+    if (equipment.clientId !== clientId) {
+      throw new ConflictException(
+        `El equipo ${equipmentId} no pertenece al cliente ${clientId}`,
       );
     }
   }

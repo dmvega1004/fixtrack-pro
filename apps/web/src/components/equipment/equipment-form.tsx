@@ -44,6 +44,7 @@ export function EquipmentForm({
   const [brand, setBrand] = useState(initial?.brand ?? "");
   const [model, setModel] = useState(initial?.model ?? "");
   const [serialNumber, setSerialNumber] = useState(initial?.serialNumber ?? "");
+  const [location, setLocation] = useState(initial?.location ?? "");
   const [status, setStatus] = useState<EquipmentStatus>(
     initial?.status ?? "ACTIVE",
   );
@@ -78,6 +79,7 @@ export function EquipmentForm({
       brand: brand.trim(),
       model: model.trim(),
       serialNumber: serialNumber.trim() || undefined,
+      location: location.trim() || undefined,
       clientId: selectedClientId!,
       ...(mode === "edit" ? { status } : {}),
     };
@@ -152,6 +154,17 @@ export function EquipmentForm({
               onChange={(event: ChangeEvent<HTMLInputElement>) =>
                 setSerialNumber(event.target.value)
               }
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="location">Ubicación</Label>
+            <Input
+              id="location"
+              value={location}
+              onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                setLocation(event.target.value)
+              }
+              placeholder="Ej. CC La Cuesta, Piedecuesta — Local AME2170 Americanino"
             />
           </div>
 

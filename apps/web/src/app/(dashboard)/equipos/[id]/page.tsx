@@ -92,6 +92,7 @@ export default async function EquipoDetallePage({
             <Field label="Marca" value={equipment.brand} />
             <Field label="Modelo" value={equipment.model} />
             <Field label="Serial" value={equipment.serialNumber} />
+            <Field label="Ubicación" value={equipment.location} />
             <Field label="Código QR" value={equipment.qrCode} />
             <Field label="Registrado" value={formatDate(equipment.createdAt)} />
           </CardContent>
