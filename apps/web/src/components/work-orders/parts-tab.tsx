@@ -3,12 +3,15 @@ import type { WorkOrderPartsSummary } from "@/lib/api/work-order-parts";
 import type { SparePart } from "@/lib/api/spare-parts";
 import { RemovePartButton } from "./remove-part-button";
 import { AddPartPanel } from "./add-part-panel";
+import { BillingSection } from "./billing-section";
 
 interface PartsTabProps {
   orderId: string;
   summary: WorkOrderPartsSummary;
   catalog: SparePart[];
   isTerminal: boolean;
+  currency: string;
+  isAdmin: boolean;
 }
 
 export function PartsTab({
@@ -16,8 +19,10 @@ export function PartsTab({
   summary,
   catalog,
   isTerminal,
+  currency,
+  isAdmin,
 }: PartsTabProps) {
-  const { items, totalSale, totalCost } = summary;
+  const { items, totalSale, totalCost, billing } = summary;
   const margin =
     totalCost !== undefined
       ? Number(totalSale) - Number(totalCost)
@@ -52,10 +57,13 @@ export function PartsTab({
                     </td>
                     <td className="px-4 py-3">{line.quantity}</td>
                     <td className="px-4 py-3">
-                      {formatCurrency(line.unitPrice)}
+                      {formatCurrency(line.unitPrice, currency)}
                     </td>
                     <td className="px-4 py-3">
-                      {formatCurrency(Number(line.unitPrice) * line.quantity)}
+                      {formatCurrency(
+                        Number(line.unitPrice) * line.quantity,
+                        currency,
+                      )}
                     </td>
                     {!isTerminal && (
                       <td className="px-4 py-3 text-right">
@@ -93,10 +101,13 @@ export function PartsTab({
                 </span>
                 <div className="flex justify-between text-sm">
                   <span>
-                    {line.quantity} × {formatCurrency(line.unitPrice)}
+                    {line.quantity} × {formatCurrency(line.unitPrice, currency)}
                   </span>
                   <span className="font-medium">
-                    {formatCurrency(Number(line.unitPrice) * line.quantity)}
+                    {formatCurrency(
+                      Number(line.unitPrice) * line.quantity,
+                      currency,
+                    )}
                   </span>
                 </div>
               </div>
@@ -105,21 +116,21 @@ export function PartsTab({
 
           <div className="flex flex-col gap-1 rounded-lg border border-border bg-muted/50 p-4 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Total a cobrar</span>
+              <span className="text-muted-foreground">Subtotal repuestos</span>
               <span className="font-semibold">
-                {formatCurrency(totalSale)}
+                {formatCurrency(totalSale, currency)}
               </span>
             </div>
             {totalCost !== undefined && (
               <div className="flex justify-between text-muted-foreground">
                 <span>Costo total</span>
-                <span>{formatCurrency(totalCost)}</span>
+                <span>{formatCurrency(totalCost, currency)}</span>
               </div>
             )}
             {margin !== undefined && (
               <div className="flex justify-between text-muted-foreground">
                 <span>Margen</span>
-                <span>{formatCurrency(margin)}</span>
+                <span>{formatCurrency(margin, currency)}</span>
               </div>
             )}
           </div>
@@ -127,6 +138,15 @@ export function PartsTab({
       )}
 
       {!isTerminal && <AddPartPanel orderId={orderId} catalog={catalog} />}
+
+      <BillingSection
+        orderId={orderId}
+        billing={billing}
+        partsTotal={totalSale}
+        currency={currency}
+        isAdmin={isAdmin}
+        isTerminal={isTerminal}
+      />
     </div>
   );
 }

@@ -94,6 +94,30 @@ export async function changePriorityAction(
   );
 }
 
+export interface SaveBillingInput {
+  laborAmount: number;
+  additionalAmount: number;
+  additionalDescription: string;
+  discountAmount: number;
+}
+
+export async function saveBillingAction(
+  orderId: string,
+  dto: SaveBillingInput,
+): Promise<ActionResult> {
+  return runMutation(orderId, () =>
+    serverFetch(`/work-orders/${orderId}`, {
+      method: "PATCH",
+      body: {
+        laborAmount: dto.laborAmount,
+        additionalAmount: dto.additionalAmount,
+        additionalDescription: dto.additionalDescription,
+        discountAmount: dto.discountAmount,
+      },
+    }),
+  );
+}
+
 export async function addPartAction(
   orderId: string,
   sparePartId: string,

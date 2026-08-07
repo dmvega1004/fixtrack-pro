@@ -32,6 +32,20 @@ enum Priority {
   HIGH
 }
 
+enum PaymentStatus {
+  PENDING
+  PARTIAL
+  PAID
+}
+
+enum PaymentMethod {
+  CASH
+  TRANSFER
+  CHECK
+  CARD
+  OTHER
+}
+
 model Company {
   id              String          @id @default(uuid())
   name            String
@@ -47,6 +61,8 @@ model Company {
   currency        String          @default("COP")
   /// Contador atómico por tenant para asignar WorkOrder.orderNumber consecutivo.
   nextOrderNumber Int             @default(1)
+  /// Porcentaje de IVA del tenant (ej. 19.00). 0 si no es responsable de IVA.
+  taxRate         Decimal         @default(0) @db.Decimal(5, 2)
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   users           User[]
@@ -56,6 +72,7 @@ model Company {
   spareParts      SparePart[]
   workOrderParts  WorkOrderPart[]
   attachments     Attachment[]
+  payments        Payment[]
 }
 
 model User {
@@ -72,26 +89,31 @@ model User {
   /// Fotos que este usuario subió a órdenes; sobrevive a su eliminación
   /// (uploadedById queda en null, la foto y su orden no se tocan).
   attachments Attachment[]
+  /// Pagos que este usuario registró; sobrevive a su eliminación
+  /// (registeredById queda en null, el pago no se toca).
+  payments    Payment[]
 
   @@index([companyId])
 }
 
 model Client {
-  id             String      @id @default(uuid())
-  name           String
-  email          String?
-  phone          String?
+  id              String      @id @default(uuid())
+  name            String
+  email           String?
+  phone           String?
   /// CC, NIT, CE o PASAPORTE — validado en el DTO, no como enum de BD
   /// para no requerir migración si aparecen otros tipos de documento.
-  documentType   String?
-  documentNumber String?
-  address        String?
-  companyId      String
-  company        Company     @relation(fields: [companyId], references: [id])
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
-  equipments     Equipment[]
-  workOrders     WorkOrder[]
+  documentType    String?
+  documentNumber  String?
+  address         String?
+  /// Días de crédito acordados con el cliente (ej. 30 = "pago a 30 días").
+  paymentTermDays Int         @default(30)
+  companyId       String
+  company         Company     @relation(fields: [companyId], references: [id])
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  equipments      Equipment[]
+  workOrders      WorkOrder[]
 
   @@index([companyId])
   @@index([companyId, documentNumber])
@@ -121,32 +143,47 @@ model Equipment {
 }
 
 model WorkOrder {
-  id           String          @id @default(uuid())
+  id                    String          @id @default(uuid())
   /// Consecutivo legible por tenant (ej. OT-0001). Asignado atómicamente
   /// desde Company.nextOrderNumber al crear la orden.
-  orderNumber  Int
-  description  String
-  diagnosis    String?
+  orderNumber           Int
+  description           String
+  diagnosis             String?
   /// Notas del servicio realizado, separadas del diagnóstico inicial.
-  observations String?
-  status       OrderStatus     @default(PENDING)
-  priority     Priority        @default(MEDIUM)
+  observations          String?
+  status                OrderStatus     @default(PENDING)
+  priority              Priority        @default(MEDIUM)
+  /// Mano de obra cobrada en la orden.
+  laborAmount           Decimal         @default(0) @db.Decimal(12, 2)
+  /// Cargos adicionales (transporte u otros), con su descripción.
+  additionalAmount      Decimal         @default(0) @db.Decimal(12, 2)
+  additionalDescription String?
+  discountAmount        Decimal         @default(0) @db.Decimal(12, 2)
+  /// Congelados al pasar la orden a COMPLETED: a partir de ese momento el
+  /// total no se recalcula aunque cambien precios del inventario o el IVA
+  /// de la empresa — misma lógica de integridad contable que unitCost/
+  /// unitPrice en WorkOrderPart.
+  taxRateApplied        Decimal?        @db.Decimal(5, 2)
+  totalAmount           Decimal?        @db.Decimal(12, 2)
+  billedAt              DateTime?
+  paymentStatus         PaymentStatus   @default(PENDING)
   /// Cliente dueño de la orden — vínculo principal. Toda orden pertenece a
   /// un cliente; el equipo es opcional (ver equipmentId).
-  clientId     String
-  client       Client          @relation(fields: [clientId], references: [id])
+  clientId              String
+  client                Client          @relation(fields: [clientId], references: [id])
   /// Equipo a intervenir. Opcional: la empresa también presta servicios
   /// locativos (sellado, limpieza, instalación) sin equipo asociado.
-  equipmentId  String?
-  equipment    Equipment?      @relation(fields: [equipmentId], references: [id])
-  userId       String?
-  user         User?           @relation(fields: [userId], references: [id])
-  companyId    String
-  company      Company         @relation(fields: [companyId], references: [id])
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
-  parts        WorkOrderPart[]
-  attachments  Attachment[]
+  equipmentId           String?
+  equipment             Equipment?      @relation(fields: [equipmentId], references: [id])
+  userId                String?
+  user                  User?           @relation(fields: [userId], references: [id])
+  companyId             String
+  company               Company         @relation(fields: [companyId], references: [id])
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  parts                 WorkOrderPart[]
+  attachments           Attachment[]
+  payments              Payment[]
 
   @@unique([companyId, orderNumber])
   @@index([companyId])
@@ -211,6 +248,29 @@ model Attachment {
   uploadedById String?
   uploadedBy   User?     @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
   createdAt    DateTime  @default(now())
+
+  @@index([companyId])
+  @@index([workOrderId])
+}
+
+/// Abono registrado contra una orden de trabajo. El módulo de cartera
+/// (siguiente entrega) se apoya en esta tabla para calcular saldos; por
+/// ahora solo se registra el pago — WorkOrder.paymentStatus se actualiza
+/// en el mismo flujo.
+model Payment {
+  id             String        @id @default(uuid())
+  workOrderId    String
+  workOrder      WorkOrder     @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  companyId      String
+  company        Company       @relation(fields: [companyId], references: [id])
+  amount         Decimal       @db.Decimal(12, 2)
+  paidAt         DateTime
+  method         PaymentMethod
+  reference      String?
+  notes          String?
+  registeredById String?
+  registeredBy   User?         @relation(fields: [registeredById], references: [id], onDelete: SetNull)
+  createdAt      DateTime      @default(now())
 
   @@index([companyId])
   @@index([workOrderId])

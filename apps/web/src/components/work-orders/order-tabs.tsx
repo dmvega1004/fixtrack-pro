@@ -12,7 +12,7 @@ interface OrderTabsProps {
 
 const TABS = [
   { id: "detalles", label: "Detalles" },
-  { id: "repuestos", label: "Repuestos" },
+  { id: "repuestos", label: "Valores" },
   { id: "fotos", label: "Fotos" },
   { id: "historial", label: "Historial" },
 ] as const;

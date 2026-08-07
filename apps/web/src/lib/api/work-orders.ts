@@ -25,6 +25,9 @@ export interface WorkOrderAssignee {
   email: string;
 }
 
+/** Debe reflejar exactamente el enum PaymentStatus de packages/database/prisma/schema.prisma */
+export type PaymentStatus = "PENDING" | "PARTIAL" | "PAID";
+
 export interface WorkOrder {
   id: string;
   orderNumber: number;
@@ -39,6 +42,17 @@ export interface WorkOrder {
   equipmentId: string | null;
   userId: string | null;
   companyId: string;
+  /** Mano de obra cobrada en la orden. */
+  laborAmount: string;
+  /** Cargos adicionales (transporte u otros), con su descripción. */
+  additionalAmount: string;
+  additionalDescription: string | null;
+  discountAmount: string;
+  /** Congelados al pasar la orden a COMPLETED; null mientras sigue abierta. */
+  taxRateApplied: string | null;
+  totalAmount: string | null;
+  billedAt: string | null;
+  paymentStatus: PaymentStatus;
   createdAt: string;
   updatedAt: string;
   client: WorkOrderClient;

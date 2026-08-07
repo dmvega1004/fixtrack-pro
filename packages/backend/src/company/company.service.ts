@@ -19,6 +19,7 @@ const COMPANY_SELECT = {
   website: true,
   logoUrl: true,
   currency: true,
+  taxRate: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -34,6 +35,7 @@ export type PublicCompany = Pick<
   | 'website'
   | 'logoUrl'
   | 'currency'
+  | 'taxRate'
   | 'createdAt'
   | 'updatedAt'
 >;
@@ -68,6 +70,7 @@ export class CompanyService {
         address: dto.address?.trim(),
         website: dto.website?.trim(),
         currency: dto.currency,
+        taxRate: dto.taxRate,
       },
       select: COMPANY_SELECT,
     });

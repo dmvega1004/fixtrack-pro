@@ -30,6 +30,9 @@ export function ClientForm({ mode, clientId, initial }: ClientFormProps) {
   const [phone, setPhone] = useState(initialPhone);
   const [email, setEmail] = useState(initial?.email ?? "");
   const [address, setAddress] = useState(initial?.address ?? "");
+  const [paymentTermDays, setPaymentTermDays] = useState(
+    String(initial?.paymentTermDays ?? 30),
+  );
   const [isSaving, setIsSaving] = useState(false);
 
   /**
@@ -45,11 +48,18 @@ export function ClientForm({ mode, clientId, initial }: ClientFormProps) {
   const documentNumberRequired = isRequiredNow(documentNumber, initialDocumentNumber);
   const phoneRequired = isRequiredNow(phone, initialPhone);
 
+  const paymentTermDaysValue = Number(paymentTermDays);
+  const isPaymentTermDaysValid =
+    paymentTermDays.trim() !== "" &&
+    Number.isInteger(paymentTermDaysValue) &&
+    paymentTermDaysValue >= 0;
+
   const isValid =
     name.trim() !== "" &&
     (!documentTypeRequired || documentType !== "") &&
     (!documentNumberRequired || documentNumber.trim() !== "") &&
     (!phoneRequired || phone.trim() !== "") &&
+    isPaymentTermDaysValid &&
     !isSaving;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -64,6 +74,7 @@ export function ClientForm({ mode, clientId, initial }: ClientFormProps) {
       phone: phone.trim() || undefined,
       email: email.trim() || undefined,
       address: address.trim() || undefined,
+      paymentTermDays: paymentTermDaysValue,
     };
 
     const result =
@@ -153,13 +164,28 @@ export function ClientForm({ mode, clientId, initial }: ClientFormProps) {
             </div>
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="address">Dirección</Label>
-            <Input
-              id="address"
-              value={address}
-              onChange={(event: ChangeEvent<HTMLInputElement>) => setAddress(event.target.value)}
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="address">Dirección</Label>
+              <Input
+                id="address"
+                value={address}
+                onChange={(event: ChangeEvent<HTMLInputElement>) => setAddress(event.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="paymentTermDays">Días de crédito</Label>
+              <Input
+                id="paymentTermDays"
+                type="number"
+                min={0}
+                step="1"
+                value={paymentTermDays}
+                onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                  setPaymentTermDays(event.target.value)
+                }
+              />
+            </div>
           </div>
         </CardContent>
       </Card>

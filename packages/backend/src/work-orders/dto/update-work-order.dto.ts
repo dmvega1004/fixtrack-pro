@@ -1,14 +1,28 @@
 import { PartialType } from '@nestjs/mapped-types';
 import { OrderStatus } from 'database';
-import { IsEnum, IsOptional } from 'class-validator';
+import {
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+} from 'class-validator';
 import { CreateWorkOrderDto } from './create-work-order.dto';
 
 /**
  * Campos de creación (opcionales) + status para avanzar el ciclo de vida:
- * PENDING → IN_PROGRESS → COMPLETED → DELIVERED (o CANCELLED).
+ * PENDING → IN_PROGRESS → COMPLETED → DELIVERED (o CANCELLED), más los
+ * montos de valorización (mano de obra, cargos adicionales, descuento).
+ * No viven en CreateWorkOrderDto: una orden nace sin valorizar, se
+ * valoriza más adelante desde la pestaña «Valores».
  *
- * Nota RBAC (aplicado en el service): un TECHNICIAN solo puede enviar
- * `status`, `diagnosis` y `observations`; cualquier otro campo le devuelve 403.
+ * Nota RBAC (aplicado en el service):
+ * - TECHNICIAN solo puede enviar `status`, `diagnosis` y `observations`.
+ * - Los montos de valorización (laborAmount, additionalAmount,
+ *   additionalDescription, discountAmount) son SOLO ADMIN — ni siquiera
+ *   COORDINATOR puede tocarlos.
+ * Cualquier campo no permitido devuelve 403.
  */
 export class UpdateWorkOrderDto extends PartialType(CreateWorkOrderDto) {
   @IsOptional()
@@ -17,4 +31,35 @@ export class UpdateWorkOrderDto extends PartialType(CreateWorkOrderDto) {
       'status debe ser PENDING, IN_PROGRESS, COMPLETED, DELIVERED o CANCELLED',
   })
   status?: OrderStatus;
+
+  /** Mano de obra cobrada en la orden. */
+  @IsOptional()
+  @IsNumber(
+    { maxDecimalPlaces: 2 },
+    { message: 'laborAmount debe ser un número con máximo 2 decimales' },
+  )
+  @Min(0)
+  laborAmount?: number;
+
+  /** Cargos adicionales (transporte u otros), con su descripción libre en additionalDescription. */
+  @IsOptional()
+  @IsNumber(
+    { maxDecimalPlaces: 2 },
+    { message: 'additionalAmount debe ser un número con máximo 2 decimales' },
+  )
+  @Min(0)
+  additionalAmount?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  additionalDescription?: string;
+
+  @IsOptional()
+  @IsNumber(
+    { maxDecimalPlaces: 2 },
+    { message: 'discountAmount debe ser un número con máximo 2 decimales' },
+  )
+  @Min(0)
+  discountAmount?: number;
 }

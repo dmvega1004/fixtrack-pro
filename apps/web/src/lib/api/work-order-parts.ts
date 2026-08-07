@@ -1,4 +1,5 @@
 import { serverFetch } from "./server-fetch";
+import type { PaymentStatus } from "./work-orders";
 
 // Debe reflejar exactamente WorkOrderPartView/WorkOrderPartsSummary en
 // packages/backend/src/work-orders/work-order-parts.service.ts
@@ -20,11 +21,34 @@ export interface WorkOrderPartLine {
   };
 }
 
+/**
+ * Cierre económico de la orden. Los montos son precios al cliente (no
+ * costos): visibles para los 3 roles; solo ADMIN puede editarlos.
+ */
+export interface WorkOrderBilling {
+  laborAmount: string;
+  additionalAmount: string;
+  additionalDescription: string | null;
+  discountAmount: string;
+  subtotal: string;
+  /** Tasa efectivamente usada: la congelada si la orden ya cerró, si no la vigente de la empresa. */
+  taxRate: string;
+  taxAmount: string;
+  /** Congelado (no se recalcula) si la orden ya pasó por COMPLETED; si no, calculado en vivo. */
+  total: string;
+  isFrozen: boolean;
+  billedAt: string | null;
+  paymentStatus: PaymentStatus;
+  /** Suma de abonos registrados contra la orden. */
+  paidAmount: string;
+}
+
 export interface WorkOrderPartsSummary {
   items: WorkOrderPartLine[];
   totalSale: string;
   /** Solo presente para ADMIN. */
   totalCost?: string;
+  billing: WorkOrderBilling;
 }
 
 /** GET /work-orders/:orderId/parts */

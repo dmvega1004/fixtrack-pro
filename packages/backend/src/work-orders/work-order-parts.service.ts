@@ -3,9 +3,17 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { OrderStatus, Prisma, Role, WorkOrderPart } from 'database';
+import {
+  OrderStatus,
+  PaymentStatus,
+  Prisma,
+  Role,
+  WorkOrder,
+  WorkOrderPart,
+} from 'database';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { PrismaService } from '../prisma.service';
+import { calculateBilling } from './billing.util';
 import { AddWorkOrderPartDto } from './dto/add-work-order-part.dto';
 import { WorkOrdersService } from './work-orders.service';
 
@@ -23,12 +31,40 @@ export type WorkOrderPartView = Omit<WorkOrderPart, 'unitCost'> & {
   unitCost?: WorkOrderPart['unitCost'];
 };
 
+/**
+ * Cierre económico de la orden (pestaña «Valores»). Los montos son precios
+ * al cliente, no costos — visibles para los 3 roles (aparecen en el
+ * documento que se entrega); solo ADMIN puede editarlos (PATCH /work-orders/:id).
+ */
+export interface WorkOrderBilling {
+  laborAmount: string;
+  additionalAmount: string;
+  additionalDescription: string | null;
+  discountAmount: string;
+  subtotal: string;
+  /** Tasa efectivamente usada: la congelada si la orden ya cerró, si no la vigente de la empresa. */
+  taxRate: string;
+  taxAmount: string;
+  /** Congelado (no se recalcula) si la orden ya pasó por COMPLETED; si no, calculado en vivo. */
+  total: string;
+  isFrozen: boolean;
+  billedAt: string | null;
+  paymentStatus: PaymentStatus;
+  /**
+   * Suma de abonos registrados (Payment). El módulo de cartera (siguiente
+   * entrega) tendrá su propia vista de cobros; por ahora esto solo alcanza
+   * para mostrar el saldo pendiente en el documento impreso.
+   */
+  paidAmount: string;
+}
+
 export interface WorkOrderPartsSummary {
   items: WorkOrderPartView[];
-  /** Total a cobrar al cliente (suma de quantity × unitPrice). */
+  /** Total de repuestos a cobrar al cliente (suma de quantity × unitPrice). */
   totalSale: string;
   /** Costo total para la empresa — SOLO visible para ADMIN. */
   totalCost?: string;
+  billing: WorkOrderBilling;
 }
 
 /**
@@ -153,22 +189,34 @@ export class WorkOrderPartsService {
     workOrderId: string,
   ): Promise<WorkOrderPartsSummary> {
     // Visibilidad + candado (404 si la orden es ajena o de otro técnico)
-    await this.workOrdersService.findOne(user, workOrderId);
+    const order = await this.workOrdersService.findOne(user, workOrderId);
 
-    const lines = await this.prisma.workOrderPart.findMany({
-      where: { workOrderId, companyId: user.companyId }, // candado
-      include: PART_SUMMARY,
-      orderBy: { createdAt: 'asc' },
-    });
+    const [lines, company, paidAgg] = await Promise.all([
+      this.prisma.workOrderPart.findMany({
+        where: { workOrderId, companyId: user.companyId }, // candado
+        include: PART_SUMMARY,
+        orderBy: { createdAt: 'asc' },
+      }),
+      this.prisma.company.findUniqueOrThrow({
+        where: { id: user.companyId },
+        select: { taxRate: true },
+      }),
+      this.prisma.payment.aggregate({
+        where: { workOrderId, companyId: user.companyId }, // candado
+        _sum: { amount: true },
+      }),
+    ]);
 
     const totalSale = lines.reduce(
       (acc, l) => acc.add(l.unitPrice.mul(l.quantity)),
       new Prisma.Decimal(0),
     );
+    const paidAmount = paidAgg._sum.amount ?? new Prisma.Decimal(0);
 
     const summary: WorkOrderPartsSummary = {
       items: lines.map((l) => this.redact(l, user.role)),
       totalSale: totalSale.toFixed(2),
+      billing: this.buildBilling(order, totalSale, company.taxRate, paidAmount),
     };
 
     // RBAC financiero: el costo total solo lo ve el ADMIN
@@ -181,6 +229,46 @@ export class WorkOrderPartsService {
     }
 
     return summary;
+  }
+
+  /**
+   * Arma el desglose económico. Si la orden ya está congelada (totalAmount
+   * no nulo), el TOTAL mostrado es siempre el valor guardado — nunca se
+   * recalcula, ni con el IVA actual de la empresa ni si cambian los
+   * repuestos después del cierre; subtotal/impuesto se recomputan con la
+   * tasa congelada solo para mostrar el desglose, no para derivar el total.
+   */
+  private buildBilling(
+    order: WorkOrder,
+    partsTotal: Prisma.Decimal,
+    companyTaxRate: Prisma.Decimal,
+    paidAmount: Prisma.Decimal,
+  ): WorkOrderBilling {
+    const isFrozen = order.totalAmount !== null;
+    const taxRate = isFrozen ? order.taxRateApplied! : companyTaxRate;
+
+    const { subtotal, taxAmount, total } = calculateBilling({
+      laborAmount: order.laborAmount,
+      partsTotal,
+      additionalAmount: order.additionalAmount,
+      discountAmount: order.discountAmount,
+      taxRate,
+    });
+
+    return {
+      laborAmount: order.laborAmount.toFixed(2),
+      additionalAmount: order.additionalAmount.toFixed(2),
+      additionalDescription: order.additionalDescription,
+      discountAmount: order.discountAmount.toFixed(2),
+      subtotal: subtotal.toFixed(2),
+      taxRate: taxRate.toFixed(2),
+      taxAmount: taxAmount.toFixed(2),
+      total: isFrozen ? order.totalAmount!.toFixed(2) : total.toFixed(2),
+      isFrozen,
+      billedAt: order.billedAt ? order.billedAt.toISOString() : null,
+      paymentStatus: order.paymentStatus,
+      paidAmount: paidAmount.toFixed(2),
+    };
   }
 
   private ensureNotTerminal(status: OrderStatus): void {

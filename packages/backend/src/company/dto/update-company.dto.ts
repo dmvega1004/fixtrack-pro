@@ -2,11 +2,14 @@ import {
   IsEmail,
   IsIn,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
   IsString,
   IsUrl,
   Matches,
+  Max,
   MaxLength,
+  Min,
 } from 'class-validator';
 
 /** Monedas soportadas para formatear precios en el frontend. */
@@ -48,4 +51,14 @@ export class UpdateCompanyDto {
   @IsOptional()
   @IsIn(CURRENCIES, { message: 'currency debe ser COP, USD, EUR, MXN o PEN' })
   currency?: string;
+
+  /** Porcentaje de IVA del tenant (ej. 19.00). 0 si no es responsable de IVA. */
+  @IsOptional()
+  @IsNumber(
+    { maxDecimalPlaces: 2 },
+    { message: 'taxRate debe ser un número con máximo 2 decimales' },
+  )
+  @Min(0)
+  @Max(100, { message: 'taxRate no puede superar 100' })
+  taxRate?: number;
 }

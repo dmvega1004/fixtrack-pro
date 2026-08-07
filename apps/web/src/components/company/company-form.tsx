@@ -24,6 +24,7 @@ interface CompanyFormState {
   address: string;
   website: string;
   currency: Currency;
+  taxRate: string;
 }
 
 function toFormState(company: Company): CompanyFormState {
@@ -35,6 +36,7 @@ function toFormState(company: Company): CompanyFormState {
     address: company.address ?? "",
     website: company.website ?? "",
     currency: (company.currency as Currency) ?? "COP",
+    taxRate: company.taxRate,
   };
 }
 
@@ -88,9 +90,13 @@ export function CompanyForm({ company }: CompanyFormProps) {
     };
   }
 
+  const taxRate = Number(form.taxRate);
+  const isTaxRateValid =
+    form.taxRate.trim() !== "" && !Number.isNaN(taxRate) && taxRate >= 0 && taxRate <= 100;
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!form.name.trim()) return;
+    if (!form.name.trim() || !isTaxRateValid) return;
 
     setIsSaving(true);
     const result = await saveCompanyAction({
@@ -101,6 +107,7 @@ export function CompanyForm({ company }: CompanyFormProps) {
       address: form.address.trim() || undefined,
       website: form.website.trim() || undefined,
       currency: form.currency,
+      taxRate,
     });
     setIsSaving(false);
 
@@ -167,21 +174,39 @@ export function CompanyForm({ company }: CompanyFormProps) {
               placeholder="https://tuempresa.com"
             />
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="currency">Moneda</Label>
-            <select
-              id="currency"
-              value={form.currency}
-              onChange={updateField("currency")}
-              className="h-9 rounded-lg border border-border bg-background px-2.5 text-sm text-foreground"
-            >
-              {CURRENCIES.map((currency) => (
-                <option key={currency} value={currency}>
-                  {CURRENCY_LABELS[currency]}
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="currency">Moneda</Label>
+              <select
+                id="currency"
+                value={form.currency}
+                onChange={updateField("currency")}
+                className="h-9 rounded-lg border border-border bg-background px-2.5 text-sm text-foreground"
+              >
+                {CURRENCIES.map((currency) => (
+                  <option key={currency} value={currency}>
+                    {CURRENCY_LABELS[currency]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="taxRate">Tarifa de IVA (%)</Label>
+              <Input
+                id="taxRate"
+                type="number"
+                min={0}
+                max={100}
+                step="0.01"
+                value={form.taxRate}
+                onChange={updateField("taxRate")}
+              />
+            </div>
           </div>
+          <p className="text-xs text-muted-foreground">
+            Se aplica a las órdenes de trabajo al valorizarlas. Deja 0 si tu
+            empresa no es responsable de IVA.
+          </p>
         </CardContent>
       </Card>
 
@@ -241,7 +266,7 @@ export function CompanyForm({ company }: CompanyFormProps) {
 
       <Button
         type="submit"
-        disabled={isSaving || !form.name.trim()}
+        disabled={isSaving || !form.name.trim() || !isTaxRateValid}
         className="w-full md:w-auto md:self-end"
       >
         {isSaving ? "Guardando..." : "Guardar cambios"}

@@ -12,6 +12,8 @@ export interface Client {
   documentType: string | null;
   documentNumber: string | null;
   address: string | null;
+  /** Días de crédito acordados con el cliente (ej. 30 = "pago a 30 días"). */
+  paymentTermDays: number;
   companyId: string;
   createdAt: string;
   updatedAt: string;
@@ -24,6 +26,7 @@ export interface CreateClientInput {
   documentType?: DocumentType;
   documentNumber?: string;
   address?: string;
+  paymentTermDays?: number;
 }
 
 export interface UpdateClientInput {
@@ -33,6 +36,7 @@ export interface UpdateClientInput {
   documentType?: DocumentType;
   documentNumber?: string;
   address?: string;
+  paymentTermDays?: number;
 }
 
 /** GET /clients. Cualquier rol autenticado ve los clientes de su empresa. */

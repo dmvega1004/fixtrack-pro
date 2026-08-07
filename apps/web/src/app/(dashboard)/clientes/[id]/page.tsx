@@ -91,6 +91,7 @@ export default async function ClienteDetallePage({ params }: ClienteDetallePageP
           <Field label="Teléfono" value={client.phone} />
           <Field label="Correo" value={client.email} />
           <Field label="Dirección" value={client.address} />
+          <Field label="Días de crédito" value={`${client.paymentTermDays} días`} />
         </CardContent>
       </Card>
 

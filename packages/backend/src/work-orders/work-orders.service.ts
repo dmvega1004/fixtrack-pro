@@ -7,6 +7,7 @@ import {
 import { OrderStatus, Prisma, Role, WorkOrder } from 'database';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { PrismaService } from '../prisma.service';
+import { calculateBilling } from './billing.util';
 import { CreateWorkOrderDto } from './dto/create-work-order.dto';
 import { UpdateWorkOrderDto } from './dto/update-work-order.dto';
 
@@ -162,11 +163,39 @@ export class WorkOrdersService {
       if (dto.clientId !== undefined) forbiddenFields.push('clientId');
       if (dto.equipmentId !== undefined) forbiddenFields.push('equipmentId');
       if (dto.userId !== undefined) forbiddenFields.push('userId');
+      if (dto.laborAmount !== undefined) forbiddenFields.push('laborAmount');
+      if (dto.additionalAmount !== undefined)
+        forbiddenFields.push('additionalAmount');
+      if (dto.additionalDescription !== undefined)
+        forbiddenFields.push('additionalDescription');
+      if (dto.discountAmount !== undefined)
+        forbiddenFields.push('discountAmount');
 
       if (forbiddenFields.length > 0) {
         throw new ForbiddenException(
           `Como técnico solo puedes modificar status, diagnosis y observations. ` +
             `Campos no permitidos: ${forbiddenFields.join(', ')}`,
+        );
+      }
+    }
+
+    // RBAC financiero: solo ADMIN valoriza la orden — ni siquiera Coordinador.
+    // (El técnico ya quedó bloqueado arriba; este check cubre a Coordinador.)
+    if (user.role !== Role.ADMIN) {
+      const forbiddenBillingFields: string[] = [];
+      if (dto.laborAmount !== undefined)
+        forbiddenBillingFields.push('laborAmount');
+      if (dto.additionalAmount !== undefined)
+        forbiddenBillingFields.push('additionalAmount');
+      if (dto.additionalDescription !== undefined)
+        forbiddenBillingFields.push('additionalDescription');
+      if (dto.discountAmount !== undefined)
+        forbiddenBillingFields.push('discountAmount');
+
+      if (forbiddenBillingFields.length > 0) {
+        throw new ForbiddenException(
+          `Solo un ADMIN puede modificar la valorización de la orden. ` +
+            `Campos no permitidos: ${forbiddenBillingFields.join(', ')}`,
         );
       }
     }
@@ -189,6 +218,63 @@ export class WorkOrdersService {
       await this.ensureUserBelongsToCompany(user.companyId, dto.userId);
     }
 
+    // Congelamiento contable: al (re)pasar la orden a COMPLETED se
+    // fotografía el total con los montos vigentes en ESTE update (los que
+    // trae el dto, o si no los envía, los que ya tenía la orden) — igual
+    // que unitCost/unitPrice en WorkOrderPart. A partir de ahí el total no
+    // se recalcula aunque cambien los precios del inventario o el IVA de
+    // la empresa, porque totalAmount queda guardado como columna, no
+    // derivado. Reenviar status COMPLETED (ej. tras corregir un monto)
+    // vuelve a congelar con los valores del momento.
+    let freeze:
+      | {
+          taxRateApplied: Prisma.Decimal;
+          totalAmount: Prisma.Decimal;
+          billedAt: Date;
+        }
+      | undefined;
+
+    if (dto.status === OrderStatus.COMPLETED) {
+      const [company, parts] = await Promise.all([
+        this.prisma.company.findUniqueOrThrow({
+          where: { id: user.companyId },
+          select: { taxRate: true },
+        }),
+        this.prisma.workOrderPart.findMany({
+          where: { workOrderId: id, companyId: user.companyId },
+          select: { unitPrice: true, quantity: true },
+        }),
+      ]);
+
+      const partsTotal = parts.reduce(
+        (acc, p) => acc.add(p.unitPrice.mul(p.quantity)),
+        new Prisma.Decimal(0),
+      );
+
+      const { total } = calculateBilling({
+        laborAmount:
+          dto.laborAmount !== undefined
+            ? new Prisma.Decimal(dto.laborAmount)
+            : workOrder.laborAmount,
+        partsTotal,
+        additionalAmount:
+          dto.additionalAmount !== undefined
+            ? new Prisma.Decimal(dto.additionalAmount)
+            : workOrder.additionalAmount,
+        discountAmount:
+          dto.discountAmount !== undefined
+            ? new Prisma.Decimal(dto.discountAmount)
+            : workOrder.discountAmount,
+        taxRate: company.taxRate,
+      });
+
+      freeze = {
+        taxRateApplied: company.taxRate,
+        totalAmount: total,
+        billedAt: new Date(),
+      };
+    }
+
     return this.prisma.workOrder.update({
       where: { id },
       data: {
@@ -200,6 +286,15 @@ export class WorkOrdersService {
         clientId: dto.clientId,
         equipmentId: dto.equipmentId,
         userId: dto.userId,
+        laborAmount: dto.laborAmount,
+        additionalAmount: dto.additionalAmount,
+        additionalDescription: dto.additionalDescription?.trim(),
+        discountAmount: dto.discountAmount,
+        ...(freeze && {
+          taxRateApplied: freeze.taxRateApplied,
+          totalAmount: freeze.totalAmount,
+          billedAt: freeze.billedAt,
+        }),
       },
       include: WORK_ORDER_INCLUDE,
     });

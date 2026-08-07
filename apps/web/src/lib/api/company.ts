@@ -15,6 +15,8 @@ export interface Company {
   website: string | null;
   logoUrl: string | null;
   currency: string;
+  /** Porcentaje de IVA del tenant (ej. "19.00"). "0.00" si no es responsable de IVA. */
+  taxRate: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -27,6 +29,7 @@ export interface UpdateCompanyInput {
   address?: string;
   website?: string;
   currency?: Currency;
+  taxRate?: number;
 }
 
 /** GET /company/me. Los 3 roles ven los datos del tenant de su sesión. */

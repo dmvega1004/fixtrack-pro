@@ -27,6 +27,7 @@ export class ClientsService {
         documentType: dto.documentType,
         documentNumber: dto.documentNumber?.trim(),
         address: dto.address?.trim(),
+        paymentTermDays: dto.paymentTermDays,
         companyId, // candado: el cliente nace amarrado al tenant del token
       },
     });
@@ -73,6 +74,7 @@ export class ClientsService {
         documentType: dto.documentType,
         documentNumber: dto.documentNumber?.trim(),
         address: dto.address?.trim(),
+        paymentTermDays: dto.paymentTermDays,
       },
     });
   }

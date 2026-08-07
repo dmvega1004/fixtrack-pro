@@ -7,6 +7,7 @@ import { getWorkOrderParts } from "@/lib/api/work-order-parts";
 import { getSpareParts } from "@/lib/api/spare-parts";
 import { getTechnicians } from "@/lib/api/users";
 import { getPhotos } from "@/lib/api/attachments";
+import { getCompany } from "@/lib/api/company";
 import { HttpError } from "@/lib/api/http";
 import { StatusChip } from "@/components/shared/status-chip";
 import { PriorityBadge } from "@/components/shared/priority-badge";
@@ -45,13 +46,15 @@ export default async function OrdenDetallePage({
   }
 
   const canManage = session.role === "ADMIN" || session.role === "COORDINATOR";
+  const isAdmin = session.role === "ADMIN";
   const isTerminal = TERMINAL_STATUSES.includes(order.status);
 
-  const [partsSummary, technicians, catalog, photos] = await Promise.all([
+  const [partsSummary, technicians, catalog, photos, company] = await Promise.all([
     getWorkOrderParts(id),
     canManage ? getTechnicians() : Promise.resolve([]),
     isTerminal ? Promise.resolve([]) : getSpareParts(),
     getPhotos(id),
+    getCompany(),
   ]);
 
   return (
@@ -126,6 +129,8 @@ export default async function OrdenDetallePage({
             summary={partsSummary}
             catalog={catalog}
             isTerminal={isTerminal}
+            currency={company.currency}
+            isAdmin={isAdmin}
           />
         }
         fotos={

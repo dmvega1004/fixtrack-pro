@@ -82,6 +82,30 @@ function Callout({
   );
 }
 
+function BillingRow({
+  label,
+  value,
+  currency,
+  negative,
+  className,
+}: {
+  label: string;
+  value: string;
+  currency: string;
+  negative?: boolean;
+  className?: string;
+}) {
+  return (
+    <tr className={className}>
+      <td className="py-1 pr-2 text-neutral-700">{label}</td>
+      <td className="py-1 text-right text-neutral-900">
+        {negative ? "− " : ""}
+        {formatCurrency(value, currency)}
+      </td>
+    </tr>
+  );
+}
+
 function SignatureBox({ title }: { title: string }) {
   return (
     <div className="flex flex-col gap-8">
@@ -103,6 +127,8 @@ export function WorkOrderPrintDocument({
   partsSummary,
   photos,
 }: WorkOrderPrintDocumentProps) {
+  const billing = partsSummary.billing;
+
   const documentLabel =
     client.documentType && client.documentNumber
       ? `${DOCUMENT_TYPE_LABELS[client.documentType as DocumentType] ?? client.documentType} ${client.documentNumber}`
@@ -250,17 +276,71 @@ export function WorkOrderPrintDocument({
               })
             )}
           </tbody>
+        </table>
+      </section>
+
+      <section className="mt-4 flex flex-col gap-2">
+        <SectionTitle>Cierre económico</SectionTitle>
+        <table className="w-full border-collapse text-sm">
+          <tbody>
+            <BillingRow label="Repuestos" value={partsSummary.totalSale} currency={company.currency} />
+            <BillingRow label="Mano de obra" value={billing.laborAmount} currency={company.currency} />
+            {Number(billing.additionalAmount) > 0 && (
+              <BillingRow
+                label={billing.additionalDescription ?? "Otros cargos"}
+                value={billing.additionalAmount}
+                currency={company.currency}
+              />
+            )}
+            {Number(billing.discountAmount) > 0 && (
+              <BillingRow
+                label="Descuento"
+                value={billing.discountAmount}
+                currency={company.currency}
+                negative
+              />
+            )}
+            <BillingRow
+              label="Subtotal"
+              value={billing.subtotal}
+              currency={company.currency}
+              className="border-t border-neutral-300 font-semibold"
+            />
+            {Number(billing.taxRate) > 0 && (
+              <BillingRow
+                label={`IVA (${Number(billing.taxRate)}%)`}
+                value={billing.taxAmount}
+                currency={company.currency}
+              />
+            )}
+          </tbody>
           <tfoot>
             <tr>
-              <td colSpan={4} className="pt-2 text-right text-sm font-semibold">
-                Total a cobrar
+              <td className="pt-2 text-right text-base font-bold uppercase">
+                Total a pagar
               </td>
-              <td className="pt-2 text-right text-sm font-bold">
-                {formatCurrency(partsSummary.totalSale, company.currency)}
+              <td
+                className="pt-2 text-right text-base font-bold"
+                style={{ color: BRAND_BLUE }}
+              >
+                {formatCurrency(billing.total, company.currency)}
               </td>
             </tr>
           </tfoot>
         </table>
+
+        <div className="flex flex-col gap-0.5 text-xs text-neutral-600">
+          <span>Pago a {client.paymentTermDays} días</span>
+          {Number(billing.paidAmount) > 0 && (
+            <span className="font-medium text-neutral-800">
+              Saldo pendiente:{" "}
+              {formatCurrency(
+                Math.max(Number(billing.total) - Number(billing.paidAmount), 0),
+                company.currency,
+              )}
+            </span>
+          )}
+        </div>
       </section>
 
       {photos.length > 0 && (

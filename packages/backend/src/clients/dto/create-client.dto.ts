@@ -1,11 +1,14 @@
 import {
   IsEmail,
   IsIn,
+  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
   Matches,
+  Max,
   MaxLength,
+  Min,
 } from 'class-validator';
 
 /**
@@ -47,4 +50,11 @@ export class CreateClientDto {
   @IsString()
   @MaxLength(255)
   address?: string;
+
+  /** Días de crédito acordados con el cliente (ej. 30 = "pago a 30 días"). */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(365, { message: 'paymentTermDays no puede superar 365' })
+  paymentTermDays?: number;
 }
