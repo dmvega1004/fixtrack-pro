@@ -9,6 +9,7 @@ export { ROLE_LABELS, type Session };
 interface JwtPayload {
   sub: string;
   email: string;
+  name: string;
   role: Role;
   companyId: string;
 }
@@ -41,6 +42,7 @@ export async function getSession(): Promise<Session | null> {
   return {
     userId: payload.sub,
     email: payload.email,
+    name: payload.name,
     role: payload.role,
     companyId: payload.companyId,
   };

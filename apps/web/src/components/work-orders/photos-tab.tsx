@@ -3,8 +3,14 @@
 import { useRef, useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Camera, Loader2, Trash2 } from "lucide-react";
+import { Camera, Image as ImageIcon, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import type { Attachment } from "@/lib/api/attachments";
 import { removePhotoAction } from "@/app/(dashboard)/ordenes/[id]/actions";
 import { compressImage } from "@/lib/image/compress-image";
@@ -31,7 +37,9 @@ export function PhotosTab({
   const [photos, setPhotos] = useState(initialPhotos);
   const [isUploading, setIsUploading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [sourceSheetOpen, setSourceSheetOpen] = useState(false);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -160,22 +168,76 @@ export function PhotosTab({
       ) : (
         <>
           <input
-            ref={inputRef}
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={(event) => void handleFileChange(event)}
+            className="hidden"
+          />
+          <input
+            ref={galleryInputRef}
             type="file"
             accept="image/*"
             onChange={(event) => void handleFileChange(event)}
             className="hidden"
           />
+
+          {/* Móvil: hay cámara trasera, así que se ofrece elegir el origen. */}
           <Button
             type="button"
             variant="outline"
-            onClick={() => inputRef.current?.click()}
+            onClick={() => setSourceSheetOpen(true)}
             disabled={isUploading}
-            className="self-start"
+            className="self-start md:hidden"
           >
             <Camera className="size-4" />
             {isUploading ? "Subiendo..." : "Agregar foto"}
           </Button>
+
+          {/* Escritorio: no hay cámara trasera, se va directo al explorador de archivos. */}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => galleryInputRef.current?.click()}
+            disabled={isUploading}
+            className="hidden self-start md:inline-flex"
+          >
+            <Camera className="size-4" />
+            {isUploading ? "Subiendo..." : "Agregar foto"}
+          </Button>
+
+          <Sheet open={sourceSheetOpen} onOpenChange={setSourceSheetOpen}>
+            <SheetContent side="bottom" className="pb-[env(safe-area-inset-bottom)] md:hidden">
+              <SheetHeader>
+                <SheetTitle>Agregar foto</SheetTitle>
+              </SheetHeader>
+              <div className="flex flex-col gap-1 px-4 pb-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSourceSheetOpen(false);
+                    cameraInputRef.current?.click();
+                  }}
+                  className="flex min-h-12 items-center gap-3 rounded-lg px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                >
+                  <Camera className="size-5" />
+                  Tomar foto
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSourceSheetOpen(false);
+                    galleryInputRef.current?.click();
+                  }}
+                  className="flex min-h-12 items-center gap-3 rounded-lg px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                >
+                  <ImageIcon className="size-5" />
+                  Elegir de la galería
+                </button>
+              </div>
+            </SheetContent>
+          </Sheet>
         </>
       )}
     </div>

@@ -36,13 +36,12 @@ const MOBILE_NAV_LEFT: MobileNavItem[] = [
 
 const MOBILE_NAV_RIGHT: MobileNavItem[] = [{ href: "/equipos", label: "Equipos", icon: Boxes }];
 
-function getInitials(email: string): string {
-  const local = email.split("@")[0] ?? "";
-  const parts = local.split(/[._-]/).filter(Boolean);
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length >= 2) {
     return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
   }
-  return local.slice(0, 2).toUpperCase();
+  return (parts[0] ?? "").slice(0, 2).toUpperCase();
 }
 
 export function AppShell({ session, children }: AppShellProps) {
@@ -104,10 +103,10 @@ export function AppShell({ session, children }: AppShellProps) {
 
         <div className="flex items-center gap-3 border-t border-border px-4 py-4">
           <div className="flex size-9 flex-shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
-            {getInitials(session.email)}
+            {getInitials(session.name)}
           </div>
           <div className="flex flex-1 flex-col overflow-hidden">
-            <span className="truncate text-sm font-medium">{session.email}</span>
+            <span className="truncate text-sm font-medium">{session.name}</span>
             <span className="text-xs text-muted-foreground">
               {ROLE_LABELS[session.role]}
             </span>
@@ -188,10 +187,10 @@ export function AppShell({ session, children }: AppShellProps) {
 
           <div className="mt-2 flex items-center gap-3 border-t border-border px-4 py-4">
             <div className="flex size-9 flex-shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
-              {getInitials(session.email)}
+              {getInitials(session.name)}
             </div>
             <div className="flex flex-1 flex-col overflow-hidden">
-              <span className="truncate text-sm font-medium">{session.email}</span>
+              <span className="truncate text-sm font-medium">{session.name}</span>
               <span className="text-xs text-muted-foreground">
                 {ROLE_LABELS[session.role]}
               </span>

@@ -1,4 +1,9 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  OnModuleInit,
+} from '@nestjs/common';
 import {
   v2 as cloudinary,
   type UploadApiErrorResponse,
@@ -12,16 +17,54 @@ export interface UploadImageOptions {
   maxDimension?: number;
 }
 
+const REQUIRED_ENV_VARS = [
+  'CLOUDINARY_CLOUD_NAME',
+  'CLOUDINARY_API_KEY',
+  'CLOUDINARY_API_SECRET',
+] as const;
+
+/** Prefijos/fragmentos típicos de un valor de marcador que nunca es una credencial real. */
+const PLACEHOLDER_PATTERNS = [/^tu_/i, /^your_/i, /xxx/i];
+
+function looksLikePlaceholder(value: string): boolean {
+  return PLACEHOLDER_PATTERNS.some((pattern) => pattern.test(value));
+}
+
 /**
  * Envoltorio delgado sobre el SDK de Cloudinary. La configuración se valida
  * de forma PEREZOSA (al primer upload/destroy), nunca en el constructor:
  * si faltan credenciales, el error aparece cuando alguien intenta subir un
  * archivo, no al arrancar el servidor (que no debe depender de Cloudinary
  * para levantar).
+ *
+ * Como el fallo real solo se ve en campo (un técnico subiendo una foto),
+ * `onModuleInit` además registra una advertencia en los logs de arranque si
+ * detecta variables faltantes o con valores de marcador — así se detecta en
+ * el despliegue, sin bloquearlo.
  */
 @Injectable()
-export class CloudinaryService {
+export class CloudinaryService implements OnModuleInit {
+  private readonly logger = new Logger(CloudinaryService.name);
   private configured = false;
+
+  onModuleInit(): void {
+    const problems: string[] = [];
+
+    for (const name of REQUIRED_ENV_VARS) {
+      const value = process.env[name];
+      if (!value) {
+        problems.push(`${name} falta`);
+      } else if (looksLikePlaceholder(value)) {
+        problems.push(`${name} tiene un valor de marcador ("${value}")`);
+      }
+    }
+
+    if (problems.length > 0) {
+      this.logger.warn(
+        `Cloudinary mal configurado — la subida de fotos fallará hasta corregirlo en Railway: ${problems.join(', ')}`,
+      );
+    }
+  }
 
   uploadBuffer(
     buffer: Buffer,

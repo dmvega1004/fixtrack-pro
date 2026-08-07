@@ -20,10 +20,9 @@ interface TechnicianDashboardProps {
 
 /**
  * Home del Técnico: pantalla operativa mobile-first, sin KPIs financieros
- * ni ranking de compañeros. GET /users/:id es ADMIN/COORDINATOR-only, así
- * que a diferencia de la vista Admin no hay forma de resolver el nombre del
- * técnico sin un cambio de backend — se usa el correo de la sesión, igual
- * que el saludo genérico que había antes en esta página.
+ * ni ranking de compañeros. El nombre viaja en el JWT (ver JwtPayload en el
+ * backend), así que no hace falta GET /users/:id (ADMIN/COORDINATOR-only)
+ * para saludar al técnico por su nombre.
  */
 export async function TechnicianDashboard({ session }: TechnicianDashboardProps) {
   // El backend ya limita GET /work-orders a las órdenes asignadas al técnico.
@@ -34,7 +33,7 @@ export async function TechnicianDashboard({ session }: TechnicianDashboardProps)
   return (
     <div className="flex flex-1 flex-col gap-4 p-4">
       <div>
-        <h1 className="text-2xl font-semibold">Hola, {session.email}</h1>
+        <h1 className="text-2xl font-semibold">Hola, {session.name}</h1>
         <p className="text-sm text-muted-foreground">{formatToday()}</p>
       </div>
 

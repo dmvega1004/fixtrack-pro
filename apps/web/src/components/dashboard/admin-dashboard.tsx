@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ClipboardList, UserRoundX, PackageX } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
-import { getUser, getTechnicians } from "@/lib/api/users";
+import { getTechnicians } from "@/lib/api/users";
 import { getCompany } from "@/lib/api/company";
 import { getWorkOrders } from "@/lib/api/work-orders";
 import { getSpareParts } from "@/lib/api/spare-parts";
@@ -41,8 +41,7 @@ interface AdminDashboardProps {
  * Ver ahí la nota sobre por qué no hay tarjeta de "Ventas del mes".
  */
 export async function AdminDashboard({ session }: AdminDashboardProps) {
-  const [me, company, workOrders, lowStockParts, technicians] = await Promise.all([
-    getUser(session.userId),
+  const [company, workOrders, lowStockParts, technicians] = await Promise.all([
     getCompany(),
     getWorkOrders(),
     getSpareParts({ lowStock: true }),
@@ -61,7 +60,7 @@ export async function AdminDashboard({ session }: AdminDashboardProps) {
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Hola, {me.name}</h1>
+          <h1 className="text-2xl font-semibold">Hola, {session.name}</h1>
           <p className="text-sm text-muted-foreground">
             {formatToday()} · {company.name}
           </p>
