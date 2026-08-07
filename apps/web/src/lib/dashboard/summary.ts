@@ -2,6 +2,7 @@ import type { WorkOrder } from "@/lib/api/work-orders";
 import type { SparePart } from "@/lib/api/spare-parts";
 import type { Employee } from "@/lib/api/users";
 import type { OrderStatus } from "@/components/shared/status-chip";
+import type { Priority } from "@/components/shared/priority-badge";
 
 /**
  * Cálculos puros para el panel de decisiones de la home del dashboard.
@@ -151,5 +152,58 @@ export function recentOrders(orders: WorkOrder[], limit = 5): WorkOrder[] {
 export function lowStockAlerts(spareParts: SparePart[], limit = 5): SparePart[] {
   return [...spareParts]
     .sort((a, b) => a.stock - a.minStock - (b.stock - b.minStock))
+    .slice(0, limit);
+}
+
+export function filterByStatus(orders: WorkOrder[], status: OrderStatus): WorkOrder[] {
+  return orders.filter((order) => order.status === status);
+}
+
+export function filterHighPriorityActive(orders: WorkOrder[]): WorkOrder[] {
+  return filterActiveOrders(orders).filter((order) => order.priority === "HIGH");
+}
+
+const PRIORITY_RANK: Record<Priority, number> = { HIGH: 0, MEDIUM: 1, LOW: 2 };
+
+/** Prioridad más alta primero; a igual prioridad, la más desatendida (updatedAt más antiguo) primero. */
+export function sortActiveOrdersByUrgency(orders: WorkOrder[]): WorkOrder[] {
+  return [...filterActiveOrders(orders)].sort((a, b) => {
+    const priorityDiff = PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
+    if (priorityDiff !== 0) return priorityDiff;
+    return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+  });
+}
+
+export interface StaleOrder {
+  order: WorkOrder;
+  daysSinceUpdate: number;
+}
+
+/**
+ * Órdenes activas sin actividad hace más de `thresholdDays`, la más
+ * desatendida primero. Usa updatedAt: no hay un timestamp específico de
+ * "último contacto" en el modelo.
+ */
+export function staleActiveOrders(
+  orders: WorkOrder[],
+  thresholdDays = 5,
+  now: Date = new Date(),
+): StaleOrder[] {
+  return filterActiveOrders(orders)
+    .map((order) => ({
+      order,
+      daysSinceUpdate: Math.floor(
+        (now.getTime() - new Date(order.updatedAt).getTime()) / DAY_MS,
+      ),
+    }))
+    .filter(({ daysSinceUpdate }) => daysSinceUpdate > thresholdDays)
+    .sort((a, b) => b.daysSinceUpdate - a.daysSinceUpdate);
+}
+
+/** Últimas órdenes cerradas (COMPLETED/DELIVERED), la más reciente primero. */
+export function recentlyClosedOrders(orders: WorkOrder[], limit = 5): WorkOrder[] {
+  return orders
+    .filter((order) => order.status === "COMPLETED" || order.status === "DELIVERED")
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     .slice(0, limit);
 }

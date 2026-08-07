@@ -39,6 +39,11 @@ export function WorkOrderCard({ order }: WorkOrderCardProps) {
           <span className="text-sm text-muted-foreground">
             {order.client.name}
           </span>
+          {order.equipment.location && (
+            <span className="text-xs text-muted-foreground">
+              {order.equipment.location}
+            </span>
+          )}
         </>
       ) : (
         <>
