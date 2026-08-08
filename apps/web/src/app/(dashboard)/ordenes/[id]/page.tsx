@@ -9,6 +9,7 @@ import { getTechnicians } from "@/lib/api/users";
 import { getEquipments } from "@/lib/api/equipments";
 import { getPhotos } from "@/lib/api/attachments";
 import { getCompany } from "@/lib/api/company";
+import { getWorkOrderPayments } from "@/lib/api/payments";
 import { HttpError } from "@/lib/api/http";
 import { StatusChip } from "@/components/shared/status-chip";
 import { PriorityBadge } from "@/components/shared/priority-badge";
@@ -50,8 +51,9 @@ export default async function OrdenDetallePage({
   const canManage = session.role === "ADMIN" || session.role === "COORDINATOR";
   const isAdmin = session.role === "ADMIN";
   const isTerminal = TERMINAL_STATUSES.includes(order.status);
+  const isClosed = order.status === "COMPLETED" || order.status === "DELIVERED";
 
-  const [partsSummary, technicians, catalog, photos, company, clientEquipments] =
+  const [partsSummary, technicians, catalog, photos, company, clientEquipments, payments] =
     await Promise.all([
       getWorkOrderParts(id),
       canManage ? getTechnicians() : Promise.resolve([]),
@@ -63,6 +65,7 @@ export default async function OrdenDetallePage({
             list.filter((equipment) => equipment.clientId === order.clientId),
           )
         : Promise.resolve([]),
+      isAdmin && isClosed ? getWorkOrderPayments(id) : Promise.resolve([]),
     ]);
 
   return (
@@ -122,6 +125,8 @@ export default async function OrdenDetallePage({
             isTerminal={isTerminal}
             currency={company.currency}
             isAdmin={isAdmin}
+            isClosed={isClosed}
+            payments={payments}
           />
         }
         fotos={

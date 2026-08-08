@@ -1,10 +1,12 @@
 import Link from "next/link";
-import { ClipboardList, UserRoundX, PackageX } from "lucide-react";
+import { ClipboardList, UserRoundX, PackageX, Wallet } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { getTechnicians } from "@/lib/api/users";
 import { getCompany } from "@/lib/api/company";
 import { getWorkOrders } from "@/lib/api/work-orders";
 import { getSpareParts } from "@/lib/api/spare-parts";
+import { getBillingSummary } from "@/lib/api/billing";
+import { formatCurrency } from "@/lib/format/currency";
 import type { Session } from "@/lib/roles";
 import {
   filterActiveOrders,
@@ -41,11 +43,16 @@ interface AdminDashboardProps {
  * Ver ahí la nota sobre por qué no hay tarjeta de "Ventas del mes".
  */
 export async function AdminDashboard({ session }: AdminDashboardProps) {
-  const [company, workOrders, lowStockParts, technicians] = await Promise.all([
+  const isAdmin = session.role === "ADMIN";
+
+  const [company, workOrders, lowStockParts, technicians, billingSummary] = await Promise.all([
     getCompany(),
     getWorkOrders(),
     getSpareParts({ lowStock: true }),
     getTechnicians(),
+    // GET /billing/summary es solo ADMIN (403 para Coordinador) — esta home
+    // la comparten ambos roles.
+    isAdmin ? getBillingSummary() : Promise.resolve(null),
   ]);
 
   const activeOrders = filterActiveOrders(workOrders);
@@ -96,6 +103,29 @@ export async function AdminDashboard({ session }: AdminDashboardProps) {
           icon={PackageX}
           tone={lowStockParts.length > 0 ? "danger" : "default"}
         />
+        {billingSummary && (
+          <Link
+            href="/cobros"
+            className="flex flex-col gap-2 rounded-lg border border-border bg-card p-4 shadow-sm transition-colors hover:bg-muted/50"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                Por cobrar
+              </span>
+              <Wallet className="size-4 text-amber-600" />
+            </div>
+            <span className="text-3xl font-semibold text-amber-600">
+              {formatCurrency(billingSummary.totalReceivable, company.currency)}
+            </span>
+            {Number(billingSummary.totalOverdue) > 0 ? (
+              <span className="text-xs font-medium text-red-600">
+                {formatCurrency(billingSummary.totalOverdue, company.currency)} vencido
+              </span>
+            ) : (
+              <span className="text-xs font-medium text-primary">Ver →</span>
+            )}
+          </Link>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

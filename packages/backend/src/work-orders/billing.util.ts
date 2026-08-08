@@ -1,4 +1,4 @@
-import { Prisma } from 'database';
+import { Prisma, PaymentStatus } from 'database';
 
 export interface BillingComponents {
   laborAmount: Prisma.Decimal;
@@ -32,4 +32,19 @@ export function calculateBilling(components: BillingComponents): BillingResult {
   const total = subtotal.add(taxAmount);
 
   return { subtotal, taxAmount, total };
+}
+
+/**
+ * Deriva WorkOrder.paymentStatus a partir del total congelado y lo abonado
+ * hasta ahora. Se recalcula dentro de la misma transacción cada vez que se
+ * registra o elimina un pago (PaymentsService) — nunca se guarda un delta,
+ * siempre se deriva de la suma real de Payment para esa orden.
+ */
+export function derivePaymentStatus(
+  total: Prisma.Decimal,
+  paidAmount: Prisma.Decimal,
+): PaymentStatus {
+  if (paidAmount.lte(0)) return PaymentStatus.PENDING;
+  if (paidAmount.gte(total)) return PaymentStatus.PAID;
+  return PaymentStatus.PARTIAL;
 }

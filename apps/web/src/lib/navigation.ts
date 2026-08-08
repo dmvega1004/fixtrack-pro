@@ -6,6 +6,7 @@ import {
   Users,
   Boxes,
   Package,
+  Wallet,
   UserCog,
   Building,
 } from "lucide-react";
@@ -25,6 +26,12 @@ export const NAV_SECTIONS: NavSection[] = [
   { href: "/clientes", label: "Clientes", icon: Users, roles: ALL_ROLES },
   { href: "/equipos", label: "Equipos", icon: Boxes, roles: ALL_ROLES },
   { href: "/inventario", label: "Inventario", icon: Package, roles: ALL_ROLES },
+  {
+    href: "/cobros",
+    label: "Cobros",
+    icon: Wallet,
+    roles: ["ADMIN"],
+  },
   {
     href: "/personal",
     label: "Personal",

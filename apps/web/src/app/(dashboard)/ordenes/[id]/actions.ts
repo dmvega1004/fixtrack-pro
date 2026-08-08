@@ -5,6 +5,7 @@ import { serverFetch } from "@/lib/api/server-fetch";
 import { HttpError } from "@/lib/api/http";
 import type { OrderStatus } from "@/components/shared/status-chip";
 import type { Priority } from "@/components/shared/priority-badge";
+import type { PaymentMethod } from "@/lib/api/payments";
 
 export interface ActionResult {
   ok: boolean;
@@ -154,6 +155,37 @@ export async function removePartAction(
 ): Promise<ActionResult> {
   return runMutation(orderId, () =>
     serverFetch(`/work-orders/${orderId}/parts/${sparePartId}`, {
+      method: "DELETE",
+    }),
+  );
+}
+
+export interface CreatePaymentInput {
+  amount: number;
+  paidAt: string;
+  method: PaymentMethod;
+  reference?: string;
+  notes?: string;
+}
+
+export async function createPaymentAction(
+  orderId: string,
+  dto: CreatePaymentInput,
+): Promise<ActionResult> {
+  return runMutation(orderId, () =>
+    serverFetch(`/work-orders/${orderId}/payments`, {
+      method: "POST",
+      body: dto,
+    }),
+  );
+}
+
+export async function deletePaymentAction(
+  orderId: string,
+  paymentId: string,
+): Promise<ActionResult> {
+  return runMutation(orderId, () =>
+    serverFetch(`/payments/${paymentId}`, {
       method: "DELETE",
     }),
   );

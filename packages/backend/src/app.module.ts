@@ -7,10 +7,12 @@ import { AttachmentsModule } from './attachments/attachments.module';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
+import { BillingModule } from './billing/billing.module';
 import { ClientsModule } from './clients/clients.module';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { CompanyModule } from './company/company.module';
 import { EquipmentsModule } from './equipments/equipments.module';
+import { PaymentsModule } from './payments/payments.module';
 import { PrismaModule } from './prisma.module';
 import { SparePartsModule } from './spare-parts/spare-parts.module';
 import { UsersModule } from './users/users.module';
@@ -25,10 +27,12 @@ import { WorkOrdersModule } from './work-orders/work-orders.module';
     PrismaModule,
     AuthModule,
     AttachmentsModule,
+    BillingModule,
     ClientsModule,
     CloudinaryModule,
     CompanyModule,
     EquipmentsModule,
+    PaymentsModule,
     WorkOrdersModule,
     SparePartsModule,
     UsersModule,

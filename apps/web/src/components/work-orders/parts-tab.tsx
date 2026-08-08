@@ -1,9 +1,11 @@
 import { formatCurrency } from "@/lib/format/currency";
 import type { WorkOrderPartsSummary } from "@/lib/api/work-order-parts";
 import type { SparePart } from "@/lib/api/spare-parts";
+import type { Payment } from "@/lib/api/payments";
 import { RemovePartButton } from "./remove-part-button";
 import { AddPartPanel } from "./add-part-panel";
 import { BillingSection } from "./billing-section";
+import { PaymentsPanel } from "./payments-panel";
 
 interface PartsTabProps {
   orderId: string;
@@ -12,6 +14,9 @@ interface PartsTabProps {
   isTerminal: boolean;
   currency: string;
   isAdmin: boolean;
+  /** true si status es COMPLETED o DELIVERED — condición para admitir pagos. */
+  isClosed: boolean;
+  payments: Payment[];
 }
 
 export function PartsTab({
@@ -21,8 +26,11 @@ export function PartsTab({
   isTerminal,
   currency,
   isAdmin,
+  isClosed,
+  payments,
 }: PartsTabProps) {
   const { items, totalSale, totalCost, billing } = summary;
+  const balance = (Number(billing.total) - Number(billing.paidAmount)).toFixed(2);
   const margin =
     totalCost !== undefined
       ? Number(totalSale) - Number(totalCost)
@@ -147,6 +155,15 @@ export function PartsTab({
         isAdmin={isAdmin}
         isTerminal={isTerminal}
       />
+
+      {isAdmin && isClosed && (
+        <PaymentsPanel
+          orderId={orderId}
+          payments={payments}
+          balance={balance}
+          currency={currency}
+        />
+      )}
     </div>
   );
 }
