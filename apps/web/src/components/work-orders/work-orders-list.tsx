@@ -37,10 +37,17 @@ export function WorkOrdersList({ workOrders }: WorkOrdersListProps) {
                 </td>
                 <td className="p-0">
                   <Link href={href} className="flex flex-col px-4 py-3">
-                    {order.equipment ? (
+                    {order.equipments.length === 0 ? (
+                      <>
+                        <span>{order.client.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          Servicio locativo
+                        </span>
+                      </>
+                    ) : order.equipments.length === 1 ? (
                       <>
                         <span>
-                          {order.equipment.brand} {order.equipment.model}
+                          {order.equipments[0].brand} {order.equipments[0].model}
                         </span>
                         <span className="text-xs text-muted-foreground">
                           {order.client.name}
@@ -48,9 +55,9 @@ export function WorkOrdersList({ workOrders }: WorkOrdersListProps) {
                       </>
                     ) : (
                       <>
-                        <span>{order.client.name}</span>
+                        <span>{order.equipments.length} equipos</span>
                         <span className="text-xs text-muted-foreground">
-                          Servicio locativo
+                          {order.client.name}
                         </span>
                       </>
                     )}

@@ -1,5 +1,7 @@
 import { Priority } from 'database';
 import {
+  ArrayUnique,
+  IsArray,
   IsEnum,
   IsNotEmpty,
   IsOptional,
@@ -39,14 +41,22 @@ export class CreateWorkOrderDto {
   clientId: string;
 
   /**
-   * Equipo a intervenir (opcional): la empresa también presta servicios
-   * locativos (sellado, limpieza, instalación) sin equipo asociado. Si
-   * se envía, se verifica que pertenezca a la empresa del token Y al
-   * cliente indicado en `clientId`.
+   * Equipos a intervenir (opcional, varios): la empresa también presta
+   * servicios locativos (sellado, limpieza, instalación) sin equipo
+   * asociado — un array vacío u omitido es un servicio locativo. Una
+   * orden puede abarcar varios equipos del mismo cliente (ej. un proyecto
+   * de adecuación normativa sobre 5 portones cotizado como una sola OT).
+   * Se verifica que cada equipo pertenezca a la empresa del token Y al
+   * cliente indicado en `clientId`; duplicados se rechazan acá mismo.
    */
   @IsOptional()
-  @IsUUID('4', { message: 'equipmentId debe ser un UUID válido' })
-  equipmentId?: string;
+  @IsArray()
+  @ArrayUnique({ message: 'equipmentIds no puede tener equipos repetidos' })
+  @IsUUID('4', {
+    each: true,
+    message: 'Cada equipmentId debe ser un UUID válido',
+  })
+  equipmentIds?: string[];
 
   /**
    * Técnico asignado (opcional al crear). Debe pertenecer a la empresa.

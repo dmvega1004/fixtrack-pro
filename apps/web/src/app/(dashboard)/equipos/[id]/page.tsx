@@ -38,9 +38,10 @@ export default async function EquipoDetallePage({
   ]);
 
   // El backend no filtra por equipmentId en query: se pide todo lo visible
-  // para el rol actual y se filtra acá.
+  // para el rol actual y se filtra acá — incluye órdenes que abarcan varios
+  // equipos (ej. un proyecto sobre 5 portones), no solo las de un equipo único.
   const history = workOrders
-    .filter((order) => order.equipmentId === equipment.id)
+    .filter((order) => order.equipments.some((eq) => eq.id === equipment.id))
     .sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );

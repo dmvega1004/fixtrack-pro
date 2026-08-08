@@ -10,13 +10,13 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { OrderStatus, Role, WorkOrder } from 'database';
+import { OrderStatus, Role } from 'database';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { CreateWorkOrderDto } from './dto/create-work-order.dto';
 import { UpdateWorkOrderDto } from './dto/update-work-order.dto';
-import { WorkOrdersService } from './work-orders.service';
+import { WorkOrdersService, WorkOrderView } from './work-orders.service';
 
 /**
  * Este módulo recibe el @CurrentUser() COMPLETO (no solo companyId),
@@ -38,7 +38,7 @@ export class WorkOrdersController {
   create(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateWorkOrderDto,
-  ): Promise<WorkOrder> {
+  ): Promise<WorkOrderView> {
     return this.workOrdersService.create(user, dto);
   }
 
@@ -51,7 +51,7 @@ export class WorkOrdersController {
     @CurrentUser() user: AuthenticatedUser,
     @Query('status', new ParseEnumPipe(OrderStatus, { optional: true }))
     status?: OrderStatus,
-  ): Promise<WorkOrder[]> {
+  ): Promise<WorkOrderView[]> {
     return this.workOrdersService.findAll(user, status);
   }
 
@@ -60,7 +60,7 @@ export class WorkOrdersController {
   findOne(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<WorkOrder> {
+  ): Promise<WorkOrderView> {
     return this.workOrdersService.findOne(user, id);
   }
 
@@ -73,7 +73,7 @@ export class WorkOrdersController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateWorkOrderDto,
-  ): Promise<WorkOrder> {
+  ): Promise<WorkOrderView> {
     return this.workOrdersService.update(user, id, dto);
   }
 
@@ -83,7 +83,7 @@ export class WorkOrdersController {
   remove(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<WorkOrder> {
+  ): Promise<WorkOrderView> {
     return this.workOrdersService.remove(user, id);
   }
 }

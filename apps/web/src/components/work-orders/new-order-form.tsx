@@ -3,11 +3,13 @@
 import { useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ComboSelect } from "./combo-select";
+import { EquipmentCheckboxList } from "./equipment-checkbox-list";
 import type { Client } from "@/lib/api/clients";
 import {
   DOCUMENT_TYPES,
@@ -58,6 +60,11 @@ const EMPTY_NEW_EQUIPMENT: NewEquipmentDraft = {
   location: "",
 };
 
+/** Etiqueta unificada en la selección: un equipo ya existente o uno nuevo aún sin crear. */
+type EquipmentTag =
+  | { key: string; kind: "existing"; id: string; label: string }
+  | { key: string; kind: "draft"; index: number; label: string };
+
 interface NewOrderFormProps {
   clients: Client[];
   equipments: Equipment[];
@@ -84,13 +91,15 @@ export function NewOrderForm({
   );
   const [newClient, setNewClient] = useState<NewClientDraft>(EMPTY_NEW_CLIENT);
 
-  const [equipmentMode, setEquipmentMode] = useState<
-    "existing" | "new" | "none"
-  >("existing");
-  const [selectedEquipmentId, setSelectedEquipmentId] = useState<
-    string | null
-  >(initialEquipmentId ?? null);
-  const [newEquipment, setNewEquipment] =
+  const [equipmentSectionMode, setEquipmentSectionMode] = useState<
+    "selection" | "none"
+  >("selection");
+  const [selectedEquipmentIds, setSelectedEquipmentIds] = useState<string[]>(
+    initialEquipmentId ? [initialEquipmentId] : [],
+  );
+  const [draftEquipments, setDraftEquipments] = useState<NewEquipmentDraft[]>([]);
+  const [isAddingEquipment, setIsAddingEquipment] = useState(false);
+  const [newEquipmentDraft, setNewEquipmentDraft] =
     useState<NewEquipmentDraft>(EMPTY_NEW_EQUIPMENT);
 
   const [description, setDescription] = useState("");
@@ -117,9 +126,6 @@ export function NewOrderForm({
     [equipments, activeClientId],
   );
 
-  const canPickExistingEquipment =
-    clientMode === "existing" && equipmentsForClient.length > 0;
-
   const clientComboItems = useMemo(
     () =>
       clients.map((client) => ({
@@ -138,7 +144,7 @@ export function NewOrderForm({
     [clients],
   );
 
-  const equipmentComboItems = useMemo(
+  const equipmentCheckboxItems = useMemo(
     () =>
       equipmentsForClient.map((equipment) => ({
         id: equipment.id,
@@ -148,20 +154,37 @@ export function NewOrderForm({
     [equipmentsForClient],
   );
 
+  const equipmentTags: EquipmentTag[] = useMemo(() => {
+    const existingTags: EquipmentTag[] = selectedEquipmentIds
+      .map((id) => equipmentCheckboxItems.find((item) => item.id === id))
+      .filter((item): item is (typeof equipmentCheckboxItems)[number] => item !== undefined)
+      .map((item) => ({ key: `existing-${item.id}`, kind: "existing", id: item.id, label: item.label }));
+
+    const draftTags: EquipmentTag[] = draftEquipments.map((draft, index) => ({
+      key: `draft-${index}`,
+      kind: "draft",
+      index,
+      label: `${draft.brand} ${draft.model} (nuevo)`,
+    }));
+
+    return [...existingTags, ...draftTags];
+  }, [selectedEquipmentIds, equipmentCheckboxItems, draftEquipments]);
+
   function handleSelectClient(id: string) {
     setSelectedClientId(id);
-    setSelectedEquipmentId(null);
-    const hasEquipment = equipments.some(
-      (equipment) => equipment.client.id === id,
-    );
-    setEquipmentMode(hasEquipment ? "existing" : "new");
+    setSelectedEquipmentIds([]);
+    setDraftEquipments([]);
+    setEquipmentSectionMode("selection");
+    setIsAddingEquipment(false);
   }
 
   function handleClientModeChange(mode: "existing" | "new") {
     setClientMode(mode);
     setSelectedClientId(null);
-    setSelectedEquipmentId(null);
-    setEquipmentMode("new");
+    setSelectedEquipmentIds([]);
+    setDraftEquipments([]);
+    setEquipmentSectionMode("selection");
+    setIsAddingEquipment(false);
     if (mode === "new") {
       setNewClient(EMPTY_NEW_CLIENT);
     }
@@ -176,27 +199,48 @@ export function NewOrderForm({
     };
   }
 
-  function updateNewEquipment(field: keyof NewEquipmentDraft) {
+  function toggleEquipment(id: string) {
+    setSelectedEquipmentIds((current) =>
+      current.includes(id) ? current.filter((existing) => existing !== id) : [...current, id],
+    );
+  }
+
+  function updateNewEquipmentDraft(field: keyof NewEquipmentDraft) {
     return (event: ChangeEvent<HTMLInputElement>) => {
-      setNewEquipment((current) => ({
+      setNewEquipmentDraft((current) => ({
         ...current,
         [field]: event.target.value,
       }));
     };
   }
 
-  const equipmentValid =
-    equipmentMode === "none"
-      ? true
-      : equipmentMode === "existing"
-        ? selectedEquipmentId !== null
-        : newEquipment.brand.trim() !== "" && newEquipment.model.trim() !== "";
+  const canAddDraftEquipment =
+    newEquipmentDraft.brand.trim() !== "" && newEquipmentDraft.model.trim() !== "";
 
-  const isFormValid =
-    hasClient &&
-    equipmentValid &&
-    description.trim() !== "" &&
-    !isSubmitting;
+  function handleAddDraftEquipment() {
+    if (!canAddDraftEquipment) return;
+    setDraftEquipments((current) => [
+      ...current,
+      {
+        brand: newEquipmentDraft.brand.trim(),
+        model: newEquipmentDraft.model.trim(),
+        serialNumber: newEquipmentDraft.serialNumber.trim(),
+        location: newEquipmentDraft.location.trim(),
+      },
+    ]);
+    setNewEquipmentDraft(EMPTY_NEW_EQUIPMENT);
+    setIsAddingEquipment(false);
+  }
+
+  function removeEquipmentTag(tag: EquipmentTag) {
+    if (tag.kind === "existing") {
+      setSelectedEquipmentIds((current) => current.filter((id) => id !== tag.id));
+    } else {
+      setDraftEquipments((current) => current.filter((_, index) => index !== tag.index));
+    }
+  }
+
+  const isFormValid = hasClient && description.trim() !== "" && !isSubmitting;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -220,19 +264,18 @@ export function NewOrderForm({
           } as const);
 
     const equipmentPayload =
-      equipmentMode === "none"
+      equipmentSectionMode === "none"
         ? ({ mode: "none" } as const)
-        : equipmentMode === "existing"
-          ? ({ mode: "existing", id: selectedEquipmentId! } as const)
-          : ({
-              mode: "new",
-              data: {
-                brand: newEquipment.brand.trim(),
-                model: newEquipment.model.trim(),
-                serialNumber: newEquipment.serialNumber.trim() || undefined,
-                location: newEquipment.location.trim() || undefined,
-              },
-            } as const);
+        : ({
+            mode: "selection",
+            existingIds: selectedEquipmentIds,
+            newEquipment: draftEquipments.map((draft) => ({
+              brand: draft.brand,
+              model: draft.model,
+              serialNumber: draft.serialNumber || undefined,
+              location: draft.location || undefined,
+            })),
+          } as const);
 
     const result = await createWorkOrderChainedAction({
       client: clientPayload,
@@ -362,7 +405,7 @@ export function NewOrderForm({
 
       <Card>
         <CardHeader>
-          <CardTitle>Equipo</CardTitle>
+          <CardTitle>Equipos</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           {!hasClient ? (
@@ -372,44 +415,25 @@ export function NewOrderForm({
           ) : (
             <>
               <div className="flex flex-wrap gap-2">
-                {canPickExistingEquipment && (
-                  <Button
-                    type="button"
-                    variant={equipmentMode === "existing" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setEquipmentMode("existing")}
-                  >
-                    Equipo existente
-                  </Button>
-                )}
                 <Button
                   type="button"
-                  variant={equipmentMode === "new" ? "default" : "outline"}
+                  variant={equipmentSectionMode === "selection" ? "default" : "outline"}
                   size="sm"
-                  onClick={() => setEquipmentMode("new")}
+                  onClick={() => setEquipmentSectionMode("selection")}
                 >
-                  Crear equipo nuevo
+                  Seleccionar equipos
                 </Button>
                 <Button
                   type="button"
-                  variant={equipmentMode === "none" ? "default" : "outline"}
+                  variant={equipmentSectionMode === "none" ? "default" : "outline"}
                   size="sm"
-                  onClick={() => setEquipmentMode("none")}
+                  onClick={() => setEquipmentSectionMode("none")}
                 >
                   Servicio sin equipo (locativo)
                 </Button>
               </div>
 
-              {clientMode === "existing" &&
-                equipmentsForClient.length === 0 &&
-                equipmentMode !== "none" && (
-                  <p className="text-xs text-muted-foreground">
-                    Este cliente no tiene equipos registrados. Completa los
-                    datos del equipo nuevo o elige &quot;Servicio sin equipo&quot;.
-                  </p>
-                )}
-
-              {equipmentMode === "none" && (
+              {equipmentSectionMode === "none" && (
                 <p className="rounded-lg border border-dashed border-border p-3 text-sm text-muted-foreground">
                   La orden quedará asociada solo al cliente — para servicios
                   locativos como sellado de paredes, limpieza de fachada,
@@ -417,58 +441,118 @@ export function NewOrderForm({
                 </p>
               )}
 
-              {equipmentMode === "existing" && (
-                <ComboSelect
-                  items={equipmentComboItems}
-                  selectedId={selectedEquipmentId}
-                  onSelect={setSelectedEquipmentId}
-                  placeholder="Buscar equipo por marca o modelo..."
-                  emptyMessage="No se encontraron equipos."
-                />
-              )}
-
-              {equipmentMode === "new" && (
+              {equipmentSectionMode === "selection" && (
                 <div className="flex flex-col gap-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="brand">Marca *</Label>
-                      <Input
-                        id="brand"
-                        value={newEquipment.brand}
-                        onChange={updateNewEquipment("brand")}
-                        required
-                      />
+                  {equipmentTags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {equipmentTags.map((tag) => (
+                        <span
+                          key={tag.key}
+                          className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary"
+                        >
+                          {tag.label}
+                          <button
+                            type="button"
+                            onClick={() => removeEquipmentTag(tag)}
+                            aria-label={`Quitar ${tag.label}`}
+                            className="rounded-full hover:bg-primary/20"
+                          >
+                            <X className="size-3" />
+                          </button>
+                        </span>
+                      ))}
                     </div>
-                    <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="model">Modelo *</Label>
-                      <Input
-                        id="model"
-                        value={newEquipment.model}
-                        onChange={updateNewEquipment("model")}
-                        required
-                      />
+                  )}
+
+                  {equipmentCheckboxItems.length > 0 ? (
+                    <EquipmentCheckboxList
+                      items={equipmentCheckboxItems}
+                      selectedIds={selectedEquipmentIds}
+                      onToggle={toggleEquipment}
+                      placeholder="Buscar equipo por marca o modelo..."
+                      emptyMessage="No se encontraron equipos."
+                    />
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      {clientMode === "existing"
+                        ? "Este cliente no tiene equipos registrados todavía."
+                        : "El cliente es nuevo: no tiene equipos registrados todavía."}
+                    </p>
+                  )}
+
+                  {isAddingEquipment ? (
+                    <div className="flex flex-col gap-3 rounded-lg border border-border p-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1.5">
+                          <Label htmlFor="draftBrand">Marca *</Label>
+                          <Input
+                            id="draftBrand"
+                            value={newEquipmentDraft.brand}
+                            onChange={updateNewEquipmentDraft("brand")}
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <Label htmlFor="draftModel">Modelo *</Label>
+                          <Input
+                            id="draftModel"
+                            value={newEquipmentDraft.model}
+                            onChange={updateNewEquipmentDraft("model")}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="draftSerialNumber">Número de serie</Label>
+                        <Input
+                          id="draftSerialNumber"
+                          value={newEquipmentDraft.serialNumber}
+                          onChange={updateNewEquipmentDraft("serialNumber")}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="draftLocation">Ubicación</Label>
+                        <Input
+                          id="draftLocation"
+                          value={newEquipmentDraft.location}
+                          onChange={updateNewEquipmentDraft("location")}
+                          placeholder="Ej. CC La Cuesta, Piedecuesta — Local AME2170 Americanino"
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        El código QR se genera automáticamente al crear el equipo.
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={!canAddDraftEquipment}
+                          onClick={handleAddDraftEquipment}
+                        >
+                          Agregar a la orden
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setIsAddingEquipment(false);
+                            setNewEquipmentDraft(EMPTY_NEW_EQUIPMENT);
+                          }}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="serialNumber">Número de serie</Label>
-                    <Input
-                      id="serialNumber"
-                      value={newEquipment.serialNumber}
-                      onChange={updateNewEquipment("serialNumber")}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="equipmentLocation">Ubicación</Label>
-                    <Input
-                      id="equipmentLocation"
-                      value={newEquipment.location}
-                      onChange={updateNewEquipment("location")}
-                      placeholder="Ej. CC La Cuesta, Piedecuesta — Local AME2170 Americanino"
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    El código QR se genera automáticamente al crear el equipo.
-                  </p>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="self-start"
+                      onClick={() => setIsAddingEquipment(true)}
+                    >
+                      Crear equipo nuevo
+                    </Button>
+                  )}
                 </div>
               )}
             </>

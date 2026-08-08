@@ -30,11 +30,14 @@ export type ClientSelection =
 /**
  * "none" = servicio locativo sin equipo asociado (sellado, limpieza,
  * instalación de vitrinas, etc.) — la orden se crea solo con clientId.
+ * "selection" = 0+ equipos ya existentes (existingIds) + 0+ equipos nuevos
+ * creados en línea (newEquipment, colgados del cliente resultante) — una
+ * orden puede abarcar varios equipos del mismo cliente (ej. un proyecto de
+ * adecuación normativa sobre 5 portones cotizado como una sola OT).
  */
 export type EquipmentSelection =
-  | { mode: "existing"; id: string }
-  | { mode: "new"; data: NewEquipmentData }
-  | { mode: "none" };
+  | { mode: "none" }
+  | { mode: "selection"; existingIds: string[]; newEquipment: NewEquipmentData[] };
 
 export interface CreateOrderInput {
   client: ClientSelection;
@@ -78,17 +81,20 @@ export async function createWorkOrderChainedAction(
       clientId = client.id;
     }
 
-    let equipmentId: string | undefined;
-    if (input.equipment.mode === "existing") {
-      equipmentId = input.equipment.id;
-    } else if (input.equipment.mode === "new") {
-      const equipment = await serverFetch<Equipment>("/equipments", {
-        method: "POST",
-        body: { ...input.equipment.data, clientId },
-      });
-      equipmentId = equipment.id;
+    // mode "none": servicio locativo, equipmentIds queda vacío.
+    const equipmentIds: string[] = [];
+    if (input.equipment.mode === "selection") {
+      equipmentIds.push(...input.equipment.existingIds);
+      // Los equipos nuevos se crean colgados del cliente YA resuelto arriba
+      // (nuevo o existente) — uno por uno, para poder recuperar cada id.
+      for (const data of input.equipment.newEquipment) {
+        const equipment = await serverFetch<Equipment>("/equipments", {
+          method: "POST",
+          body: { ...data, clientId },
+        });
+        equipmentIds.push(equipment.id);
+      }
     }
-    // mode "none": servicio locativo, equipmentId queda undefined
 
     const order = await serverFetch<CreatedWorkOrder>("/work-orders", {
       method: "POST",
@@ -96,7 +102,7 @@ export async function createWorkOrderChainedAction(
         description: input.description,
         priority: input.priority,
         clientId,
-        ...(equipmentId ? { equipmentId } : {}),
+        ...(equipmentIds.length > 0 ? { equipmentIds } : {}),
         ...(input.userId ? { userId: input.userId } : {}),
       },
     });

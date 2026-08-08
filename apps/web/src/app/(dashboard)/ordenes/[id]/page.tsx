@@ -6,6 +6,7 @@ import { getWorkOrder } from "@/lib/api/work-orders";
 import { getWorkOrderParts } from "@/lib/api/work-order-parts";
 import { getSpareParts } from "@/lib/api/spare-parts";
 import { getTechnicians } from "@/lib/api/users";
+import { getEquipments } from "@/lib/api/equipments";
 import { getPhotos } from "@/lib/api/attachments";
 import { getCompany } from "@/lib/api/company";
 import { HttpError } from "@/lib/api/http";
@@ -19,6 +20,7 @@ import { OrderStatusChanger } from "@/components/work-orders/order-status-change
 import { DetailsTab } from "@/components/work-orders/details-tab";
 import { PartsTab } from "@/components/work-orders/parts-tab";
 import { PhotosTab } from "@/components/work-orders/photos-tab";
+import { EquipmentSection } from "@/components/work-orders/equipment-section";
 
 const TERMINAL_STATUSES = ["DELIVERED", "CANCELLED"];
 
@@ -49,13 +51,19 @@ export default async function OrdenDetallePage({
   const isAdmin = session.role === "ADMIN";
   const isTerminal = TERMINAL_STATUSES.includes(order.status);
 
-  const [partsSummary, technicians, catalog, photos, company] = await Promise.all([
-    getWorkOrderParts(id),
-    canManage ? getTechnicians() : Promise.resolve([]),
-    isTerminal ? Promise.resolve([]) : getSpareParts(),
-    getPhotos(id),
-    getCompany(),
-  ]);
+  const [partsSummary, technicians, catalog, photos, company, clientEquipments] =
+    await Promise.all([
+      getWorkOrderParts(id),
+      canManage ? getTechnicians() : Promise.resolve([]),
+      isTerminal ? Promise.resolve([]) : getSpareParts(),
+      getPhotos(id),
+      getCompany(),
+      canManage
+        ? getEquipments().then((list) =>
+            list.filter((equipment) => equipment.clientId === order.clientId),
+          )
+        : Promise.resolve([]),
+    ]);
 
   return (
     <div className="flex flex-1 flex-col pb-36 md:pb-6">
@@ -81,31 +89,14 @@ export default async function OrdenDetallePage({
         </p>
         <p className="line-clamp-2 text-sm">{order.description}</p>
 
-        <div className="flex flex-col gap-0.5 rounded-lg border border-border bg-card p-4 text-sm">
-          {order.equipment ? (
-            <>
-              <span className="font-medium">
-                {order.equipment.brand} {order.equipment.model}
-              </span>
-              <span className="text-muted-foreground">{order.client.name}</span>
-              {order.equipment.location && (
-                <span className="text-xs text-muted-foreground">
-                  {order.equipment.location}
-                </span>
-              )}
-              <span className="mt-1 text-xs text-muted-foreground">
-                Código QR: {order.equipment.qrCode}
-              </span>
-            </>
-          ) : (
-            <>
-              <span className="font-medium">{order.client.name}</span>
-              <span className="w-fit rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                Servicio locativo
-              </span>
-            </>
-          )}
-        </div>
+        <EquipmentSection
+          orderId={order.id}
+          clientName={order.client.name}
+          equipments={order.equipments}
+          clientEquipments={clientEquipments}
+          canManage={canManage}
+          isTerminal={isTerminal}
+        />
       </div>
 
       <OrderStatusChanger

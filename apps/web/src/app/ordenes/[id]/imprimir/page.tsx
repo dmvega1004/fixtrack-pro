@@ -74,7 +74,7 @@ export default async function ImprimirOrdenPage({
     <div className="min-h-svh bg-neutral-100 pb-24 print:bg-white print:pb-0">
       <WorkOrderPrintDocument
         order={order}
-        equipment={order.equipment}
+        equipments={order.equipments}
         client={client}
         company={company}
         partsSummary={partsSummary}

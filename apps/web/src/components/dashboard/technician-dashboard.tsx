@@ -6,6 +6,7 @@ import { getWorkOrders } from "@/lib/api/work-orders";
 import { WorkOrderCard } from "@/components/work-orders/work-order-card";
 import { StatusChip } from "@/components/shared/status-chip";
 import { formatOrderNumber } from "@/lib/format/order-number";
+import { formatEquipmentSummary } from "@/lib/format/equipment-summary";
 import { formatDate } from "@/lib/format/dates";
 import type { Session } from "@/lib/roles";
 import {
@@ -168,10 +169,7 @@ export async function TechnicianDashboard({ session }: TechnicianDashboardProps)
                 <div className="flex flex-col overflow-hidden">
                   <span className="font-medium">{formatOrderNumber(order.orderNumber)}</span>
                   <span className="truncate text-xs text-muted-foreground">
-                    {order.equipment
-                      ? `${order.equipment.brand} ${order.equipment.model}`
-                      : "Servicio locativo"}{" "}
-                    · {order.client.name}
+                    {formatEquipmentSummary(order.equipments)} · {order.client.name}
                   </span>
                 </div>
                 <div className="flex flex-shrink-0 flex-col items-end gap-1">

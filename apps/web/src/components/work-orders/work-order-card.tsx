@@ -31,25 +31,34 @@ export function WorkOrderCard({ order }: WorkOrderCardProps) {
         </span>
         <StatusChip status={order.status} />
       </div>
-      {order.equipment ? (
+      {order.equipments.length === 0 ? (
+        <>
+          <span className="text-sm font-medium">{order.client.name}</span>
+          <span className="text-sm text-muted-foreground">
+            Servicio locativo
+          </span>
+        </>
+      ) : order.equipments.length === 1 ? (
         <>
           <span className="text-sm font-medium">
-            {order.equipment.brand} {order.equipment.model}
+            {order.equipments[0].brand} {order.equipments[0].model}
           </span>
           <span className="text-sm text-muted-foreground">
             {order.client.name}
           </span>
-          {order.equipment.location && (
+          {order.equipments[0].location && (
             <span className="text-xs text-muted-foreground">
-              {order.equipment.location}
+              {order.equipments[0].location}
             </span>
           )}
         </>
       ) : (
         <>
-          <span className="text-sm font-medium">{order.client.name}</span>
+          <span className="text-sm font-medium">
+            {order.equipments.length} equipos
+          </span>
           <span className="text-sm text-muted-foreground">
-            Servicio locativo
+            {order.client.name}
           </span>
         </>
       )}

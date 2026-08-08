@@ -12,6 +12,7 @@ import { ResetPasswordForm } from "@/components/employee/reset-password-form";
 import { DeleteEmployeeButton } from "@/components/employee/delete-employee-button";
 import { StatusChip } from "@/components/shared/status-chip";
 import { formatOrderNumber } from "@/lib/format/order-number";
+import { formatEquipmentSummary } from "@/lib/format/equipment-summary";
 import { formatDate } from "@/lib/format/dates";
 
 interface EmpleadoDetallePageProps {
@@ -102,9 +103,7 @@ export default async function EmpleadoDetallePage({ params }: EmpleadoDetallePag
                     <div className="flex flex-col gap-0.5">
                       <span className="font-medium">{formatOrderNumber(order.orderNumber)}</span>
                       <span className="text-xs text-muted-foreground">
-                        {order.equipment
-                          ? `${order.equipment.brand} ${order.equipment.model} · ${order.client.name}`
-                          : `${order.client.name} · Servicio locativo`}
+                        {formatEquipmentSummary(order.equipments)} · {order.client.name}
                       </span>
                     </div>
                     <span className="flex items-center gap-3">

@@ -82,6 +82,23 @@ export async function reassignTechnicianAction(
   );
 }
 
+/**
+ * PATCH /work-orders/:id con equipmentIds — reemplaza el set COMPLETO de
+ * equipos de la orden (no es un delta), así que el llamador siempre debe
+ * mandar la lista final resultante (tras agregar o quitar uno).
+ */
+export async function updateOrderEquipmentsAction(
+  orderId: string,
+  equipmentIds: string[],
+): Promise<ActionResult> {
+  return runMutation(orderId, () =>
+    serverFetch(`/work-orders/${orderId}`, {
+      method: "PATCH",
+      body: { equipmentIds },
+    }),
+  );
+}
+
 export async function changePriorityAction(
   orderId: string,
   priority: Priority,

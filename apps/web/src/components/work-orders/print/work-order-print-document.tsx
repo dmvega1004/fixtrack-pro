@@ -15,8 +15,8 @@ const BRAND_BLUE = "#2563EB";
 
 interface WorkOrderPrintDocumentProps {
   order: WorkOrder;
-  /** Ausente en órdenes de servicio locativo — el bloque "Equipo" se omite. */
-  equipment: WorkOrderEquipment | null;
+  /** Vacío en órdenes de servicio locativo — el bloque "Equipo(s)" se omite. */
+  equipments: WorkOrderEquipment[];
   client: Client;
   company: Company;
   partsSummary: WorkOrderPartsSummary;
@@ -121,7 +121,7 @@ function SignatureBox({ title }: { title: string }) {
 
 export function WorkOrderPrintDocument({
   order,
-  equipment,
+  equipments,
   client,
   company,
   partsSummary,
@@ -195,16 +195,44 @@ export function WorkOrderPrintDocument({
         </div>
       </section>
 
-      {equipment && (
+      {equipments.length === 1 && (
         <section className="mt-6 flex flex-col gap-3">
           <SectionTitle>Equipo</SectionTitle>
           <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
-            <Field label="Marca" value={equipment.brand} />
-            <Field label="Modelo" value={equipment.model} />
-            <Field label="Serial" value={equipment.serialNumber} />
-            <Field label="Ubicación" value={equipment.location} />
-            <Field label="Código QR" value={equipment.qrCode} />
+            <Field label="Marca" value={equipments[0].brand} />
+            <Field label="Modelo" value={equipments[0].model} />
+            <Field label="Serial" value={equipments[0].serialNumber} />
+            <Field label="Ubicación" value={equipments[0].location} />
+            <Field label="Código QR" value={equipments[0].qrCode} />
           </div>
+        </section>
+      )}
+
+      {equipments.length > 1 && (
+        <section className="mt-6 flex flex-col gap-3">
+          <SectionTitle>{`Equipos (${equipments.length})`}</SectionTitle>
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-neutral-400 text-left text-[11px] tracking-wide text-neutral-500 uppercase">
+                <th className="py-1.5 pr-2 font-medium">Marca</th>
+                <th className="py-1.5 pr-2 font-medium">Modelo</th>
+                <th className="py-1.5 pr-2 font-medium">Serial</th>
+                <th className="py-1.5 font-medium">Ubicación</th>
+              </tr>
+            </thead>
+            <tbody>
+              {equipments.map((item) => (
+                <tr key={item.id} className="border-b border-neutral-200">
+                  <td className="py-1.5 pr-2">{item.brand}</td>
+                  <td className="py-1.5 pr-2">{item.model}</td>
+                  <td className="py-1.5 pr-2 text-neutral-600">
+                    {item.serialNumber ?? "—"}
+                  </td>
+                  <td className="py-1.5 text-neutral-600">{item.location ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </section>
       )}
 

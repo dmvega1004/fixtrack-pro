@@ -13,24 +13,49 @@ import { UpdateWorkOrderDto } from './dto/update-work-order.dto';
 
 /**
  * Relaciones que acompañan a cada orden en las respuestas. `client` es el
- * vínculo principal (siempre presente); `equipment` es opcional — las
- * órdenes de servicio locativo no tienen equipo asociado y el campo llega
- * como `null` a los consumidores.
+ * vínculo principal (siempre presente); `equipmentLinks` viaja vía la
+ * tabla intermedia WorkOrderEquipment — se aplana a `equipments` en
+ * `toView()` porque Prisma no puede devolver un array plano directo desde
+ * un include anidado. Cero equipos = servicio locativo.
  */
 const WORK_ORDER_INCLUDE = {
   client: { select: { id: true, name: true } },
-  equipment: {
+  equipmentLinks: {
     select: {
-      id: true,
-      brand: true,
-      model: true,
-      serialNumber: true,
-      location: true,
-      qrCode: true,
+      equipment: {
+        select: {
+          id: true,
+          brand: true,
+          model: true,
+          serialNumber: true,
+          location: true,
+          qrCode: true,
+        },
+      },
     },
   },
   user: { select: { id: true, name: true, email: true } },
 } as const;
+
+type WorkOrderWithRelations = Prisma.WorkOrderGetPayload<{
+  include: typeof WORK_ORDER_INCLUDE;
+}>;
+
+export interface WorkOrderEquipmentSummary {
+  id: string;
+  brand: string;
+  model: string;
+  serialNumber: string | null;
+  location: string | null;
+  qrCode: string;
+}
+
+/** Vista pública de una orden: WorkOrder + client/user incluidos + equipments ya aplanado. */
+export type WorkOrderView = WorkOrder & {
+  client: { id: string; name: string };
+  user: { id: string; name: string; email: string } | null;
+  equipments: WorkOrderEquipmentSummary[];
+};
 
 /** Estados terminales: una orden entregada o cancelada queda sellada. */
 const TERMINAL_STATUSES: OrderStatus[] = [
@@ -53,16 +78,18 @@ export class WorkOrdersService {
   async create(
     user: AuthenticatedUser,
     dto: CreateWorkOrderDto,
-  ): Promise<WorkOrder> {
+  ): Promise<WorkOrderView> {
     // Validación cruzada: el cliente debe pertenecer a MI empresa
     await this.ensureClientBelongsToCompany(user.companyId, dto.clientId);
 
-    // Si hay equipo, debe ser de MI empresa Y del cliente indicado
+    // Si hay equipos, deben ser de MI empresa Y del cliente indicado
     // (coherencia: no se puede colgar la orden de un equipo de otro cliente).
-    if (dto.equipmentId) {
-      await this.ensureEquipmentBelongsToClient(
+    // Duplicados ya los rechaza el DTO (@ArrayUnique).
+    const equipmentIds = dto.equipmentIds ?? [];
+    if (equipmentIds.length > 0) {
+      await this.ensureEquipmentsBelongToClient(
         user.companyId,
-        dto.equipmentId,
+        equipmentIds,
         dto.clientId,
       );
     }
@@ -82,7 +109,7 @@ export class WorkOrdersService {
     // de fila sobre Company hasta el commit, así que dos creaciones
     // simultáneas para la misma empresa se serializan y nunca repiten
     // número (el @@unique([companyId, orderNumber]) es el respaldo final).
-    return this.prisma.$transaction(async (tx) => {
+    const created = await this.prisma.$transaction(async (tx) => {
       const company = await tx.company.update({
         where: { id: user.companyId },
         data: { nextOrderNumber: { increment: 1 } },
@@ -97,17 +124,32 @@ export class WorkOrdersService {
           observations: dto.observations?.trim(),
           priority: dto.priority, // undefined → default MEDIUM
           clientId: dto.clientId,
-          equipmentId: dto.equipmentId,
           userId: assignedUserId,
           companyId: user.companyId, // candado
           // status: toda orden nace PENDING (default de Prisma)
+          equipmentLinks:
+            equipmentIds.length > 0
+              ? {
+                  createMany: {
+                    data: equipmentIds.map((equipmentId) => ({
+                      equipmentId,
+                      companyId: user.companyId, // candado
+                    })),
+                  },
+                }
+              : undefined,
         },
         include: WORK_ORDER_INCLUDE,
       });
     });
+
+    return this.toView(created);
   }
 
-  findAll(user: AuthenticatedUser, status?: OrderStatus): Promise<WorkOrder[]> {
+  async findAll(
+    user: AuthenticatedUser,
+    status?: OrderStatus,
+  ): Promise<WorkOrderView[]> {
     const where: Prisma.WorkOrderWhereInput = {
       companyId: user.companyId, // candado
       // RBAC fino: el técnico SOLO ve sus órdenes asignadas
@@ -115,14 +157,16 @@ export class WorkOrdersService {
       ...(status ? { status } : {}),
     };
 
-    return this.prisma.workOrder.findMany({
+    const orders = await this.prisma.workOrder.findMany({
       where,
       include: WORK_ORDER_INCLUDE,
       orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
     });
+
+    return orders.map((order) => this.toView(order));
   }
 
-  async findOne(user: AuthenticatedUser, id: string): Promise<WorkOrder> {
+  async findOne(user: AuthenticatedUser, id: string): Promise<WorkOrderView> {
     const workOrder = await this.prisma.workOrder.findFirst({
       where: {
         id,
@@ -137,14 +181,14 @@ export class WorkOrdersService {
       throw new NotFoundException(`Orden de trabajo ${id} no encontrada`);
     }
 
-    return workOrder;
+    return this.toView(workOrder);
   }
 
   async update(
     user: AuthenticatedUser,
     id: string,
     dto: UpdateWorkOrderDto,
-  ): Promise<WorkOrder> {
+  ): Promise<WorkOrderView> {
     // Pertenencia al tenant + visibilidad del técnico (404 si no aplica)
     const workOrder = await this.findOne(user, id);
 
@@ -161,7 +205,7 @@ export class WorkOrdersService {
       if (dto.description !== undefined) forbiddenFields.push('description');
       if (dto.priority !== undefined) forbiddenFields.push('priority');
       if (dto.clientId !== undefined) forbiddenFields.push('clientId');
-      if (dto.equipmentId !== undefined) forbiddenFields.push('equipmentId');
+      if (dto.equipmentIds !== undefined) forbiddenFields.push('equipmentIds');
       if (dto.userId !== undefined) forbiddenFields.push('userId');
       if (dto.laborAmount !== undefined) forbiddenFields.push('laborAmount');
       if (dto.additionalAmount !== undefined)
@@ -204,13 +248,13 @@ export class WorkOrdersService {
     if (dto.clientId) {
       await this.ensureClientBelongsToCompany(user.companyId, dto.clientId);
     }
-    // Coherencia equipo/cliente: si cambia el equipo (o solo el cliente, con
-    // un equipo ya existente en la orden), el equipo resultante debe ser del
-    // cliente resultante.
-    if (dto.equipmentId) {
-      await this.ensureEquipmentBelongsToClient(
+    // Coherencia equipos/cliente: si cambian los equipos (o solo el cliente,
+    // con equipos ya existentes en la orden), los equipos resultantes deben
+    // ser del cliente resultante. Duplicados ya los rechaza el DTO.
+    if (dto.equipmentIds !== undefined && dto.equipmentIds.length > 0) {
+      await this.ensureEquipmentsBelongToClient(
         user.companyId,
-        dto.equipmentId,
+        dto.equipmentIds,
         dto.clientId ?? workOrder.clientId,
       );
     }
@@ -275,7 +319,7 @@ export class WorkOrdersService {
       };
     }
 
-    return this.prisma.workOrder.update({
+    const updated = await this.prisma.workOrder.update({
       where: { id },
       data: {
         description: dto.description?.trim(),
@@ -284,12 +328,26 @@ export class WorkOrdersService {
         status: dto.status,
         priority: dto.priority,
         clientId: dto.clientId,
-        equipmentId: dto.equipmentId,
         userId: dto.userId,
         laborAmount: dto.laborAmount,
         additionalAmount: dto.additionalAmount,
         additionalDescription: dto.additionalDescription?.trim(),
         discountAmount: dto.discountAmount,
+        // Reemplaza el set completo de equipos de la orden (semántica PATCH):
+        // borra los vínculos actuales y crea los del array recibido. Un
+        // array vacío es válido y explícito: deja la orden sin equipos
+        // (servicio locativo). `undefined` (campo omitido) no toca nada.
+        ...(dto.equipmentIds !== undefined && {
+          equipmentLinks: {
+            deleteMany: {},
+            createMany: {
+              data: dto.equipmentIds.map((equipmentId) => ({
+                equipmentId,
+                companyId: user.companyId, // candado
+              })),
+            },
+          },
+        }),
         ...(freeze && {
           taxRateApplied: freeze.taxRateApplied,
           totalAmount: freeze.totalAmount,
@@ -298,15 +356,18 @@ export class WorkOrdersService {
       },
       include: WORK_ORDER_INCLUDE,
     });
+
+    return this.toView(updated);
   }
 
-  async remove(user: AuthenticatedUser, id: string): Promise<WorkOrder> {
+  async remove(user: AuthenticatedUser, id: string): Promise<WorkOrderView> {
     // El guard @Roles(ADMIN) ya filtró el rol; verificamos tenant
     await this.findOne(user, id);
-    return this.prisma.workOrder.delete({
+    const removed = await this.prisma.workOrder.delete({
       where: { id },
       include: WORK_ORDER_INCLUDE,
     });
+    return this.toView(removed);
   }
 
   /** Validación cruzada multi-tenant de la relación WorkOrder → Client. */
@@ -328,28 +389,34 @@ export class WorkOrdersService {
 
   /**
    * Validación cruzada multi-tenant + de coherencia de la relación
-   * WorkOrder → Equipment: el equipo debe ser de MI empresa Y del cliente
-   * indicado (no se puede colgar la orden de un equipo de otro cliente).
+   * WorkOrder → Equipment: cada equipo debe ser de MI empresa Y del
+   * cliente indicado (no se puede colgar la orden de un equipo de otro
+   * cliente). Una orden puede abarcar varios equipos del mismo cliente.
    */
-  private async ensureEquipmentBelongsToClient(
+  private async ensureEquipmentsBelongToClient(
     companyId: string,
-    equipmentId: string,
+    equipmentIds: string[],
     clientId: string,
   ): Promise<void> {
-    const equipment = await this.prisma.equipment.findFirst({
-      where: { id: equipmentId, companyId }, // candado
+    const equipments = await this.prisma.equipment.findMany({
+      where: { id: { in: equipmentIds }, companyId }, // candado
       select: { id: true, clientId: true },
     });
 
-    if (!equipment) {
+    const foundIds = new Set(equipments.map((equipment) => equipment.id));
+    const missingIds = equipmentIds.filter((id) => !foundIds.has(id));
+    if (missingIds.length > 0) {
       throw new NotFoundException(
-        `Equipo ${equipmentId} no encontrado en tu empresa`,
+        `Equipo(s) no encontrado(s) en tu empresa: ${missingIds.join(', ')}`,
       );
     }
 
-    if (equipment.clientId !== clientId) {
+    const mismatched = equipments.filter(
+      (equipment) => equipment.clientId !== clientId,
+    );
+    if (mismatched.length > 0) {
       throw new ConflictException(
-        `El equipo ${equipmentId} no pertenece al cliente ${clientId}`,
+        `Los equipos ${mismatched.map((equipment) => equipment.id).join(', ')} no pertenecen al cliente ${clientId}`,
       );
     }
   }
@@ -369,5 +436,20 @@ export class WorkOrdersService {
         `Usuario ${userId} no encontrado en tu empresa`,
       );
     }
+  }
+
+  /**
+   * Aplana `equipmentLinks` (filas de la tabla intermedia, cada una con su
+   * `equipment` anidado) a `equipments`: un array plano de equipos, que es
+   * la forma que consume el frontend. Prisma no ofrece un include que
+   * devuelva esto directo porque la relación es explícita (tiene columnas
+   * propias: companyId, createdAt), no un m-a-m implícito.
+   */
+  private toView(order: WorkOrderWithRelations): WorkOrderView {
+    const { equipmentLinks, ...rest } = order;
+    return {
+      ...rest,
+      equipments: equipmentLinks.map((link) => link.equipment),
+    };
   }
 }

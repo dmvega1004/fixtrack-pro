@@ -11,6 +11,7 @@ import { EquipmentStatusBadge } from "@/components/equipment/equipment-status-ba
 import { StatusChip } from "@/components/shared/status-chip";
 import { DOCUMENT_TYPE_LABELS, type DocumentType } from "@/lib/document-type";
 import { formatOrderNumber } from "@/lib/format/order-number";
+import { formatEquipmentSummary } from "@/lib/format/equipment-summary";
 import { formatDate } from "@/lib/format/dates";
 
 interface ClienteDetallePageProps {
@@ -150,9 +151,7 @@ export default async function ClienteDetallePage({ params }: ClienteDetallePageP
                       {formatOrderNumber(order.orderNumber)}
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      {order.equipment
-                        ? `${order.equipment.brand} ${order.equipment.model}`
-                        : "Servicio locativo"}
+                      {formatEquipmentSummary(order.equipments)}
                     </span>
                   </div>
                   <span className="flex items-center gap-3">

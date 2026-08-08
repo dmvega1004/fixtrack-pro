@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusChip } from "@/components/shared/status-chip";
 import { formatOrderNumber } from "@/lib/format/order-number";
+import { formatEquipmentSummary } from "@/lib/format/equipment-summary";
 import type { WorkOrder } from "@/lib/api/work-orders";
 
 interface RecentOrdersPanelProps {
@@ -36,9 +37,7 @@ export function RecentOrdersPanel({ orders }: RecentOrdersPanelProps) {
                 <div className="flex min-w-0 flex-col gap-0.5">
                   <span className="font-medium">{formatOrderNumber(order.orderNumber)}</span>
                   <span className="truncate text-xs text-muted-foreground">
-                    {order.equipment
-                      ? `${order.equipment.brand} ${order.equipment.model} · ${order.client.name}`
-                      : `${order.client.name} · Servicio locativo`}
+                    {formatEquipmentSummary(order.equipments)} · {order.client.name}
                   </span>
                 </div>
                 <StatusChip status={order.status} />

@@ -38,8 +38,6 @@ export interface WorkOrder {
   priority: Priority;
   /** Cliente dueño de la orden — vínculo principal, siempre presente. */
   clientId: string;
-  /** Equipo a intervenir. Ausente en servicios locativos (sin equipo). */
-  equipmentId: string | null;
   userId: string | null;
   companyId: string;
   /** Mano de obra cobrada en la orden. */
@@ -56,8 +54,8 @@ export interface WorkOrder {
   createdAt: string;
   updatedAt: string;
   client: WorkOrderClient;
-  /** null cuando la orden es un servicio locativo sin equipo asociado. */
-  equipment: WorkOrderEquipment | null;
+  /** Vacío cuando la orden es un servicio locativo; puede tener varios equipos. */
+  equipments: WorkOrderEquipment[];
   user: WorkOrderAssignee | null;
 }
 
