@@ -4,10 +4,12 @@ import { DiagnosisEditor } from "./diagnosis-editor";
 import { ObservationsEditor } from "./observations-editor";
 import { ReassignTechnician } from "./reassign-technician";
 import { PriorityEditor } from "./priority-editor";
+import { DeleteOrderButton } from "./delete-order-button";
 
 interface DetailsTabProps {
   order: WorkOrder;
   canManage: boolean;
+  isAdmin: boolean;
   technicians: Technician[];
   isTerminal: boolean;
 }
@@ -15,6 +17,7 @@ interface DetailsTabProps {
 export function DetailsTab({
   order,
   canManage,
+  isAdmin,
   technicians,
   isTerminal,
 }: DetailsTabProps) {
@@ -53,6 +56,13 @@ export function DetailsTab({
             isTerminal={isTerminal}
           />
         </>
+      )}
+
+      {isAdmin && (
+        <div className="mt-6 flex flex-col gap-2 border-t border-border pt-4">
+          <h2 className="text-sm font-medium">Zona de riesgo</h2>
+          <DeleteOrderButton orderId={order.id} orderNumber={order.orderNumber} />
+        </div>
       )}
     </div>
   );

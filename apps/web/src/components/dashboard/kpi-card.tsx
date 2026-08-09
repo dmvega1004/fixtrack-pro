@@ -24,20 +24,27 @@ interface KpiCardProps {
 export function KpiCard({ href, label, value, icon: Icon, tone = "default" }: KpiCardProps) {
   const content = (
     <>
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+      <div className="flex items-center justify-between gap-2">
+        <span className="min-w-0 truncate text-xs font-medium tracking-wide text-muted-foreground uppercase">
           {label}
         </span>
-        <Icon className={cn("size-4", TONE_TEXT[tone])} />
+        <Icon className={cn("size-4 shrink-0", TONE_TEXT[tone])} />
       </div>
-      <span className={cn("text-3xl font-semibold", TONE_TEXT[tone])}>{value}</span>
+      <span
+        className={cn(
+          "min-w-0 text-lg font-semibold tabular-nums sm:text-xl md:text-2xl",
+          TONE_TEXT[tone],
+        )}
+      >
+        {value}
+      </span>
       {href && <span className="text-xs font-medium text-primary">Ver →</span>}
     </>
   );
 
   if (!href) {
     return (
-      <div className="flex flex-col gap-2 rounded-lg border border-border bg-card p-4 shadow-sm">
+      <div className="flex min-w-0 flex-col gap-2 rounded-lg border border-border bg-card p-4 shadow-sm">
         {content}
       </div>
     );
@@ -46,7 +53,7 @@ export function KpiCard({ href, label, value, icon: Icon, tone = "default" }: Kp
   return (
     <Link
       href={href}
-      className="flex flex-col gap-2 rounded-lg border border-border bg-card p-4 shadow-sm transition-colors hover:bg-muted/50"
+      className="flex min-w-0 flex-col gap-2 rounded-lg border border-border bg-card p-4 shadow-sm transition-colors hover:bg-muted/50"
     >
       {content}
     </Link>

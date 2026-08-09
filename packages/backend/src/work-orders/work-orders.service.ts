@@ -2,10 +2,12 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { OrderStatus, Prisma, Role, WorkOrder } from 'database';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { PrismaService } from '../prisma.service';
 import { calculateBilling } from './billing.util';
 import { CreateWorkOrderDto } from './dto/create-work-order.dto';
@@ -73,7 +75,12 @@ const TERMINAL_STATUSES: OrderStatus[] = [
  */
 @Injectable()
 export class WorkOrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(WorkOrdersService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cloudinary: CloudinaryService,
+  ) {}
 
   async create(
     user: AuthenticatedUser,
@@ -360,14 +367,63 @@ export class WorkOrdersService {
     return this.toView(updated);
   }
 
+  /**
+   * DELETE /work-orders/:id — SOLO ADMIN (RBAC en el controller). Acción
+   * destructiva irreversible sobre un documento contable:
+   * - Devuelve al inventario el stock de cada repuesto consumido (si no, el
+   *   inventario queda descuadrado permanentemente).
+   * - Pagos, adjuntos y vínculos de equipos se borran en cascada (ver
+   *   onDelete: Cascade en schema.prisma).
+   * - Las fotos en Cloudinary se borran DESPUÉS de confirmar la transacción,
+   *   best-effort: un fallo ahí no debe dejar la orden a medio borrar.
+   */
   async remove(user: AuthenticatedUser, id: string): Promise<WorkOrderView> {
-    // El guard @Roles(ADMIN) ya filtró el rol; verificamos tenant
-    await this.findOne(user, id);
-    const removed = await this.prisma.workOrder.delete({
-      where: { id },
-      include: WORK_ORDER_INCLUDE,
+    // El guard @Roles(ADMIN) ya filtró el rol; verificamos tenant + existencia
+    const order = await this.findOne(user, id);
+
+    const attachments = await this.prisma.attachment.findMany({
+      where: { workOrderId: id, companyId: user.companyId }, // candado
+      select: { publicId: true },
     });
-    return this.toView(removed);
+
+    await this.prisma.$transaction(async (tx) => {
+      const parts = await tx.workOrderPart.findMany({
+        where: { workOrderId: id, companyId: user.companyId }, // candado
+        select: { sparePartId: true, quantity: true },
+      });
+
+      for (const part of parts) {
+        await tx.sparePart.update({
+          where: { id: part.sparePartId },
+          data: { stock: { increment: part.quantity } },
+        });
+      }
+
+      // Sin onDelete: Cascade en WorkOrderPart (es historial contable de
+      // costos/precios), así que hay que vaciarlo explícitamente antes de
+      // poder borrar la orden. Payment, Attachment y WorkOrderEquipment sí
+      // tienen Cascade en el schema.
+      await tx.workOrderPart.deleteMany({
+        where: { workOrderId: id, companyId: user.companyId },
+      });
+
+      await tx.workOrder.delete({ where: { id } });
+    });
+
+    for (const attachment of attachments) {
+      try {
+        await this.cloudinary.destroy(attachment.publicId);
+      } catch (error) {
+        this.logger.error(
+          `Fallo al borrar foto de Cloudinary (orden ${id}, publicId ${attachment.publicId}): ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+          error instanceof Error ? error.stack : undefined,
+        );
+      }
+    }
+
+    return order;
   }
 
   /** Validación cruzada multi-tenant de la relación WorkOrder → Client. */

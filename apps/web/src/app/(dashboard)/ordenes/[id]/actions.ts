@@ -201,3 +201,22 @@ export async function removePhotoAction(
     }),
   );
 }
+
+/**
+ * DELETE /work-orders/:id — SOLO ADMIN (RBAC en el backend). No usa
+ * runMutation porque tras borrar la orden ya no existe nada que revalidar
+ * en /ordenes/:id: el llamador redirige a /ordenes.
+ */
+export async function deleteWorkOrderAction(orderId: string): Promise<ActionResult> {
+  try {
+    await serverFetch(`/work-orders/${orderId}`, { method: "DELETE" });
+  } catch (error) {
+    if (error instanceof HttpError) {
+      return { ok: false, message: error.message };
+    }
+    throw error;
+  }
+
+  revalidatePath("/ordenes");
+  return { ok: true };
+}

@@ -106,19 +106,19 @@ export async function AdminDashboard({ session }: AdminDashboardProps) {
         {billingSummary && (
           <Link
             href="/cobros"
-            className="flex flex-col gap-2 rounded-lg border border-border bg-card p-4 shadow-sm transition-colors hover:bg-muted/50"
+            className="flex min-w-0 flex-col gap-2 rounded-lg border border-border bg-card p-4 shadow-sm transition-colors hover:bg-muted/50"
           >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+            <div className="flex items-center justify-between gap-2">
+              <span className="min-w-0 truncate text-xs font-medium tracking-wide text-muted-foreground uppercase">
                 Por cobrar
               </span>
-              <Wallet className="size-4 text-amber-600" />
+              <Wallet className="size-4 shrink-0 text-amber-600" />
             </div>
-            <span className="text-3xl font-semibold text-amber-600">
+            <span className="min-w-0 text-lg font-semibold tabular-nums text-amber-600 sm:text-xl md:text-2xl">
               {formatCurrency(billingSummary.totalReceivable, company.currency)}
             </span>
             {Number(billingSummary.totalOverdue) > 0 ? (
-              <span className="text-xs font-medium text-red-600">
+              <span className="min-w-0 truncate text-xs font-medium text-red-600">
                 {formatCurrency(billingSummary.totalOverdue, company.currency)} vencido
               </span>
             ) : (

@@ -113,6 +113,7 @@ export default async function OrdenDetallePage({
           <DetailsTab
             order={order}
             canManage={canManage}
+            isAdmin={isAdmin}
             technicians={technicians}
             isTerminal={isTerminal}
           />
