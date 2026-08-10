@@ -1,22 +1,13 @@
 import Link from "next/link";
 import { ClipboardList, UserRoundX, PackageX, Wallet } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
-import { getTechnicians } from "@/lib/api/users";
 import { getCompany } from "@/lib/api/company";
-import { getWorkOrders } from "@/lib/api/work-orders";
+import { getWorkOrderStats } from "@/lib/api/work-orders";
 import { getSpareParts } from "@/lib/api/spare-parts";
 import { getBillingSummary } from "@/lib/api/billing";
 import { formatCurrency } from "@/lib/format/currency";
 import type { Session } from "@/lib/roles";
-import {
-  filterActiveOrders,
-  filterUnassignedActiveOrders,
-  countByStatus,
-  averageResolutionDays,
-  technicianRanking,
-  recentOrders,
-  lowStockAlerts,
-} from "@/lib/dashboard/summary";
+import { lowStockAlerts } from "@/lib/dashboard/summary";
 import { KpiCard } from "./kpi-card";
 import { TechnicianPerformancePanel } from "./technician-performance-panel";
 import { OrdersByStatusPanel } from "./orders-by-status-panel";
@@ -38,29 +29,26 @@ interface AdminDashboardProps {
 }
 
 /**
- * Home de ADMIN/COORDINATOR. Todos los fetches van en paralelo y todos los
- * cálculos se delegan a src/lib/dashboard/summary.ts (módulo puro).
- * Ver ahí la nota sobre por qué no hay tarjeta de "Ventas del mes".
+ * Home de ADMIN/COORDINATOR. Todos los fetches van en paralelo. Los
+ * agregados de órdenes (conteos, promedio de resolución, ranking de
+ * técnicos, recientes) vienen ya calculados de GET /work-orders/stats
+ * (ver WorkOrdersService.getStats) — antes se pedían TODAS las órdenes de
+ * la empresa en cada visita al home y se calculaban acá en JS. Solo las
+ * alertas de inventario (lowStockAlerts) siguen siendo un cálculo local,
+ * sobre una lista ya acotada por el backend (?lowStock=true).
  */
 export async function AdminDashboard({ session }: AdminDashboardProps) {
   const isAdmin = session.role === "ADMIN";
 
-  const [company, workOrders, lowStockParts, technicians, billingSummary] = await Promise.all([
+  const [company, stats, lowStockParts, billingSummary] = await Promise.all([
     getCompany(),
-    getWorkOrders(),
+    getWorkOrderStats(),
     getSpareParts({ lowStock: true }),
-    getTechnicians(),
     // GET /billing/summary es solo ADMIN (403 para Coordinador) — esta home
     // la comparten ambos roles.
     isAdmin ? getBillingSummary() : Promise.resolve(null),
   ]);
 
-  const activeOrders = filterActiveOrders(workOrders);
-  const unassignedOrders = filterUnassignedActiveOrders(workOrders);
-  const statusCounts = countByStatus(workOrders);
-  const avgDays = averageResolutionDays(workOrders);
-  const ranking = technicianRanking(workOrders, technicians);
-  const recent = recentOrders(workOrders, 5);
   const alerts = lowStockAlerts(lowStockParts, 5);
 
   return (
@@ -86,15 +74,15 @@ export async function AdminDashboard({ session }: AdminDashboardProps) {
         <KpiCard
           href="/ordenes"
           label="Órdenes activas"
-          value={activeOrders.length}
+          value={stats.activeCount}
           icon={ClipboardList}
         />
         <KpiCard
           href="/ordenes?unassigned=true"
           label="Sin asignar"
-          value={unassignedOrders.length}
+          value={stats.unassignedActiveCount}
           icon={UserRoundX}
-          tone={unassignedOrders.length > 0 ? "warning" : "default"}
+          tone={stats.unassignedActiveCount > 0 ? "warning" : "default"}
         />
         <KpiCard
           href="/inventario?lowStock=true"
@@ -129,9 +117,12 @@ export async function AdminDashboard({ session }: AdminDashboardProps) {
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <TechnicianPerformancePanel ranking={ranking} avgResolutionDays={avgDays} />
-        <OrdersByStatusPanel statusCounts={statusCounts} />
-        <RecentOrdersPanel orders={recent} />
+        <TechnicianPerformancePanel
+          ranking={stats.technicianRanking}
+          avgResolutionDays={stats.avgResolutionDays}
+        />
+        <OrdersByStatusPanel statusCounts={stats.statusCounts} />
+        <RecentOrdersPanel orders={stats.recentOrders} />
         <InventoryAlertsPanel items={alerts} />
       </div>
     </div>

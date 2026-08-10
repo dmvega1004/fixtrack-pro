@@ -37,33 +37,35 @@ export default async function ClienteDetallePage({ params }: ClienteDetallePageP
     throw error;
   }
 
-  const [session, equipments, workOrders] = await Promise.all([
-    getSession(),
-    getEquipments(),
-    getWorkOrders(),
-  ]);
+  // getSession() solo decodifica la cookie (sin red), así que se puede
+  // esperar primero sin costo y usar isAdmin para lanzar TODO lo demás en
+  // un único Promise.all — antes company/clientBalances esperaban a un
+  // batch previo aunque no dependieran de él.
+  const session = await getSession();
   const isAdmin = session?.role === "ADMIN";
 
-  const clientEquipments = equipments.filter((equipment) => equipment.clientId === client.id);
-
-  // El backend no filtra por clientId en query: se pide todo lo visible para
-  // el rol actual y se filtra acá, igual que en la ficha de equipo. Incluye
-  // órdenes sin equipo (servicios locativos): clientId es el vínculo directo.
-  const history = workOrders
-    .filter((order) => order.clientId === client.id)
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  // GET /equipments?clientId= y GET /work-orders?clientId= — antes se pedía
+  // TODO lo visible para el rol actual (equipos y órdenes de la empresa
+  // entera) y se filtraba acá.
+  const [clientEquipments, history, company, clientBalances] = await Promise.all([
+    getEquipments({ clientId: client.id }),
+    getWorkOrders({ clientId: client.id }).then((orders) =>
+      [...orders].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      ),
+    ),
+    isAdmin ? getCompany() : Promise.resolve(null),
+    isAdmin ? getClientBalances() : Promise.resolve([]),
+  ]);
 
   // Valorización: las órdenes cerradas ya traen totalAmount congelado; las
   // abiertas no, así que para mostrar un valor "estimado" en el historial
   // hay que pedir su cierre económico en vivo. Se acota a las abiertas de
-  // ESTE cliente (normalmente pocas) para no golpear el backend por cada
-  // orden del historial completo.
+  // ESTE cliente (normalmente pocas), no a las de toda la empresa.
   const openOrders = isAdmin ? history.filter((order) => order.totalAmount === null) : [];
-  const [company, clientBalances, openBillings] = await Promise.all([
-    isAdmin ? getCompany() : Promise.resolve(null),
-    isAdmin ? getClientBalances() : Promise.resolve([]),
-    Promise.all(openOrders.map((order) => getWorkOrderParts(order.id))),
-  ]);
+  const openBillings = await Promise.all(
+    openOrders.map((order) => getWorkOrderParts(order.id)),
+  );
   const estimatedValueByOrderId = new Map(
     openOrders.map((order, index) => [order.id, openBillings[index].billing.total]),
   );

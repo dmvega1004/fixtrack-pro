@@ -1,32 +1,21 @@
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { getEquipments } from "@/lib/api/equipments";
-import { getWorkOrders } from "@/lib/api/work-orders";
 import {
   EquipmentCatalog,
   type EquipmentListItem,
 } from "@/components/equipment/equipment-catalog";
 
 export default async function EquiposPage() {
-  const [equipments, workOrders] = await Promise.all([
-    getEquipments(),
-    getWorkOrders(),
-  ]);
-
-  // Conteo de órdenes por equipo sobre las órdenes visibles para el usuario
-  // actual (el backend ya restringe qué órdenes ve cada rol). Una orden con
-  // varios equipos (ej. un proyecto sobre 5 portones) suma en cada uno.
-  const orderCounts = new Map<string, number>();
-  for (const order of workOrders) {
-    for (const equipment of order.equipments) {
-      orderCounts.set(equipment.id, (orderCounts.get(equipment.id) ?? 0) + 1);
-    }
-  }
+  // GET /equipments ya trae orderCount agregado en SQL (ver
+  // EquipmentsService.findAll) — antes esta pantalla traía TODAS las
+  // órdenes de la empresa solo para contarlas por equipo acá en JS.
+  const equipments = await getEquipments();
 
   const equipmentsWithCounts: EquipmentListItem[] = equipments.map(
     (equipment) => ({
       ...equipment,
-      orderCount: orderCounts.get(equipment.id) ?? 0,
+      orderCount: equipment.orderCount ?? 0,
     }),
   );
 

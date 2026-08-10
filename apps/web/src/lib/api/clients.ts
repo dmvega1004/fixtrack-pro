@@ -17,6 +17,9 @@ export interface Client {
   companyId: string;
   createdAt: string;
   updatedAt: string;
+  /** Solo presentes en la respuesta de getClients() (findAll), agregados en SQL. */
+  equipmentCount?: number;
+  orderCount?: number;
 }
 
 export interface CreateClientInput {

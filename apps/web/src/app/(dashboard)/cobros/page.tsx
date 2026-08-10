@@ -24,25 +24,18 @@ export default async function CobrosPage({ searchParams }: CobrosPageProps) {
   const { filter } = await searchParams;
   const activeFilter = parseFilter(filter);
 
-  const [summary, receivables, clientBalances, workOrders, company] = await Promise.all([
+  const [summary, receivables, clientBalances, paidOrders, company] = await Promise.all([
     getBillingSummary(),
     getReceivables(),
     getClientBalances(),
-    getWorkOrders(),
+    // GET /work-orders?paymentStatus=PAID — antes se pedían TODAS las
+    // órdenes de la empresa para filtrar las pagadas acá. paymentStatus
+    // solo llega a PAID después de que la orden se factura (ver
+    // WorkOrdersService), así que ya implica un total congelado: no hace
+    // falta filtrar status/totalAmount también.
+    getWorkOrders({ paymentStatus: "PAID" }),
     getCompany(),
   ]);
-
-  // GET /billing/receivables solo devuelve PENDING/PARTIAL (saldo pendiente,
-  // ver el backend); para el chip "Pagadas" reutilizamos GET /work-orders
-  // (ya visible para ADMIN) filtrando las cerradas con paymentStatus PAID.
-  // Si está PAID, lo abonado siempre es exactamente el total (invariante
-  // que mantiene PaymentsService), así que no hace falta otro fetch.
-  const paidOrders = workOrders.filter(
-    (order) =>
-      (order.status === "COMPLETED" || order.status === "DELIVERED") &&
-      order.paymentStatus === "PAID" &&
-      order.totalAmount !== null,
-  );
 
   const rows = buildReceivableRows(receivables, paidOrders);
 

@@ -32,19 +32,18 @@ export default async function EquipoDetallePage({
     throw error;
   }
 
-  const [client, workOrders] = await Promise.all([
+  // GET /work-orders?equipmentId= — antes se pedía TODO lo visible para el
+  // rol actual y se filtraba acá. Sigue trayendo órdenes que abarcan varios
+  // equipos (ej. un proyecto sobre 5 portones): el filtro es del lado del
+  // backend sobre la tabla puente WorkOrderEquipment.
+  const [client, history] = await Promise.all([
     getClient(equipment.clientId),
-    getWorkOrders(),
+    getWorkOrders({ equipmentId: equipment.id }).then((orders) =>
+      [...orders].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      ),
+    ),
   ]);
-
-  // El backend no filtra por equipmentId en query: se pide todo lo visible
-  // para el rol actual y se filtra acá — incluye órdenes que abarcan varios
-  // equipos (ej. un proyecto sobre 5 portones), no solo las de un equipo único.
-  const history = workOrders
-    .filter((order) => order.equipments.some((eq) => eq.id === equipment.id))
-    .sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">

@@ -3,8 +3,10 @@ import { buttonVariants } from "@/components/ui/button";
 import { StatusFilterChips } from "@/components/work-orders/status-filter-chips";
 import { PriorityFilterSelect } from "@/components/work-orders/priority-filter-select";
 import { WorkOrdersList } from "@/components/work-orders/work-orders-list";
+import { OrdersListWithLoadMore } from "@/components/work-orders/orders-list-with-load-more";
 import { EmptyOrdersState } from "@/components/work-orders/empty-orders-state";
-import { getWorkOrders } from "@/lib/api/work-orders";
+import { getWorkOrders, getWorkOrdersCount } from "@/lib/api/work-orders";
+import { ORDERS_PAGE_SIZE } from "@/lib/work-orders-pagination";
 import {
   ORDER_STATUS_LABELS,
   type OrderStatus,
@@ -33,9 +35,23 @@ export default async function OrdenesPage({ searchParams }: OrdenesPageProps) {
   // igual que priority, después del fetch. Enlazado desde el KPI de la home.
   const unassignedOnly = params.unassigned === "true";
 
-  let workOrders = await getWorkOrders({ status, priority });
+  // "Sin asignar" es un recorte angosto (enlazado desde el KPI de la home,
+  // siempre activas): se sigue trayendo completo, sin paginar. El listado
+  // normal sí puede crecer sin techo, así que pagina con "Cargar más" —
+  // total real vía GET /work-orders/count, primera página vía GET
+  // /work-orders?take=&skip=0 (antes se traía todo en una sola llamada).
+  let workOrders;
+  let total: number;
   if (unassignedOnly) {
-    workOrders = workOrders.filter((order) => order.user === null);
+    workOrders = (await getWorkOrders({ status, priority })).filter(
+      (order) => order.user === null,
+    );
+    total = workOrders.length;
+  } else {
+    [workOrders, total] = await Promise.all([
+      getWorkOrders({ status, priority, take: ORDERS_PAGE_SIZE, skip: 0 }),
+      getWorkOrdersCount({ status, priority }),
+    ]);
   }
 
   return (
@@ -44,8 +60,7 @@ export default async function OrdenesPage({ searchParams }: OrdenesPageProps) {
         <div>
           <h1 className="text-2xl font-semibold">Órdenes de trabajo</h1>
           <p className="text-sm text-muted-foreground">
-            {workOrders.length}{" "}
-            {workOrders.length === 1 ? "resultado" : "resultados"}
+            {total} {total === 1 ? "resultado" : "resultados"}
             {unassignedOnly && " · sin asignar"}
           </p>
         </div>
@@ -73,8 +88,14 @@ export default async function OrdenesPage({ searchParams }: OrdenesPageProps) {
 
       {workOrders.length === 0 ? (
         <EmptyOrdersState />
-      ) : (
+      ) : unassignedOnly ? (
         <WorkOrdersList workOrders={workOrders} />
+      ) : (
+        <OrdersListWithLoadMore
+          initialOrders={workOrders}
+          total={total}
+          filters={{ status, priority }}
+        />
       )}
     </div>
   );

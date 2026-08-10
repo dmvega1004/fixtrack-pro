@@ -9,7 +9,7 @@ export interface EquipmentClient {
   name: string;
 }
 
-// Debe reflejar exactamente el shape de CLIENT_SUMMARY en
+// Debe reflejar exactamente el shape de CLIENT_SUMMARY(_WITH_COUNT) en
 // packages/backend/src/equipments/equipments.service.ts
 export interface Equipment {
   id: string;
@@ -25,6 +25,8 @@ export interface Equipment {
   createdAt: string;
   updatedAt: string;
   client: EquipmentClient;
+  /** Solo presente en la respuesta de getEquipments() (findAll). */
+  orderCount?: number;
 }
 
 export interface CreateEquipmentInput {
@@ -45,13 +47,14 @@ export interface UpdateEquipmentInput {
   status?: EquipmentStatus;
 }
 
-/**
- * GET /equipments. El backend no soporta filtrar por cliente en query —
- * devuelve todos los equipos de la empresa (con el cliente incluido) y el
- * filtrado por cliente se hace del lado de Next sobre esta lista.
- */
-export function getEquipments(): Promise<Equipment[]> {
-  return serverFetch<Equipment[]>("/equipments");
+export interface EquipmentFilters {
+  clientId?: string;
+}
+
+/** GET /equipments[?clientId=]. Devuelve orderCount agregado por el backend. */
+export function getEquipments(filters: EquipmentFilters = {}): Promise<Equipment[]> {
+  const query = filters.clientId ? `?clientId=${filters.clientId}` : "";
+  return serverFetch<Equipment[]>(`/equipments${query}`);
 }
 
 /**

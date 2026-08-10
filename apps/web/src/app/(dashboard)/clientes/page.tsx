@@ -1,37 +1,18 @@
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { getClients } from "@/lib/api/clients";
-import { getEquipments } from "@/lib/api/equipments";
-import { getWorkOrders } from "@/lib/api/work-orders";
 import { ClientCatalog, type ClientListItem } from "@/components/client/client-catalog";
 
 export default async function ClientesPage() {
-  const [clients, equipments, workOrders] = await Promise.all([
-    getClients(),
-    getEquipments(),
-    getWorkOrders(),
-  ]);
-
-  // Conteos calculados sobre lo que el backend ya devolvió filtrado por rol
-  // (Admin/Coordinador ven todo, Técnico solo lo suyo) — no hay nada de RBAC
-  // que replicar acá, igual que en /equipos.
-  const equipmentCounts = new Map<string, number>();
-  for (const equipment of equipments) {
-    equipmentCounts.set(
-      equipment.clientId,
-      (equipmentCounts.get(equipment.clientId) ?? 0) + 1,
-    );
-  }
-
-  const orderCounts = new Map<string, number>();
-  for (const order of workOrders) {
-    orderCounts.set(order.clientId, (orderCounts.get(order.clientId) ?? 0) + 1);
-  }
+  // GET /clients ya trae equipmentCount/orderCount agregados en SQL (ver
+  // ClientsService.findAll) — antes esta pantalla traía TODOS los equipos
+  // y TODAS las órdenes de la empresa solo para contarlos acá en JS.
+  const clients = await getClients();
 
   const clientsWithCounts: ClientListItem[] = clients.map((client) => ({
     ...client,
-    equipmentCount: equipmentCounts.get(client.id) ?? 0,
-    orderCount: orderCounts.get(client.id) ?? 0,
+    equipmentCount: client.equipmentCount ?? 0,
+    orderCount: client.orderCount ?? 0,
   }));
 
   return (

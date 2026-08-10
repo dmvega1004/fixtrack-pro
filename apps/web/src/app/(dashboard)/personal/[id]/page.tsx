@@ -36,11 +36,15 @@ export default async function EmpleadoDetallePage({ params }: EmpleadoDetallePag
   const isAdmin = session?.role === "ADMIN";
   const isSelf = session?.userId === employee.id;
 
+  // GET /work-orders?userId= — antes se pedían TODAS las órdenes de la
+  // empresa para quedarse con las de un solo técnico. Si quien mira su
+  // propio perfil es el propio técnico, el backend igual restringe el
+  // resultado a sus órdenes (ver RBAC de TECHNICIAN en el service).
   const assignedOrders =
     employee.role === "TECHNICIAN"
-      ? (await getWorkOrders())
-          .filter((order) => order.user?.id === employee.id)
-          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      ? (await getWorkOrders({ userId: employee.id })).sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        )
       : [];
 
   return (

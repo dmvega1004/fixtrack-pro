@@ -60,11 +60,7 @@ export default async function OrdenDetallePage({
       isTerminal ? Promise.resolve([]) : getSpareParts(),
       getPhotos(id),
       getCompany(),
-      canManage
-        ? getEquipments().then((list) =>
-            list.filter((equipment) => equipment.clientId === order.clientId),
-          )
-        : Promise.resolve([]),
+      canManage ? getEquipments({ clientId: order.clientId }) : Promise.resolve([]),
       isAdmin && isClosed ? getWorkOrderPayments(id) : Promise.resolve([]),
     ]);
 
