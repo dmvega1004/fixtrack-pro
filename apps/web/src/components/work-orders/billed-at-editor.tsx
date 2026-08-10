@@ -14,12 +14,18 @@ interface BilledAtEditorProps {
   billedAt: string;
 }
 
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 /**
  * Corrección puntual de la fecha de facturación (pestaña «Valores», solo
  * ADMIN): el resto del cierre económico (montos, IVA) queda congelado para
- * siempre al pasar a COMPLETED, pero la fecha puede necesitar ajuste si la
- * orden se completó en el sistema días después del servicio real. Funciona
- * incluso si la orden ya quedó DELIVERED (sellada) — ver RBAC en el backend.
+ * siempre al pasar a COMPLETED, pero la fecha puede necesitar ajuste — ej.
+ * para cargar trabajos históricos con su antigüedad real, o si la orden se
+ * completó en el sistema días después del servicio real. Funciona incluso
+ * si la orden ya quedó DELIVERED (sellada) — ver RBAC en el backend, que
+ * también rechaza fechas futuras.
  */
 export function BilledAtEditor({ orderId, billedAt }: BilledAtEditorProps) {
   const router = useRouter();
@@ -49,22 +55,34 @@ export function BilledAtEditor({ orderId, billedAt }: BilledAtEditorProps) {
   }
 
   return (
-    <div className="flex flex-wrap items-end gap-2">
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor={inputId} className="text-xs text-muted-foreground">
-          Fecha de facturación
-        </Label>
-        <Input id={inputId} type="date" value={date} onChange={handleChange} className="w-40" />
+    <div className="flex flex-col gap-1.5">
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor={inputId} className="text-xs text-muted-foreground">
+            Fecha de facturación
+          </Label>
+          <Input
+            id={inputId}
+            type="date"
+            value={date}
+            max={todayIso()}
+            onChange={handleChange}
+            className="w-40"
+          />
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => void handleSave()}
+          disabled={isSaving || !date || date === initialDate}
+        >
+          {isSaving ? "Guardando..." : "Corregir fecha"}
+        </Button>
       </div>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={() => void handleSave()}
-        disabled={isSaving || !date || date === initialDate}
-      >
-        {isSaving ? "Guardando..." : "Corregir fecha"}
-      </Button>
+      <p className="text-xs text-muted-foreground">
+        Determina el inicio del plazo de crédito del cliente en Cobros.
+      </p>
     </div>
   );
 }

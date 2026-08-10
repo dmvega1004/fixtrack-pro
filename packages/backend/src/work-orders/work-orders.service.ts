@@ -223,9 +223,22 @@ export class WorkOrdersService {
         );
       }
 
+      const newBilledAt = new Date(dto.billedAt!);
+      // Corte al final del día (no el instante exacto): billedAt viaja como
+      // fecha (YYYY-MM-DD) desde el selector del frontend, no como
+      // timestamp, así que comparar contra Date.now() a secas rechazaría
+      // "hoy" en zonas horarias adelantadas a UTC.
+      const endOfToday = new Date();
+      endOfToday.setHours(23, 59, 59, 999);
+      if (newBilledAt.getTime() > endOfToday.getTime()) {
+        throw new ConflictException(
+          'La fecha de facturación no puede ser futura',
+        );
+      }
+
       const updated = await this.prisma.workOrder.update({
         where: { id },
-        data: { billedAt: new Date(dto.billedAt!) },
+        data: { billedAt: newBilledAt },
         include: WORK_ORDER_INCLUDE,
       });
       return this.toView(updated);

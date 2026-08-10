@@ -66,9 +66,11 @@ export class UpdateWorkOrderDto extends PartialType(CreateWorkOrderDto) {
 
   /**
    * Corrección puntual de la fecha de facturación de una orden YA
-   * facturada (billedAt no nulo) — ej. si se completó tarde en el sistema
-   * pero el servicio real se facturó otro día. Solo ADMIN (RBAC en el
-   * service), y debe enviarse sola (sin combinar con otros campos).
+   * facturada (billedAt no nulo) — ej. para cargar trabajos históricos con
+   * su antigüedad real, o si se completó tarde en el sistema pero el
+   * servicio real se facturó otro día. Solo ADMIN (RBAC en el service), no
+   * puede ser futura (validado en el service) y debe enviarse sola (sin
+   * combinar con otros campos).
    */
   @IsOptional()
   @IsDateString(
