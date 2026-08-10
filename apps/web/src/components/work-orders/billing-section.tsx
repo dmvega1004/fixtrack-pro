@@ -7,8 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatCurrency } from "@/lib/format/currency";
+import { formatDate } from "@/lib/format/dates";
 import type { WorkOrderBilling } from "@/lib/api/work-order-parts";
 import { saveBillingAction } from "@/app/(dashboard)/ordenes/[id]/actions";
+import { BilledAtEditor } from "./billed-at-editor";
 
 interface BillingSectionProps {
   orderId: string;
@@ -122,12 +124,16 @@ export function BillingSection({
     <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4">
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">Cierre económico</h3>
-        {billing.isFrozen && (
+        {billing.isFrozen && billing.billedAt && (
           <span className="text-xs text-muted-foreground italic">
-            Valores congelados al cierre
+            Valores congelados al cierre · Facturada el {formatDate(billing.billedAt)}
           </span>
         )}
       </div>
+
+      {billing.isFrozen && billing.billedAt && isAdmin && (
+        <BilledAtEditor orderId={orderId} billedAt={billing.billedAt} />
+      )}
 
       {canEdit ? (
         <>

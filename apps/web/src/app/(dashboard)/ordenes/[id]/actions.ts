@@ -136,6 +136,25 @@ export async function saveBillingAction(
   );
 }
 
+/**
+ * PATCH /work-orders/:id con SOLO billedAt — corrige la fecha de
+ * facturación de una orden ya facturada (ADMIN, ver RBAC en el service).
+ * A diferencia de saveBillingAction, no se combina con laborAmount/
+ * additionalAmount/discountAmount: el backend exige que billedAt viaje
+ * solo para poder editarlo incluso en órdenes DELIVERED (selladas).
+ */
+export async function saveBilledAtAction(
+  orderId: string,
+  billedAt: string,
+): Promise<ActionResult> {
+  return runMutation(orderId, () =>
+    serverFetch(`/work-orders/${orderId}`, {
+      method: "PATCH",
+      body: { billedAt },
+    }),
+  );
+}
+
 export async function addPartAction(
   orderId: string,
   sparePartId: string,

@@ -199,6 +199,47 @@ export class WorkOrdersService {
     // Pertenencia al tenant + visibilidad del técnico (404 si no aplica)
     const workOrder = await this.findOne(user, id);
 
+    // Excepción puntual: ADMIN puede corregir SOLO la fecha de facturación
+    // de una orden YA facturada, incluso si quedó sellada (DELIVERED) — el
+    // congelamiento contable (billing.util) protege el TOTAL, no la fecha,
+    // que puede necesitar corrección si la orden se completó en el sistema
+    // días después del servicio real. No se combina con otros campos: así
+    // no hay que reconciliar esta excepción con el resto del método.
+    const isBilledAtOnlyEdit =
+      dto.billedAt !== undefined &&
+      Object.entries(dto).every(
+        ([key, value]) => key === 'billedAt' || value === undefined,
+      );
+
+    if (isBilledAtOnlyEdit) {
+      if (user.role !== Role.ADMIN) {
+        throw new ForbiddenException(
+          'Solo un ADMIN puede modificar la fecha de facturación',
+        );
+      }
+      if (workOrder.billedAt === null) {
+        throw new ConflictException(
+          'La orden aún no ha sido facturada: no tiene fecha de facturación que corregir',
+        );
+      }
+
+      const updated = await this.prisma.workOrder.update({
+        where: { id },
+        data: { billedAt: new Date(dto.billedAt!) },
+        include: WORK_ORDER_INCLUDE,
+      });
+      return this.toView(updated);
+    }
+
+    // billedAt combinado con otros campos: el resto del método no lo
+    // persiste (no vive en el `data` del update general) — se rechaza
+    // explícito para no fallar en silencio.
+    if (dto.billedAt !== undefined) {
+      throw new ConflictException(
+        'billedAt debe enviarse solo, sin combinar con otros campos',
+      );
+    }
+
     // Una orden entregada o cancelada queda sellada para todos
     if (TERMINAL_STATUSES.includes(workOrder.status)) {
       throw new ConflictException(
@@ -221,6 +262,8 @@ export class WorkOrdersService {
         forbiddenFields.push('additionalDescription');
       if (dto.discountAmount !== undefined)
         forbiddenFields.push('discountAmount');
+      // billedAt no aparece acá: si llegó hasta este punto ya no está
+      // presente en el dto (el bloque de arriba lo maneja o lo rechaza).
 
       if (forbiddenFields.length > 0) {
         throw new ForbiddenException(
@@ -242,6 +285,7 @@ export class WorkOrdersService {
         forbiddenBillingFields.push('additionalDescription');
       if (dto.discountAmount !== undefined)
         forbiddenBillingFields.push('discountAmount');
+      // billedAt: mismo caso que arriba, ya no puede estar presente acá.
 
       if (forbiddenBillingFields.length > 0) {
         throw new ForbiddenException(
