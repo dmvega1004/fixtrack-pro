@@ -54,23 +54,27 @@ export default async function CobrosPage({ searchParams }: CobrosPageProps) {
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <KpiCard
+          href="/cobros/facturado"
           label="Facturado del mes"
           value={formatCurrency(summary.billedThisMonth, company.currency)}
           icon={Wallet}
         />
         <KpiCard
+          href="/cobros/cobrado"
           label="Cobrado del mes"
           value={formatCurrency(summary.collectedThisMonth, company.currency)}
           icon={TrendingUp}
           tone="success"
         />
         <KpiCard
+          href="/cobros/por-cobrar"
           label="Por cobrar"
           value={formatCurrency(summary.totalReceivable, company.currency)}
           icon={Clock}
           tone="warning"
         />
         <KpiCard
+          href="/cobros/vencido"
           label="Vencido"
           value={formatCurrency(summary.totalOverdue, company.currency)}
           icon={AlertTriangle}

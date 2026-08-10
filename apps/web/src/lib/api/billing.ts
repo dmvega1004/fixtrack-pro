@@ -44,6 +44,47 @@ export interface ClientBalance {
   balance: string;
 }
 
+// Debe reflejar exactamente BilledOrderView/BilledOrdersResult en
+// packages/backend/src/billing/billing.service.ts
+export interface BilledOrder {
+  orderId: string;
+  orderNumber: number;
+  clientId: string;
+  clientName: string;
+  billedAt: string;
+  total: string;
+  paymentStatus: PaymentStatus;
+}
+
+export interface BilledOrdersResult {
+  items: BilledOrder[];
+  total: string;
+}
+
+// Debe reflejar exactamente CollectedPaymentView/CollectedPaymentsResult en
+// packages/backend/src/billing/billing.service.ts
+export interface CollectedPayment {
+  paymentId: string;
+  paidAt: string;
+  clientId: string;
+  clientName: string;
+  orderId: string;
+  orderNumber: number;
+  method: PaymentMethod;
+  reference: string | null;
+  amount: string;
+}
+
+export interface CollectedPaymentsResult {
+  items: CollectedPayment[];
+  total: string;
+}
+
+export interface ReceivablesListResult {
+  items: Receivable[];
+  total: string;
+}
+
 /** GET /billing/summary. Solo ADMIN (403 para el resto). */
 export function getBillingSummary(): Promise<BillingSummary> {
   return serverFetch<BillingSummary>("/billing/summary");
@@ -57,4 +98,24 @@ export function getReceivables(): Promise<Receivable[]> {
 /** GET /billing/by-client. Solo ADMIN. Saldo agregado por cliente, de mayor a menor. */
 export function getClientBalances(): Promise<ClientBalance[]> {
   return serverFetch<ClientBalance[]>("/billing/by-client");
+}
+
+/** GET /billing/billed-orders. Solo ADMIN. Detalle + total de "Facturado del mes". */
+export function getBilledOrders(): Promise<BilledOrdersResult> {
+  return serverFetch<BilledOrdersResult>("/billing/billed-orders");
+}
+
+/** GET /billing/collected-payments. Solo ADMIN. Detalle + total de "Cobrado del mes". */
+export function getCollectedPayments(): Promise<CollectedPaymentsResult> {
+  return serverFetch<CollectedPaymentsResult>("/billing/collected-payments");
+}
+
+/** GET /billing/receivables-detail. Solo ADMIN. Detalle + total de "Por cobrar". */
+export function getReceivablesDetail(): Promise<ReceivablesListResult> {
+  return serverFetch<ReceivablesListResult>("/billing/receivables-detail");
+}
+
+/** GET /billing/receivables-overdue. Solo ADMIN. Detalle + total de "Vencido". */
+export function getOverdueReceivables(): Promise<ReceivablesListResult> {
+  return serverFetch<ReceivablesListResult>("/billing/receivables-overdue");
 }

@@ -1,0 +1,125 @@
+import Link from "next/link";
+import { formatCurrency } from "@/lib/format/currency";
+import { formatOrderNumber } from "@/lib/format/order-number";
+import type { Receivable } from "@/lib/api/billing";
+import { DaysChip } from "./days-chip";
+
+interface ReceivableBreakdownTableProps {
+  items: Receivable[];
+  currency: string;
+  emptyMessage: string;
+}
+
+/**
+ * Detalle de "Por cobrar" y "Vencido" (mismas columnas para ambos
+ * indicadores, ver /cobros/[indicador]): tabla en escritorio, tarjetas en
+ * móvil. "Días transcurridos" se muestra con DaysChip — ya trae el número
+ * de días y el semáforo de vencimiento en un solo elemento.
+ */
+export function ReceivableBreakdownTable({
+  items,
+  currency,
+  emptyMessage,
+}: ReceivableBreakdownTableProps) {
+  if (items.length === 0) {
+    return (
+      <p className="rounded-lg border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
+        {emptyMessage}
+      </p>
+    );
+  }
+
+  return (
+    <>
+      <div className="hidden overflow-x-auto rounded-lg border border-border md:block">
+        <table className="w-full text-left text-sm">
+          <thead className="border-b border-border text-xs uppercase text-muted-foreground">
+            <tr>
+              <th className="px-4 py-3 font-medium">Orden</th>
+              <th className="px-4 py-3 font-medium">Cliente</th>
+              <th className="px-4 py-3 font-medium">Total</th>
+              <th className="px-4 py-3 font-medium">Abonado</th>
+              <th className="px-4 py-3 font-medium">Saldo</th>
+              <th className="px-4 py-3 font-medium">Días transcurridos</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {items.map((item) => {
+              const href = `/ordenes/${item.orderId}`;
+              return (
+                <tr key={item.orderId} className="hover:bg-muted/50">
+                  <td className="p-0">
+                    <Link href={href} className="block px-4 py-3 font-medium">
+                      {formatOrderNumber(item.orderNumber)}
+                    </Link>
+                  </td>
+                  <td className="p-0">
+                    <Link href={href} className="block px-4 py-3">
+                      {item.clientName}
+                    </Link>
+                  </td>
+                  <td className="p-0">
+                    <Link href={href} className="block px-4 py-3 tabular-nums">
+                      {formatCurrency(item.total, currency)}
+                    </Link>
+                  </td>
+                  <td className="p-0">
+                    <Link href={href} className="block px-4 py-3 tabular-nums">
+                      {formatCurrency(item.paid, currency)}
+                    </Link>
+                  </td>
+                  <td className="p-0">
+                    <Link href={href} className="block px-4 py-3 font-medium tabular-nums">
+                      {formatCurrency(item.balance, currency)}
+                    </Link>
+                  </td>
+                  <td className="p-0">
+                    <Link href={href} className="block px-4 py-3">
+                      <DaysChip
+                        daysSinceBilled={item.daysSinceBilled}
+                        paymentTermDays={item.paymentTermDays}
+                        isOverdue={item.isOverdue}
+                      />
+                    </Link>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="flex flex-col gap-3 md:hidden">
+        {items.map((item) => (
+          <Link
+            key={item.orderId}
+            href={`/ordenes/${item.orderId}`}
+            className="flex flex-col gap-1 rounded-lg border border-border bg-card p-4 shadow-sm"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-semibold text-blue-600">
+                {formatOrderNumber(item.orderNumber)}
+              </span>
+              <DaysChip
+                daysSinceBilled={item.daysSinceBilled}
+                paymentTermDays={item.paymentTermDays}
+                isOverdue={item.isOverdue}
+              />
+            </div>
+            <span className="text-sm font-medium">{item.clientName}</span>
+            <div className="mt-1 flex justify-between text-sm">
+              <span className="text-muted-foreground">Saldo</span>
+              <span className="font-semibold tabular-nums">
+                {formatCurrency(item.balance, currency)}
+              </span>
+            </div>
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>Total {formatCurrency(item.total, currency)}</span>
+              <span>Abonado {formatCurrency(item.paid, currency)}</span>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </>
+  );
+}
