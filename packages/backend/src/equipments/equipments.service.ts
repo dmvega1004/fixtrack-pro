@@ -13,6 +13,19 @@ const CLIENT_SUMMARY = {
   client: { select: { id: true, name: true } },
 } as const;
 
+/** findAll además trae el conteo de órdenes (agregado en SQL, no un fetch a contar). */
+const CLIENT_SUMMARY_WITH_COUNT = {
+  ...CLIENT_SUMMARY,
+  _count: { select: { workOrderEquipment: true } },
+} as const;
+
+export type EquipmentView = Equipment & {
+  client: { id: string; name: string };
+  /** Cuántas órdenes de trabajo incluyen este equipo — reemplaza el fetch
+   * completo de /work-orders que hacía /equipos para contar en JS. */
+  orderCount: number;
+};
+
 /**
  * REGLA DE ORO MULTI-TENANT: `companyId` es el primer parámetro
  * obligatorio de todos los métodos y se aplica en cada consulta.
@@ -42,12 +55,23 @@ export class EquipmentsService {
     });
   }
 
-  findAll(companyId: string): Promise<Equipment[]> {
-    return this.prisma.equipment.findMany({
-      where: { companyId }, // candado
-      include: CLIENT_SUMMARY,
+  async findAll(
+    companyId: string,
+    clientId?: string,
+  ): Promise<EquipmentView[]> {
+    const equipments = await this.prisma.equipment.findMany({
+      where: {
+        companyId, // candado
+        ...(clientId ? { clientId } : {}),
+      },
+      include: CLIENT_SUMMARY_WITH_COUNT,
       orderBy: { createdAt: 'desc' },
     });
+
+    return equipments.map(({ _count, ...equipment }) => ({
+      ...equipment,
+      orderCount: _count.workOrderEquipment,
+    }));
   }
 
   async findOne(companyId: string, id: string): Promise<Equipment> {

@@ -8,6 +8,14 @@ import { PrismaService } from '../prisma.service';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 
+/** findAll trae estos conteos agregados en SQL — reemplaza el fetch
+ * completo de /equipments y /work-orders que hacía /clientes para contar
+ * en JS (ver auditoría de rendimiento). */
+export type ClientListItem = Client & {
+  equipmentCount: number;
+  orderCount: number;
+};
+
 /**
  * REGLA DE ORO MULTI-TENANT:
  * Todos los métodos reciben `companyId` como PRIMER parámetro obligatorio
@@ -33,11 +41,20 @@ export class ClientsService {
     });
   }
 
-  findAll(companyId: string): Promise<Client[]> {
-    return this.prisma.client.findMany({
+  async findAll(companyId: string): Promise<ClientListItem[]> {
+    const clients = await this.prisma.client.findMany({
       where: { companyId }, // candado: solo clientes de MI empresa
+      include: {
+        _count: { select: { equipments: true, workOrders: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
+
+    return clients.map(({ _count, ...client }) => ({
+      ...client,
+      equipmentCount: _count.equipments,
+      orderCount: _count.workOrders,
+    }));
   }
 
   /**

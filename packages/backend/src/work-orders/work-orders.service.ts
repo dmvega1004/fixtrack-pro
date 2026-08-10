@@ -5,7 +5,14 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { OrderStatus, Prisma, Role, WorkOrder } from 'database';
+import {
+  OrderStatus,
+  PaymentStatus,
+  Prisma,
+  Priority,
+  Role,
+  WorkOrder,
+} from 'database';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { PrismaService } from '../prisma.service';
@@ -64,6 +71,49 @@ const TERMINAL_STATUSES: OrderStatus[] = [
   OrderStatus.DELIVERED,
   OrderStatus.CANCELLED,
 ];
+
+const ALL_STATUSES: OrderStatus[] = [
+  OrderStatus.PENDING,
+  OrderStatus.IN_PROGRESS,
+  OrderStatus.COMPLETED,
+  OrderStatus.DELIVERED,
+  OrderStatus.CANCELLED,
+];
+
+const RANKING_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+
+export interface WorkOrderFindAllFilters {
+  status?: OrderStatus;
+  priority?: Priority;
+  paymentStatus?: PaymentStatus;
+  clientId?: string;
+  equipmentId?: string;
+  /** Filtro de query — para TECHNICIAN queda siempre pisado por su propio id. */
+  userId?: string;
+  take?: number;
+  skip?: number;
+}
+
+export interface WorkOrderStatusCount {
+  status: OrderStatus;
+  count: number;
+}
+
+export interface WorkOrderTechnicianRankingEntry {
+  userId: string;
+  name: string;
+  closedCount: number;
+}
+
+export interface WorkOrderDashboardStats {
+  statusCounts: WorkOrderStatusCount[];
+  activeCount: number;
+  unassignedActiveCount: number;
+  /** null si no hay ninguna orden cerrada (DELIVERED/CANCELLED) todavía. */
+  avgResolutionDays: number | null;
+  technicianRanking: WorkOrderTechnicianRankingEntry[];
+  recentOrders: WorkOrderView[];
+}
 
 /**
  * REGLA DE ORO MULTI-TENANT + RBAC FINO:
@@ -155,22 +205,163 @@ export class WorkOrdersService {
 
   async findAll(
     user: AuthenticatedUser,
-    status?: OrderStatus,
+    filters: WorkOrderFindAllFilters = {},
   ): Promise<WorkOrderView[]> {
-    const where: Prisma.WorkOrderWhereInput = {
-      companyId: user.companyId, // candado
-      // RBAC fino: el técnico SOLO ve sus órdenes asignadas
-      ...(user.role === Role.TECHNICIAN ? { userId: user.userId } : {}),
-      ...(status ? { status } : {}),
-    };
-
     const orders = await this.prisma.workOrder.findMany({
-      where,
+      where: this.buildWhere(user, filters),
       include: WORK_ORDER_INCLUDE,
       orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
+      take: filters.take,
+      skip: filters.skip,
     });
 
     return orders.map((order) => this.toView(order));
+  }
+
+  /** GET /work-orders/count — mismo `where` que findAll, sin traer filas. */
+  count(
+    user: AuthenticatedUser,
+    filters: Omit<WorkOrderFindAllFilters, 'take' | 'skip'> = {},
+  ): Promise<number> {
+    return this.prisma.workOrder.count({
+      where: this.buildWhere(user, filters),
+    });
+  }
+
+  /**
+   * GET /work-orders/stats — agregados del dashboard (ver controller: solo
+   * Admin/Coordinador). Reemplaza el cálculo que antes corría en el
+   * frontend sobre un fetch completo de TODA la empresa: acá cada número
+   * sale de una query acotada/indexada (groupBy o count), salvo el
+   * promedio de resolución, que necesita createdAt/updatedAt fila por fila
+   * pero solo de las órdenes YA cerradas y con un select liviano de 2
+   * columnas (no el include completo con joins de cliente/equipos/técnico).
+   */
+  async getStats(user: AuthenticatedUser): Promise<WorkOrderDashboardStats> {
+    const companyId = user.companyId; // candado
+    const since = new Date(Date.now() - RANKING_WINDOW_MS);
+
+    const [
+      statusGroups,
+      activeCount,
+      unassignedActiveCount,
+      closedForAvg,
+      rankingGroups,
+      technicians,
+      recentOrders,
+    ] = await Promise.all([
+      this.prisma.workOrder.groupBy({
+        by: ['status'],
+        where: { companyId },
+        _count: { _all: true },
+      }),
+      this.prisma.workOrder.count({
+        where: { companyId, status: { notIn: TERMINAL_STATUSES } },
+      }),
+      this.prisma.workOrder.count({
+        where: {
+          companyId,
+          status: { notIn: TERMINAL_STATUSES },
+          userId: null,
+        },
+      }),
+      this.prisma.workOrder.findMany({
+        where: { companyId, status: { in: TERMINAL_STATUSES } },
+        select: { createdAt: true, updatedAt: true },
+      }),
+      this.prisma.workOrder.groupBy({
+        by: ['userId'],
+        where: {
+          companyId,
+          status: { in: TERMINAL_STATUSES },
+          updatedAt: { gte: since },
+          userId: { not: null },
+        },
+        _count: { _all: true },
+      }),
+      this.prisma.user.findMany({
+        where: { companyId, role: Role.TECHNICIAN },
+        select: { id: true, name: true },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.workOrder.findMany({
+        where: { companyId },
+        include: WORK_ORDER_INCLUDE,
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+      }),
+    ]);
+
+    const countByStatus = new Map(
+      statusGroups.map((g) => [g.status, g._count._all]),
+    );
+    const statusCounts: WorkOrderStatusCount[] = ALL_STATUSES.map((status) => ({
+      status,
+      count: countByStatus.get(status) ?? 0,
+    }));
+
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const avgResolutionDays =
+      closedForAvg.length === 0
+        ? null
+        : closedForAvg.reduce(
+            (sum, o) =>
+              sum + (o.updatedAt.getTime() - o.createdAt.getTime()) / DAY_MS,
+            0,
+          ) / closedForAvg.length;
+
+    const rankingCounts = new Map(
+      rankingGroups.map((g) => [g.userId as string, g._count._all]),
+    );
+    const technicianRanking: WorkOrderTechnicianRankingEntry[] = technicians
+      .map((tech) => ({
+        userId: tech.id,
+        name: tech.name,
+        closedCount: rankingCounts.get(tech.id) ?? 0,
+      }))
+      .sort((a, b) => b.closedCount - a.closedCount);
+
+    return {
+      statusCounts,
+      activeCount,
+      unassignedActiveCount,
+      avgResolutionDays,
+      technicianRanking,
+      recentOrders: recentOrders.map((order) => this.toView(order)),
+    };
+  }
+
+  /**
+   * `where` compartido entre findAll/count: candado de tenant + filtros
+   * opcionales + RBAC de TECHNICIAN aplicado AL FINAL, para que un
+   * `userId` de query jamás pueda pisar la restricción a sus propias
+   * órdenes (ver nota de RBAC en el controller).
+   */
+  private buildWhere(
+    user: AuthenticatedUser,
+    filters: Omit<WorkOrderFindAllFilters, 'take' | 'skip'>,
+  ): Prisma.WorkOrderWhereInput {
+    const where: Prisma.WorkOrderWhereInput = {
+      companyId: user.companyId, // candado
+      ...(filters.status ? { status: filters.status } : {}),
+      ...(filters.priority ? { priority: filters.priority } : {}),
+      ...(filters.paymentStatus
+        ? { paymentStatus: filters.paymentStatus }
+        : {}),
+      ...(filters.clientId ? { clientId: filters.clientId } : {}),
+      ...(filters.equipmentId
+        ? { equipmentLinks: { some: { equipmentId: filters.equipmentId } } }
+        : {}),
+      ...(filters.userId ? { userId: filters.userId } : {}),
+    };
+
+    if (user.role === Role.TECHNICIAN) {
+      // RBAC fino: el técnico SOLO ve sus órdenes asignadas — gana sobre
+      // cualquier userId que haya llegado por query.
+      where.userId = user.userId;
+    }
+
+    return where;
   }
 
   async findOne(user: AuthenticatedUser, id: string): Promise<WorkOrderView> {

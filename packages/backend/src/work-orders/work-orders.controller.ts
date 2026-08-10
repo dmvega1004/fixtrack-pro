@@ -5,18 +5,23 @@ import {
   Get,
   Param,
   ParseEnumPipe,
+  ParseIntPipe,
   ParseUUIDPipe,
   Patch,
   Post,
   Query,
 } from '@nestjs/common';
-import { OrderStatus, Role } from 'database';
+import { OrderStatus, PaymentStatus, Priority, Role } from 'database';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { CreateWorkOrderDto } from './dto/create-work-order.dto';
 import { UpdateWorkOrderDto } from './dto/update-work-order.dto';
-import { WorkOrdersService, WorkOrderView } from './work-orders.service';
+import {
+  WorkOrderDashboardStats,
+  WorkOrdersService,
+  WorkOrderView,
+} from './work-orders.service';
 
 /**
  * Este módulo recibe el @CurrentUser() COMPLETO (no solo companyId),
@@ -43,16 +48,88 @@ export class WorkOrdersController {
   }
 
   /**
-   * GET /work-orders[?status=PENDING] — Admin/Coordinador ven todas las
-   * de su empresa; el Técnico SOLO las asignadas a él.
+   * GET /work-orders[?status=&priority=&paymentStatus=&clientId=&equipmentId=&userId=&take=&skip=]
+   * Admin/Coordinador ven todas las de su empresa; el Técnico SOLO las
+   * asignadas a él — el filtro `userId` de query NUNCA puede ampliar eso
+   * (ver el candado aplicado al final en el service, después de mezclar
+   * los filtros opcionales).
    */
   @Get()
   findAll(
     @CurrentUser() user: AuthenticatedUser,
     @Query('status', new ParseEnumPipe(OrderStatus, { optional: true }))
     status?: OrderStatus,
+    @Query('priority', new ParseEnumPipe(Priority, { optional: true }))
+    priority?: Priority,
+    @Query(
+      'paymentStatus',
+      new ParseEnumPipe(PaymentStatus, { optional: true }),
+    )
+    paymentStatus?: PaymentStatus,
+    @Query('clientId', new ParseUUIDPipe({ optional: true })) clientId?: string,
+    @Query('equipmentId', new ParseUUIDPipe({ optional: true }))
+    equipmentId?: string,
+    @Query('userId', new ParseUUIDPipe({ optional: true })) userId?: string,
+    @Query('take', new ParseIntPipe({ optional: true })) take?: number,
+    @Query('skip', new ParseIntPipe({ optional: true })) skip?: number,
   ): Promise<WorkOrderView[]> {
-    return this.workOrdersService.findAll(user, status);
+    return this.workOrdersService.findAll(user, {
+      status,
+      priority,
+      paymentStatus,
+      clientId,
+      equipmentId,
+      userId,
+      take,
+      skip,
+    });
+  }
+
+  /**
+   * GET /work-orders/count — mismos filtros que arriba (menos take/skip),
+   * para mostrar un total real mientras /ordenes pagina con "Cargar más".
+   */
+  @Get('count')
+  count(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('status', new ParseEnumPipe(OrderStatus, { optional: true }))
+    status?: OrderStatus,
+    @Query('priority', new ParseEnumPipe(Priority, { optional: true }))
+    priority?: Priority,
+    @Query(
+      'paymentStatus',
+      new ParseEnumPipe(PaymentStatus, { optional: true }),
+    )
+    paymentStatus?: PaymentStatus,
+    @Query('clientId', new ParseUUIDPipe({ optional: true })) clientId?: string,
+    @Query('equipmentId', new ParseUUIDPipe({ optional: true }))
+    equipmentId?: string,
+    @Query('userId', new ParseUUIDPipe({ optional: true })) userId?: string,
+  ): Promise<{ count: number }> {
+    return this.workOrdersService
+      .count(user, {
+        status,
+        priority,
+        paymentStatus,
+        clientId,
+        equipmentId,
+        userId,
+      })
+      .then((count) => ({ count }));
+  }
+
+  /**
+   * GET /work-orders/stats — agregados del dashboard de Admin/Coordinador
+   * (conteos por estado, promedio de resolución, ranking de técnicos,
+   * recientes). SOLO Admin/Coordinador: expone datos de toda la empresa
+   * (ranking de TODOS los técnicos), que un Técnico no debe ver.
+   */
+  @Roles(Role.ADMIN, Role.COORDINATOR)
+  @Get('stats')
+  stats(
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<WorkOrderDashboardStats> {
+    return this.workOrdersService.getStats(user);
   }
 
   /** GET /work-orders/:id — 404 si es de otra empresa o de otro técnico */

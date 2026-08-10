@@ -7,13 +7,14 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { Equipment, Role } from 'database';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CreateEquipmentDto } from './dto/create-equipment.dto';
 import { UpdateEquipmentDto } from './dto/update-equipment.dto';
-import { EquipmentsService } from './equipments.service';
+import { EquipmentsService, EquipmentView } from './equipments.service';
 
 /**
  * Sin @Public(): todas las rutas exigen JWT (guard global).
@@ -32,10 +33,13 @@ export class EquipmentsController {
     return this.equipmentsService.create(companyId, dto);
   }
 
-  /** GET /equipments — solo los equipos de la empresa del token */
+  /** GET /equipments[?clientId=] — solo los equipos de la empresa del token */
   @Get()
-  findAll(@CurrentUser('companyId') companyId: string): Promise<Equipment[]> {
-    return this.equipmentsService.findAll(companyId);
+  findAll(
+    @CurrentUser('companyId') companyId: string,
+    @Query('clientId', new ParseUUIDPipe({ optional: true })) clientId?: string,
+  ): Promise<EquipmentView[]> {
+    return this.equipmentsService.findAll(companyId, clientId);
   }
 
   /** GET /equipments/qr/:qrCode — resolución del escáner QR (Módulo 3) */

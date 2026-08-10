@@ -11,7 +11,7 @@ import {
 import { Client, Role } from 'database';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { ClientsService } from './clients.service';
+import { ClientListItem, ClientsService } from './clients.service';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 
@@ -35,7 +35,9 @@ export class ClientsController {
 
   /** GET /clients — lista solo los clientes de la empresa del token */
   @Get()
-  findAll(@CurrentUser('companyId') companyId: string): Promise<Client[]> {
+  findAll(
+    @CurrentUser('companyId') companyId: string,
+  ): Promise<ClientListItem[]> {
     return this.clientsService.findAll(companyId);
   }
 
