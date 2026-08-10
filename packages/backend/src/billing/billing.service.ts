@@ -50,31 +50,74 @@ export interface ClientBalanceView {
   balance: string;
 }
 
+export interface BilledOrderView {
+  orderId: string;
+  orderNumber: number;
+  clientId: string;
+  clientName: string;
+  billedAt: string;
+  total: string;
+  paymentStatus: PaymentStatus;
+}
+
+export interface BilledOrdersResult {
+  items: BilledOrderView[];
+  total: string;
+}
+
+export interface CollectedPaymentView {
+  paymentId: string;
+  paidAt: string;
+  clientId: string;
+  clientName: string;
+  orderId: string;
+  orderNumber: number;
+  method: PaymentMethod;
+  reference: string | null;
+  amount: string;
+}
+
+export interface CollectedPaymentsResult {
+  items: CollectedPaymentView[];
+  total: string;
+}
+
+export interface ReceivablesListResult {
+  items: ReceivableView[];
+  total: string;
+}
+
+/** [inicio del mes actual, inicio del mes siguiente) — límite superior explícito, no solo "desde". */
+function currentMonthRange(): { start: Date; end: Date } {
+  const start = new Date();
+  start.setDate(1);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setMonth(end.getMonth() + 1);
+  return { start, end };
+}
+
 /**
  * Módulo de Cobros (solo ADMIN, ver @Roles en BillingController): indicadores
  * de facturación/cobro y cartera. "Cuentas por cobrar" = órdenes cerradas
  * (totalAmount congelado) cuyo paymentStatus todavía no es PAID.
+ *
+ * Las 4 tarjetas de /cobros y sus vistas de detalle (/cobros/[indicador])
+ * comparten exactamente el mismo cálculo: getSummary() arma sus totales a
+ * partir de getBilledOrders/getCollectedPayments/getReceivablesDetail (los
+ * mismos métodos que exponen los endpoints de detalle), así que el total de
+ * cada tarjeta y el pie de su listado son, por construcción, el mismo número.
  */
 @Injectable()
 export class BillingService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getSummary(companyId: string): Promise<BillingSummary> {
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
-
-    const [billedAgg, collectedAgg, receivables, recentPayments] =
+    const [billed, collected, receivablesDetail, recentPayments] =
       await Promise.all([
-        this.prisma.workOrder.aggregate({
-          where: { companyId, billedAt: { gte: startOfMonth } }, // candado
-          _sum: { totalAmount: true },
-        }),
-        this.prisma.payment.aggregate({
-          where: { companyId, paidAt: { gte: startOfMonth } }, // candado
-          _sum: { amount: true },
-        }),
-        this.getReceivables(companyId),
+        this.getBilledOrders(companyId),
+        this.getCollectedPayments(companyId),
+        this.getReceivablesDetail(companyId),
         this.prisma.payment.findMany({
           where: { companyId }, // candado
           include: {
@@ -87,23 +130,15 @@ export class BillingService {
         }),
       ]);
 
-    const totalReceivable = receivables.reduce(
-      (acc, r) => acc.add(r.balance),
-      new Prisma.Decimal(0),
+    const totalOverdue = this.sumBalances(
+      receivablesDetail.items.filter((r) => r.isOverdue),
     );
-    const totalOverdue = receivables
-      .filter((r) => r.isOverdue)
-      .reduce((acc, r) => acc.add(r.balance), new Prisma.Decimal(0));
 
     return {
-      billedThisMonth: (
-        billedAgg._sum.totalAmount ?? new Prisma.Decimal(0)
-      ).toFixed(2),
-      collectedThisMonth: (
-        collectedAgg._sum.amount ?? new Prisma.Decimal(0)
-      ).toFixed(2),
-      totalReceivable: totalReceivable.toFixed(2),
-      totalOverdue: totalOverdue.toFixed(2),
+      billedThisMonth: billed.total,
+      collectedThisMonth: collected.total,
+      totalReceivable: receivablesDetail.total,
+      totalOverdue,
       recentPayments: recentPayments.map((payment) => ({
         id: payment.id,
         amount: payment.amount.toFixed(2),
@@ -114,6 +149,121 @@ export class BillingService {
         clientName: payment.workOrder.client.name,
       })),
     };
+  }
+
+  /**
+   * GET /billing/billed-orders — "Facturado del mes": órdenes con billedAt
+   * en el mes calendario actual, pagadas y no pagadas (mide trabajo
+   * facturado, no cobro). Usa el índice WorkOrder(companyId, billedAt).
+   */
+  async getBilledOrders(companyId: string): Promise<BilledOrdersResult> {
+    const { start, end } = currentMonthRange();
+
+    const orders = await this.prisma.workOrder.findMany({
+      where: {
+        companyId, // candado
+        billedAt: { gte: start, lt: end },
+      },
+      include: { client: { select: { id: true, name: true } } },
+      orderBy: { billedAt: 'desc' },
+    });
+
+    const items: BilledOrderView[] = orders.map((order) => ({
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      clientId: order.client.id,
+      clientName: order.client.name,
+      billedAt: order.billedAt!.toISOString(),
+      // Toda orden con billedAt tiene totalAmount congelado en el mismo
+      // momento (ver freeze en WorkOrdersService.update) — nunca es null acá.
+      total: order.totalAmount!.toFixed(2),
+      paymentStatus: order.paymentStatus,
+    }));
+
+    const total = items
+      .reduce((acc, o) => acc.add(o.total), new Prisma.Decimal(0))
+      .toFixed(2);
+
+    return { items, total };
+  }
+
+  /**
+   * GET /billing/collected-payments — "Cobrado del mes": PAGOS con paidAt
+   * en el mes calendario actual (no órdenes) — un pago de una orden
+   * facturada en un mes anterior cuenta acá. Usa el índice
+   * Payment(companyId, paidAt).
+   */
+  async getCollectedPayments(
+    companyId: string,
+  ): Promise<CollectedPaymentsResult> {
+    const { start, end } = currentMonthRange();
+
+    const payments = await this.prisma.payment.findMany({
+      where: {
+        companyId, // candado
+        paidAt: { gte: start, lt: end },
+      },
+      include: {
+        workOrder: {
+          select: {
+            id: true,
+            orderNumber: true,
+            client: { select: { id: true, name: true } },
+          },
+        },
+      },
+      orderBy: { paidAt: 'desc' },
+    });
+
+    const items: CollectedPaymentView[] = payments.map((payment) => ({
+      paymentId: payment.id,
+      paidAt: payment.paidAt.toISOString(),
+      clientId: payment.workOrder.client.id,
+      clientName: payment.workOrder.client.name,
+      orderId: payment.workOrder.id,
+      orderNumber: payment.workOrder.orderNumber,
+      method: payment.method,
+      reference: payment.reference,
+      amount: payment.amount.toFixed(2),
+    }));
+
+    const total = items
+      .reduce((acc, p) => acc.add(p.amount), new Prisma.Decimal(0))
+      .toFixed(2);
+
+    return { items, total };
+  }
+
+  /**
+   * GET /billing/receivables-detail — "Por cobrar": TODAS las órdenes
+   * cerradas con saldo > 0, sin límite de fecha (acumulado, no mensual).
+   * Mismos datos que GET /billing/receivables, con el total ya sumado.
+   */
+  async getReceivablesDetail(
+    companyId: string,
+  ): Promise<ReceivablesListResult> {
+    const items = await this.getReceivables(companyId);
+    return { items, total: this.sumBalances(items) };
+  }
+
+  /**
+   * GET /billing/receivables-overdue — "Vencido": subconjunto de lo
+   * anterior donde daysSinceBilled > paymentTermDays del cliente, de más
+   * vencido a menos.
+   */
+  async getOverdueReceivables(
+    companyId: string,
+  ): Promise<ReceivablesListResult> {
+    const items = (await this.getReceivables(companyId))
+      .filter((r) => r.isOverdue)
+      .sort((a, b) => b.daysSinceBilled - a.daysSinceBilled);
+    return { items, total: this.sumBalances(items) };
+  }
+
+  private sumBalances(items: Pick<ReceivableView, 'balance'>[]): string {
+    return items
+      .reduce((acc, r) => acc.add(r.balance), new Prisma.Decimal(0))
+      .toFixed(2);
   }
 
   /** GET /billing/receivables — de más antigua a más reciente (billedAt asc). */

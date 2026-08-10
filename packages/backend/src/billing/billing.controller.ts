@@ -3,10 +3,13 @@ import { Role } from 'database';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import {
+  BilledOrdersResult,
   BillingService,
   BillingSummary,
   ClientBalanceView,
+  CollectedPaymentsResult,
   ReceivableView,
+  ReceivablesListResult,
 } from './billing.service';
 
 /** Módulo de Cobros: SOLO ADMIN, ni siquiera Coordinador. */
@@ -37,5 +40,37 @@ export class BillingController {
     @CurrentUser('companyId') companyId: string,
   ): Promise<ClientBalanceView[]> {
     return this.billingService.getByClient(companyId);
+  }
+
+  /** GET /billing/billed-orders — detalle de la tarjeta "Facturado del mes" */
+  @Get('billed-orders')
+  getBilledOrders(
+    @CurrentUser('companyId') companyId: string,
+  ): Promise<BilledOrdersResult> {
+    return this.billingService.getBilledOrders(companyId);
+  }
+
+  /** GET /billing/collected-payments — detalle de la tarjeta "Cobrado del mes" */
+  @Get('collected-payments')
+  getCollectedPayments(
+    @CurrentUser('companyId') companyId: string,
+  ): Promise<CollectedPaymentsResult> {
+    return this.billingService.getCollectedPayments(companyId);
+  }
+
+  /** GET /billing/receivables-detail — detalle de la tarjeta "Por cobrar" */
+  @Get('receivables-detail')
+  getReceivablesDetail(
+    @CurrentUser('companyId') companyId: string,
+  ): Promise<ReceivablesListResult> {
+    return this.billingService.getReceivablesDetail(companyId);
+  }
+
+  /** GET /billing/receivables-overdue — detalle de la tarjeta "Vencido" */
+  @Get('receivables-overdue')
+  getOverdueReceivables(
+    @CurrentUser('companyId') companyId: string,
+  ): Promise<ReceivablesListResult> {
+    return this.billingService.getOverdueReceivables(companyId);
   }
 }
