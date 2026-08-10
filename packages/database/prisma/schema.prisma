@@ -194,6 +194,11 @@ model WorkOrder {
   @@index([companyId])
   @@index([clientId])
   @@index([userId])
+  /// Filtros de GET /work-orders y agregados del dashboard/cartera.
+  @@index([companyId, status])
+  @@index([companyId, priority])
+  @@index([companyId, billedAt])
+  @@index([companyId, paymentStatus])
 }
 
 model SparePart {
@@ -278,6 +283,8 @@ model Payment {
 
   @@index([companyId])
   @@index([workOrderId])
+  /// Rango "cobrado del mes" (paidAt dentro del mes actual).
+  @@index([companyId, paidAt])
 }
 
 /// Tabla intermedia orden↔equipo: una orden puede tener cero (servicio
@@ -299,4 +306,7 @@ model WorkOrderEquipment {
   @@unique([workOrderId, equipmentId])
   @@index([companyId])
   @@index([workOrderId])
+  /// GET /work-orders?equipmentId= — el @@unique de arriba no sirve para
+  /// buscar por equipmentId solo (workOrderId es la columna líder).
+  @@index([equipmentId])
 }
