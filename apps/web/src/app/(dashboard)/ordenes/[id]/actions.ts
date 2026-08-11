@@ -221,6 +221,33 @@ export async function removePhotoAction(
   );
 }
 
+export interface GenerateCollectionDocumentResult extends ActionResult {
+  collectionNumber?: number;
+}
+
+/**
+ * POST /work-orders/:id/collection-document — SOLO ADMIN. 409 si la orden
+ * no está cerrada; idempotente si ya tiene número. Devuelve el número
+ * asignado para que el botón navegue directo al documento.
+ */
+export async function generateCollectionDocumentAction(
+  orderId: string,
+): Promise<GenerateCollectionDocumentResult> {
+  try {
+    const order = await serverFetch<{ collectionNumber: number | null }>(
+      `/work-orders/${orderId}/collection-document`,
+      { method: "POST" },
+    );
+    revalidatePath(`/ordenes/${orderId}`);
+    return { ok: true, collectionNumber: order.collectionNumber ?? undefined };
+  } catch (error) {
+    if (error instanceof HttpError) {
+      return { ok: false, message: error.message };
+    }
+    throw error;
+  }
+}
+
 /**
  * DELETE /work-orders/:id — SOLO ADMIN (RBAC en el backend). No usa
  * runMutation porque tras borrar la orden ya no existe nada que revalidar

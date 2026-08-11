@@ -3,6 +3,7 @@ import { StatusChip } from "@/components/shared/status-chip";
 import { PriorityBadge } from "@/components/shared/priority-badge";
 import { formatDate } from "@/lib/format/dates";
 import { formatOrderNumber } from "@/lib/format/order-number";
+import { formatCollectionNumber } from "@/lib/format/collection-number";
 import { WorkOrderCard } from "./work-order-card";
 import type { WorkOrder } from "@/lib/api/work-orders";
 
@@ -31,8 +32,15 @@ export function WorkOrdersList({ workOrders }: WorkOrdersListProps) {
             return (
               <tr key={order.id} className="hover:bg-muted/50">
                 <td className="p-0">
-                  <Link href={href} className="block px-4 py-3 font-medium">
-                    {formatOrderNumber(order.orderNumber)}
+                  <Link href={href} className="flex flex-col px-4 py-3">
+                    <span className="font-medium">
+                      {formatOrderNumber(order.orderNumber)}
+                    </span>
+                    {order.collectionNumber !== null && (
+                      <span className="text-xs text-muted-foreground">
+                        {formatCollectionNumber(order.collectionNumber)}
+                      </span>
+                    )}
                   </Link>
                 </td>
                 <td className="p-0">

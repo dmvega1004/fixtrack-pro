@@ -25,6 +25,15 @@ interface CompanyFormState {
   website: string;
   currency: Currency;
   taxRate: string;
+  collectionDocTitle: string;
+  payeeName: string;
+  payeeDocument: string;
+  bankName: string;
+  bankAccount: string;
+  signerName: string;
+  signerRole: string;
+  collectionDocFootnote: string;
+  nextCollectionNumber: string;
 }
 
 function toFormState(company: Company): CompanyFormState {
@@ -37,6 +46,15 @@ function toFormState(company: Company): CompanyFormState {
     website: company.website ?? "",
     currency: (company.currency as Currency) ?? "COP",
     taxRate: company.taxRate,
+    collectionDocTitle: company.collectionDocTitle,
+    payeeName: company.payeeName ?? "",
+    payeeDocument: company.payeeDocument ?? "",
+    bankName: company.bankName ?? "",
+    bankAccount: company.bankAccount ?? "",
+    signerName: company.signerName ?? "",
+    signerRole: company.signerRole ?? "",
+    collectionDocFootnote: company.collectionDocFootnote ?? "",
+    nextCollectionNumber: String(company.nextCollectionNumber),
   };
 }
 
@@ -94,9 +112,15 @@ export function CompanyForm({ company }: CompanyFormProps) {
   const isTaxRateValid =
     form.taxRate.trim() !== "" && !Number.isNaN(taxRate) && taxRate >= 0 && taxRate <= 100;
 
+  const nextCollectionNumber = Number(form.nextCollectionNumber);
+  const isNextCollectionNumberValid =
+    form.nextCollectionNumber.trim() !== "" &&
+    Number.isInteger(nextCollectionNumber) &&
+    nextCollectionNumber >= 1;
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!form.name.trim() || !isTaxRateValid) return;
+    if (!form.name.trim() || !isTaxRateValid || !isNextCollectionNumberValid) return;
 
     setIsSaving(true);
     const result = await saveCompanyAction({
@@ -108,6 +132,15 @@ export function CompanyForm({ company }: CompanyFormProps) {
       website: form.website.trim() || undefined,
       currency: form.currency,
       taxRate,
+      collectionDocTitle: form.collectionDocTitle.trim() || undefined,
+      payeeName: form.payeeName.trim() || undefined,
+      payeeDocument: form.payeeDocument.trim() || undefined,
+      bankName: form.bankName.trim() || undefined,
+      bankAccount: form.bankAccount.trim() || undefined,
+      signerName: form.signerName.trim() || undefined,
+      signerRole: form.signerRole.trim() || undefined,
+      collectionDocFootnote: form.collectionDocFootnote.trim() || undefined,
+      nextCollectionNumber,
     });
     setIsSaving(false);
 
@@ -116,7 +149,11 @@ export function CompanyForm({ company }: CompanyFormProps) {
       return;
     }
 
-    toast.success("Datos de la empresa actualizados");
+    if (result.warning) {
+      toast.warning(result.warning);
+    } else {
+      toast.success("Datos de la empresa actualizados");
+    }
     router.refresh();
   }
 
@@ -264,9 +301,113 @@ export function CompanyForm({ company }: CompanyFormProps) {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Documento de cobro</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="collectionDocTitle">Título del documento</Label>
+            <Input
+              id="collectionDocTitle"
+              value={form.collectionDocTitle}
+              onChange={updateField("collectionDocTitle")}
+              placeholder="Cuenta de cobro"
+            />
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="payeeName">Beneficiario del pago</Label>
+              <Input
+                id="payeeName"
+                value={form.payeeName}
+                onChange={updateField("payeeName")}
+                placeholder={form.name || "Nombre de la empresa por defecto"}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="payeeDocument">Documento del beneficiario</Label>
+              <Input
+                id="payeeDocument"
+                value={form.payeeDocument}
+                onChange={updateField("payeeDocument")}
+              />
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Deja el beneficiario vacío para usar el nombre de la empresa. Solo
+            complétalo si el pago se recibe a nombre de alguien distinto.
+          </p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="bankName">Entidad bancaria</Label>
+              <Input id="bankName" value={form.bankName} onChange={updateField("bankName")} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="bankAccount">Número de cuenta</Label>
+              <Input
+                id="bankAccount"
+                value={form.bankAccount}
+                onChange={updateField("bankAccount")}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="signerName">Nombre del firmante</Label>
+              <Input
+                id="signerName"
+                value={form.signerName}
+                onChange={updateField("signerName")}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="signerRole">Cargo del firmante</Label>
+              <Input
+                id="signerRole"
+                value={form.signerRole}
+                onChange={updateField("signerRole")}
+                placeholder="Ej. Gerente"
+              />
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Si dejas el firmante vacío, el documento no muestra recuadro de firma.
+          </p>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="collectionDocFootnote">Nota al pie</Label>
+            <Input
+              id="collectionDocFootnote"
+              value={form.collectionDocFootnote}
+              onChange={updateField("collectionDocFootnote")}
+              placeholder="Este documento constituye una solicitud de pago y no equivale a factura electrónica de venta."
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="nextCollectionNumber">
+              Numeración: próximo consecutivo a asignar
+            </Label>
+            <Input
+              id="nextCollectionNumber"
+              type="number"
+              min={1}
+              step={1}
+              value={form.nextCollectionNumber}
+              onChange={updateField("nextCollectionNumber")}
+            />
+            <p className="text-xs text-muted-foreground">
+              Solo aplica a los próximos documentos que generes — no cambia el
+              número de las cuentas de cobro ya emitidas.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
       <Button
         type="submit"
-        disabled={isSaving || !form.name.trim() || !isTaxRateValid}
+        disabled={
+          isSaving || !form.name.trim() || !isTaxRateValid || !isNextCollectionNumberValid
+        }
         className="w-full md:w-auto md:self-end"
       >
         {isSaving ? "Guardando..." : "Guardar cambios"}

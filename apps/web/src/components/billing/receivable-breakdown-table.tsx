@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { formatCurrency } from "@/lib/format/currency";
 import { formatOrderNumber } from "@/lib/format/order-number";
+import { formatCollectionNumber } from "@/lib/format/collection-number";
 import type { Receivable } from "@/lib/api/billing";
 import { DaysChip } from "./days-chip";
 
@@ -49,8 +50,15 @@ export function ReceivableBreakdownTable({
               return (
                 <tr key={item.orderId} className="hover:bg-muted/50">
                   <td className="p-0">
-                    <Link href={href} className="block px-4 py-3 font-medium">
-                      {formatOrderNumber(item.orderNumber)}
+                    <Link href={href} className="flex flex-col px-4 py-3">
+                      <span className="font-medium">
+                        {formatOrderNumber(item.orderNumber)}
+                      </span>
+                      {item.collectionNumber !== null && (
+                        <span className="text-xs text-muted-foreground">
+                          {formatCollectionNumber(item.collectionNumber)}
+                        </span>
+                      )}
                     </Link>
                   </td>
                   <td className="p-0">
@@ -106,6 +114,11 @@ export function ReceivableBreakdownTable({
                 isOverdue={item.isOverdue}
               />
             </div>
+            {item.collectionNumber !== null && (
+              <span className="text-xs text-muted-foreground">
+                {formatCollectionNumber(item.collectionNumber)}
+              </span>
+            )}
             <span className="text-sm font-medium">{item.clientName}</span>
             <div className="mt-1 flex justify-between text-sm">
               <span className="text-muted-foreground">Saldo</span>

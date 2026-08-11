@@ -20,6 +20,7 @@ export function buildReceivableRows(
     ...receivables.map((receivable) => ({
       orderId: receivable.orderId,
       orderNumber: receivable.orderNumber,
+      collectionNumber: receivable.collectionNumber,
       clientName: receivable.clientName,
       description: receivable.description,
       total: receivable.total,
@@ -33,6 +34,7 @@ export function buildReceivableRows(
     ...paidOrders.map((order) => ({
       orderId: order.id,
       orderNumber: order.orderNumber,
+      collectionNumber: order.collectionNumber,
       clientName: order.client.name,
       description: order.description,
       total: order.totalAmount!,

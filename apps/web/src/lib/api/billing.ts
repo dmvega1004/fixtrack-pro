@@ -25,6 +25,8 @@ export interface RecentPayment {
 export interface Receivable {
   orderId: string;
   orderNumber: number;
+  /** Número de la cuenta de cobro emitida sobre esta orden, si existe. */
+  collectionNumber: number | null;
   clientId: string;
   clientName: string;
   description: string;
@@ -49,6 +51,7 @@ export interface ClientBalance {
 export interface BilledOrder {
   orderId: string;
   orderNumber: number;
+  collectionNumber: number | null;
   clientId: string;
   clientName: string;
   billedAt: string;
@@ -70,6 +73,7 @@ export interface CollectedPayment {
   clientName: string;
   orderId: string;
   orderNumber: number;
+  collectionNumber: number | null;
   method: PaymentMethod;
   reference: string | null;
   amount: string;

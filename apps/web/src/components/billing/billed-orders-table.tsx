@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { formatCurrency } from "@/lib/format/currency";
 import { formatOrderNumber } from "@/lib/format/order-number";
+import { formatCollectionNumber } from "@/lib/format/collection-number";
 import { formatDate } from "@/lib/format/dates";
 import { PaymentStatusChip } from "@/components/shared/payment-status-chip";
 import type { BilledOrder } from "@/lib/api/billing";
@@ -39,8 +40,15 @@ export function BilledOrdersTable({ items, currency }: BilledOrdersTableProps) {
               return (
                 <tr key={item.orderId} className="hover:bg-muted/50">
                   <td className="p-0">
-                    <Link href={href} className="block px-4 py-3 font-medium">
-                      {formatOrderNumber(item.orderNumber)}
+                    <Link href={href} className="flex flex-col px-4 py-3">
+                      <span className="font-medium">
+                        {formatOrderNumber(item.orderNumber)}
+                      </span>
+                      {item.collectionNumber !== null && (
+                        <span className="text-xs text-muted-foreground">
+                          {formatCollectionNumber(item.collectionNumber)}
+                        </span>
+                      )}
                     </Link>
                   </td>
                   <td className="p-0">
@@ -83,6 +91,11 @@ export function BilledOrdersTable({ items, currency }: BilledOrdersTableProps) {
               </span>
               <PaymentStatusChip status={item.paymentStatus} />
             </div>
+            {item.collectionNumber !== null && (
+              <span className="text-xs text-muted-foreground">
+                {formatCollectionNumber(item.collectionNumber)}
+              </span>
+            )}
             <span className="text-sm font-medium">{item.clientName}</span>
             <span className="text-xs text-muted-foreground">
               {formatDate(item.billedAt)}

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { StatusChip } from "@/components/shared/status-chip";
 import { type Priority } from "@/components/shared/priority-badge";
 import { formatOrderNumber } from "@/lib/format/order-number";
+import { formatCollectionNumber } from "@/lib/format/collection-number";
 import { cn } from "@/lib/utils";
 import type { WorkOrder } from "@/lib/api/work-orders";
 
@@ -31,6 +32,11 @@ export function WorkOrderCard({ order }: WorkOrderCardProps) {
         </span>
         <StatusChip status={order.status} />
       </div>
+      {order.collectionNumber !== null && (
+        <span className="text-xs text-muted-foreground">
+          {formatCollectionNumber(order.collectionNumber)}
+        </span>
+      )}
       {order.equipments.length === 0 ? (
         <>
           <span className="text-sm font-medium">{order.client.name}</span>

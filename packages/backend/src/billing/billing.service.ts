@@ -31,6 +31,8 @@ export interface RecentPaymentView {
 export interface ReceivableView {
   orderId: string;
   orderNumber: number;
+  /** Número de la cuenta de cobro emitida sobre esta orden, si existe — para cruzar cobro y orden. */
+  collectionNumber: number | null;
   clientId: string;
   clientName: string;
   description: string;
@@ -53,6 +55,7 @@ export interface ClientBalanceView {
 export interface BilledOrderView {
   orderId: string;
   orderNumber: number;
+  collectionNumber: number | null;
   clientId: string;
   clientName: string;
   billedAt: string;
@@ -72,6 +75,7 @@ export interface CollectedPaymentView {
   clientName: string;
   orderId: string;
   orderNumber: number;
+  collectionNumber: number | null;
   method: PaymentMethod;
   reference: string | null;
   amount: string;
@@ -171,6 +175,7 @@ export class BillingService {
     const items: BilledOrderView[] = orders.map((order) => ({
       orderId: order.id,
       orderNumber: order.orderNumber,
+      collectionNumber: order.collectionNumber,
       clientId: order.client.id,
       clientName: order.client.name,
       billedAt: order.billedAt!.toISOString(),
@@ -208,6 +213,7 @@ export class BillingService {
           select: {
             id: true,
             orderNumber: true,
+            collectionNumber: true,
             client: { select: { id: true, name: true } },
           },
         },
@@ -222,6 +228,7 @@ export class BillingService {
       clientName: payment.workOrder.client.name,
       orderId: payment.workOrder.id,
       orderNumber: payment.workOrder.orderNumber,
+      collectionNumber: payment.workOrder.collectionNumber,
       method: payment.method,
       reference: payment.reference,
       amount: payment.amount.toFixed(2),
@@ -297,6 +304,7 @@ export class BillingService {
       return {
         orderId: order.id,
         orderNumber: order.orderNumber,
+        collectionNumber: order.collectionNumber,
         clientId: order.client.id,
         clientName: order.client.name,
         description: order.description,

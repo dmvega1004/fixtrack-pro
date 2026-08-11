@@ -8,20 +8,24 @@ import type { UpdateCompanyInput } from "@/lib/api/company";
 export interface ActionResult {
   ok: boolean;
   message?: string;
+  /** Advertencia no bloqueante (ej. nextCollectionNumber en riesgo de duplicar). */
+  warning?: string;
 }
 
 export async function saveCompanyAction(
   dto: UpdateCompanyInput,
 ): Promise<ActionResult> {
   try {
-    await serverFetch("/company/me", { method: "PATCH", body: dto });
+    const result = await serverFetch<{ collectionNumberWarning?: string }>(
+      "/company/me",
+      { method: "PATCH", body: dto },
+    );
+    revalidatePath("/empresa");
+    return { ok: true, warning: result.collectionNumberWarning };
   } catch (error) {
     if (error instanceof HttpError) {
       return { ok: false, message: error.message };
     }
     throw error;
   }
-
-  revalidatePath("/empresa");
-  return { ok: true };
 }

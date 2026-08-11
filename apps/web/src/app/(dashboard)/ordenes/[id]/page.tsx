@@ -22,6 +22,7 @@ import { DetailsTab } from "@/components/work-orders/details-tab";
 import { PartsTab } from "@/components/work-orders/parts-tab";
 import { PhotosTab } from "@/components/work-orders/photos-tab";
 import { EquipmentSection } from "@/components/work-orders/equipment-section";
+import { CollectionDocumentButton } from "@/components/work-orders/collection-document-button";
 
 const TERMINAL_STATUSES = ["DELIVERED", "CANCELLED"];
 
@@ -75,13 +76,22 @@ export default async function OrdenDetallePage({
             <StatusChip status={order.status} />
             <PriorityBadge priority={order.priority} />
           </div>
-          <Link
-            href={`/ordenes/${order.id}/imprimir`}
-            className={buttonVariants({ variant: "outline", size: "sm" })}
-          >
-            <Printer className="size-4" />
-            Imprimir orden
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={`/ordenes/${order.id}/imprimir`}
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              <Printer className="size-4" />
+              Imprimir orden
+            </Link>
+            {isAdmin && isClosed && (
+              <CollectionDocumentButton
+                orderId={order.id}
+                collectionNumber={order.collectionNumber}
+                docTitle={company.collectionDocTitle}
+              />
+            )}
+          </div>
         </div>
         <p className="text-xs text-muted-foreground">
           {formatDate(order.createdAt)}

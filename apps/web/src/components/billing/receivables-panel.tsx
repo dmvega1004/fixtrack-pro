@@ -2,11 +2,13 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/format/currency";
 import { formatOrderNumber } from "@/lib/format/order-number";
+import { formatCollectionNumber } from "@/lib/format/collection-number";
 import { DaysChip } from "./days-chip";
 
 export interface ReceivableRow {
   orderId: string;
   orderNumber: number;
+  collectionNumber: number | null;
   clientName: string;
   description: string;
   total: string;
@@ -97,8 +99,15 @@ export function ReceivablesPanel({ rows, activeFilter, currency }: ReceivablesPa
                   return (
                     <tr key={row.orderId} className="hover:bg-muted/50">
                       <td className="p-0">
-                        <Link href={href} className="block px-4 py-3 font-medium">
-                          {formatOrderNumber(row.orderNumber)}
+                        <Link href={href} className="flex flex-col px-4 py-3">
+                          <span className="font-medium">
+                            {formatOrderNumber(row.orderNumber)}
+                          </span>
+                          {row.collectionNumber !== null && (
+                            <span className="text-xs text-muted-foreground">
+                              {formatCollectionNumber(row.collectionNumber)}
+                            </span>
+                          )}
                         </Link>
                       </td>
                       <td className="p-0">
@@ -154,6 +163,11 @@ export function ReceivablesPanel({ rows, activeFilter, currency }: ReceivablesPa
                   </span>
                   <StatusChipFor row={row} />
                 </div>
+                {row.collectionNumber !== null && (
+                  <span className="text-xs text-muted-foreground">
+                    {formatCollectionNumber(row.collectionNumber)}
+                  </span>
+                )}
                 <span className="text-sm font-medium">{row.clientName}</span>
                 <span className="truncate text-xs text-muted-foreground">
                   {row.description}
