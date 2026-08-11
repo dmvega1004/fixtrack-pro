@@ -51,6 +51,9 @@ export interface WorkOrder {
   totalAmount: string | null;
   billedAt: string | null;
   paymentStatus: PaymentStatus;
+  /** Consecutivo de la cuenta de cobro emitida sobre esta orden; null hasta que se genera. */
+  collectionNumber: number | null;
+  collectionIssuedAt: string | null;
   createdAt: string;
   updatedAt: string;
   client: WorkOrderClient;
@@ -138,4 +141,14 @@ export interface WorkOrderDashboardStats {
 /** GET /work-orders/stats. Solo ADMIN/COORDINATOR (403 para Técnico). */
 export function getWorkOrderStats(): Promise<WorkOrderDashboardStats> {
   return serverFetch<WorkOrderDashboardStats>("/work-orders/stats");
+}
+
+/**
+ * POST /work-orders/:id/collection-document. Solo ADMIN. 409 si la orden
+ * no está cerrada; idempotente si ya tiene número (no consume otro).
+ */
+export function generateCollectionDocument(id: string): Promise<WorkOrder> {
+  return serverFetch<WorkOrder>(`/work-orders/${id}/collection-document`, {
+    method: "POST",
+  });
 }

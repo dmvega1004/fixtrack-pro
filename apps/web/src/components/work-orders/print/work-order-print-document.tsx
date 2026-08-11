@@ -10,8 +10,7 @@ import { formatOrderNumber } from "@/lib/format/order-number";
 import { formatDate } from "@/lib/format/dates";
 import { formatCurrency } from "@/lib/format/currency";
 import { cn } from "@/lib/utils";
-
-const BRAND_BLUE = "#2563EB";
+import { PrintLetterhead, PRINT_BRAND_BLUE as BRAND_BLUE } from "./print-letterhead";
 
 interface WorkOrderPrintDocumentProps {
   order: WorkOrder;
@@ -134,10 +133,6 @@ export function WorkOrderPrintDocument({
       ? `${DOCUMENT_TYPE_LABELS[client.documentType as DocumentType] ?? client.documentType} ${client.documentNumber}`
       : null;
 
-  const contactLine = [company.address, company.phone, company.email]
-    .filter(Boolean)
-    .join("  |  ");
-
   const clientMeta = documentLabel ? `${client.name} · ${documentLabel}` : client.name;
 
   // Pie fijo de cada hoja impresa: sitio web (o correo/teléfono si no hay)
@@ -150,27 +145,7 @@ export function WorkOrderPrintDocument({
 
   return (
     <div className="mx-auto w-full max-w-[210mm] bg-white p-6 text-neutral-900 sm:p-10 print:w-[216mm] print:max-w-none print:px-[14mm] print:pt-[12mm] print:pb-[18mm]">
-      <header className="flex items-start gap-4">
-        {company.logoUrl && (
-          // eslint-disable-next-line @next/next/no-img-element -- logo remoto (Cloudinary), sin dominio fijo que declarar en next.config
-          <img
-            src={company.logoUrl}
-            alt={company.name}
-            className="h-12 w-auto object-contain"
-          />
-        )}
-        <div className="flex flex-col">
-          <p className="text-2xl font-bold" style={{ color: BRAND_BLUE }}>
-            {company.name}
-          </p>
-          {company.slogan && (
-            <p className="text-sm text-neutral-500">{company.slogan}</p>
-          )}
-          {contactLine && (
-            <p className="mt-1 text-xs text-neutral-500">{contactLine}</p>
-          )}
-        </div>
-      </header>
+      <PrintLetterhead company={company} />
 
       <hr className="mt-4 border-t-4" style={{ borderColor: BRAND_BLUE }} />
 
