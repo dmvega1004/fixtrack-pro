@@ -13,7 +13,11 @@ import { memoryStorage } from 'multer';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { MAX_IMAGE_SIZE_BYTES } from '../cloudinary/image-upload.constants';
-import { CompanyService, PublicCompany } from './company.service';
+import {
+  CompanyService,
+  CompanyUpdateResult,
+  PublicCompany,
+} from './company.service';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 
 /**
@@ -37,7 +41,7 @@ export class CompanyController {
   update(
     @CurrentUser('companyId') companyId: string,
     @Body() dto: UpdateCompanyDto,
-  ): Promise<PublicCompany> {
+  ): Promise<CompanyUpdateResult> {
     return this.companyService.update(companyId, dto);
   }
 

@@ -72,6 +72,12 @@ const TERMINAL_STATUSES: OrderStatus[] = [
   OrderStatus.CANCELLED,
 ];
 
+/** Órdenes "cerradas" (valorizadas, totalAmount congelado) — mismo criterio que PaymentsService. */
+const CLOSED_STATUSES: OrderStatus[] = [
+  OrderStatus.COMPLETED,
+  OrderStatus.DELIVERED,
+];
+
 const ALL_STATUSES: OrderStatus[] = [
   OrderStatus.PENDING,
   OrderStatus.IN_PROGRESS,
@@ -672,6 +678,71 @@ export class WorkOrdersService {
     }
 
     return order;
+  }
+
+  /**
+   * POST /work-orders/:id/collection-document — SOLO ADMIN (RBAC en el
+   * controller). Genera el consecutivo de la cuenta de cobro de una orden
+   * cerrada, o lo devuelve sin consumir otro si ya existe (idempotente).
+   *
+   * No se emite cobro sobre una orden abierta: el total todavía puede
+   * cambiar (repuestos, mano de obra, descuentos) hasta que se congela en
+   * COMPLETED — igual candado de negocio que PaymentsService para
+   * registrar abonos.
+   */
+  async generateCollectionDocument(
+    user: AuthenticatedUser,
+    id: string,
+  ): Promise<WorkOrderView> {
+    const order = await this.findOne(user, id); // candado + 404 si es ajena
+
+    if (!CLOSED_STATUSES.includes(order.status)) {
+      throw new ConflictException(
+        'Solo se puede generar la cuenta de cobro de una orden cerrada (Completada o Entregada): el total todavía puede cambiar mientras la orden sigue abierta.',
+      );
+    }
+
+    // Idempotente: si ya tiene número, se devuelve tal cual — no se
+    // consume otro consecutivo por volver a entrar a la pantalla.
+    if (order.collectionNumber !== null) {
+      return order;
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      // El UPDATE con increment toma un lock de fila sobre Company hasta el
+      // commit — dos generaciones simultáneas para la misma empresa se
+      // serializan acá, mismo patrón que el consecutivo de órdenes.
+      const company = await tx.company.update({
+        where: { id: user.companyId },
+        data: { nextCollectionNumber: { increment: 1 } },
+        select: { nextCollectionNumber: true },
+      });
+
+      // Ya con el lock tomado, releo la orden: si perdió la carrera contra
+      // otra petición concurrente que alcanzó a generar el número mientras
+      // esta esperaba el lock, no lo piso con uno nuevo.
+      const current = await tx.workOrder.findUniqueOrThrow({
+        where: { id },
+        select: { collectionNumber: true },
+      });
+      if (current.collectionNumber !== null) {
+        return tx.workOrder.findUniqueOrThrow({
+          where: { id },
+          include: WORK_ORDER_INCLUDE,
+        });
+      }
+
+      return tx.workOrder.update({
+        where: { id },
+        data: {
+          collectionNumber: company.nextCollectionNumber - 1,
+          collectionIssuedAt: new Date(),
+        },
+        include: WORK_ORDER_INCLUDE,
+      });
+    });
+
+    return this.toView(updated);
   }
 
   /** Validación cruzada multi-tenant de la relación WorkOrder → Client. */

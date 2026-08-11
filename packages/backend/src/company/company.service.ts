@@ -8,7 +8,12 @@ import { UpdateCompanyDto } from './dto/update-company.dto';
 /** Lado máximo del logo: no necesita ser una foto de alta resolución. */
 const MAX_LOGO_DIMENSION = 512;
 
-/** Proyección pública: sin el contador interno nextOrderNumber. */
+/**
+ * Proyección pública: sin el contador interno nextOrderNumber.
+ * nextCollectionNumber SÍ es público (a diferencia de nextOrderNumber):
+ * "Mi empresa" lo muestra y permite editarlo (número desde el cual
+ * iniciar la numeración de cuentas de cobro).
+ */
 const COMPANY_SELECT = {
   id: true,
   name: true,
@@ -20,6 +25,15 @@ const COMPANY_SELECT = {
   logoUrl: true,
   currency: true,
   taxRate: true,
+  collectionDocTitle: true,
+  payeeName: true,
+  payeeDocument: true,
+  bankName: true,
+  bankAccount: true,
+  signerName: true,
+  signerRole: true,
+  collectionDocFootnote: true,
+  nextCollectionNumber: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -36,9 +50,24 @@ export type PublicCompany = Pick<
   | 'logoUrl'
   | 'currency'
   | 'taxRate'
+  | 'collectionDocTitle'
+  | 'payeeName'
+  | 'payeeDocument'
+  | 'bankName'
+  | 'bankAccount'
+  | 'signerName'
+  | 'signerRole'
+  | 'collectionDocFootnote'
+  | 'nextCollectionNumber'
   | 'createdAt'
   | 'updatedAt'
 >;
+
+export type CompanyUpdateResult = PublicCompany & {
+  /** Presente si nextCollectionNumber quedó en o por debajo de un número
+   * de cuenta de cobro ya emitido — riesgo de duplicado, no bloquea el guardado. */
+  collectionNumberWarning?: string;
+};
 
 /**
  * Módulo de datos del tenant: membrete para documentos (PDF) y ajustes
@@ -59,8 +88,31 @@ export class CompanyService {
     });
   }
 
-  update(companyId: string, dto: UpdateCompanyDto): Promise<PublicCompany> {
-    return this.prisma.company.update({
+  async update(
+    companyId: string,
+    dto: UpdateCompanyDto,
+  ): Promise<CompanyUpdateResult> {
+    // Advertencia (no bloqueante): si el nuevo nextCollectionNumber queda
+    // en o por debajo de un número ya emitido, el próximo documento
+    // generado podría chocar con el @@unique([companyId, collectionNumber])
+    // — mejor avisar acá que dejar que reviente en el momento de generar.
+    let collectionNumberWarning: string | undefined;
+    if (dto.nextCollectionNumber !== undefined) {
+      const { _max } = await this.prisma.workOrder.aggregate({
+        where: { companyId, collectionNumber: { not: null } }, // candado
+        _max: { collectionNumber: true },
+      });
+      if (
+        _max.collectionNumber !== null &&
+        dto.nextCollectionNumber <= _max.collectionNumber
+      ) {
+        collectionNumberWarning =
+          `Ya existe una cuenta de cobro con el número ${_max.collectionNumber}. ` +
+          `Si continúas, el próximo documento generado podría repetir un número ya emitido.`;
+      }
+    }
+
+    const updated = await this.prisma.company.update({
       where: { id: companyId },
       data: {
         name: dto.name?.trim(),
@@ -71,9 +123,23 @@ export class CompanyService {
         website: dto.website?.trim(),
         currency: dto.currency,
         taxRate: dto.taxRate,
+        collectionDocTitle: dto.collectionDocTitle?.trim(),
+        payeeName: dto.payeeName?.trim(),
+        payeeDocument: dto.payeeDocument?.trim(),
+        bankName: dto.bankName?.trim(),
+        bankAccount: dto.bankAccount?.trim(),
+        signerName: dto.signerName?.trim(),
+        signerRole: dto.signerRole?.trim(),
+        collectionDocFootnote: dto.collectionDocFootnote?.trim(),
+        nextCollectionNumber: dto.nextCollectionNumber,
       },
       select: COMPANY_SELECT,
     });
+
+    return {
+      ...updated,
+      ...(collectionNumberWarning && { collectionNumberWarning }),
+    };
   }
 
   /**

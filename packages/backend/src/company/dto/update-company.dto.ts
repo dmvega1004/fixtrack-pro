@@ -1,6 +1,7 @@
 import {
   IsEmail,
   IsIn,
+  IsInt,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -61,4 +62,59 @@ export class UpdateCompanyDto {
   @Min(0)
   @Max(100, { message: 'taxRate no puede superar 100' })
   taxRate?: number;
+
+  // --- Documento de cobro (cuenta de cobro) ---
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty({ message: 'El título del documento no puede quedar vacío' })
+  @MaxLength(100)
+  collectionDocTitle?: string;
+
+  /** Beneficiario del pago si difiere del nombre de la empresa. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  payeeName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  payeeDocument?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  bankName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  bankAccount?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  signerName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  signerRole?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  collectionDocFootnote?: string;
+
+  /**
+   * Próximo consecutivo a asignar. Solo aplica a documentos futuros — no
+   * reescribe collectionNumber de órdenes ya emitidas. El service advierte
+   * (sin bloquear) si el valor queda en o por debajo de un número ya
+   * emitido, para evitar duplicados.
+   */
+  @IsOptional()
+  @IsInt({ message: 'nextCollectionNumber debe ser un entero positivo' })
+  @Min(1, { message: 'nextCollectionNumber debe ser un entero positivo' })
+  nextCollectionNumber?: number;
 }

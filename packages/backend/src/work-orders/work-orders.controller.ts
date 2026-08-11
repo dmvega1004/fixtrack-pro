@@ -163,4 +163,18 @@ export class WorkOrdersController {
   ): Promise<WorkOrderView> {
     return this.workOrdersService.remove(user, id);
   }
+
+  /**
+   * POST /work-orders/:id/collection-document — SOLO ADMIN. Genera (o, si
+   * ya existe, devuelve) el consecutivo de la cuenta de cobro de una orden
+   * cerrada. 409 si la orden sigue abierta.
+   */
+  @Roles(Role.ADMIN)
+  @Post(':id/collection-document')
+  generateCollectionDocument(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<WorkOrderView> {
+    return this.workOrdersService.generateCollectionDocument(user, id);
+  }
 }
