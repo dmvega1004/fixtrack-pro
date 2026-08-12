@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  ActivityAction,
   OrderStatus,
   PaymentStatus,
   Prisma,
@@ -11,6 +12,8 @@ import {
   WorkOrder,
   WorkOrderPart,
 } from 'database';
+import { activityAuthorName } from '../activity/activity-labels';
+import { ActivityService } from '../activity/activity.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { PrismaService } from '../prisma.service';
 import { calculateBilling } from './billing.util';
@@ -85,6 +88,7 @@ export class WorkOrderPartsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly workOrdersService: WorkOrdersService,
+    private readonly activityService: ActivityService,
   ) {}
 
   async addPart(
@@ -125,7 +129,7 @@ export class WorkOrderPartsService {
       }
 
       // Línea de la orden: crea con fotografía de precios, o suma cantidad
-      return tx.workOrderPart.upsert({
+      const result = await tx.workOrderPart.upsert({
         where: {
           workOrderId_sparePartId: {
             workOrderId,
@@ -145,6 +149,24 @@ export class WorkOrderPartsService {
         },
         include: PART_SUMMARY,
       });
+
+      // isFinancial: false — el técnico SÍ ve que se movieron repuestos
+      // (es operativo suyo), pero NUNCA precios ni subtotales: solo nombre
+      // y cantidad, nada de part.cost/part.salePrice acá.
+      await this.activityService.record(
+        {
+          companyId: user.companyId,
+          workOrderId,
+          userId: user.userId,
+          userName: activityAuthorName(user),
+          action: ActivityAction.PART_ADDED,
+          newValue: `${part.name} ×${dto.quantity}`,
+          isFinancial: false,
+        },
+        tx,
+      );
+
+      return result;
     });
 
     return this.redact(line, user.role);
@@ -177,6 +199,21 @@ export class WorkOrderPartsService {
         where: { id: sparePartId },
         data: { stock: { increment: existing.quantity } },
       });
+
+      // isFinancial: false — mismo criterio que PART_ADDED: solo nombre y
+      // cantidad, nunca unitCost/unitPrice.
+      await this.activityService.record(
+        {
+          companyId: user.companyId,
+          workOrderId,
+          userId: user.userId,
+          userName: activityAuthorName(user),
+          action: ActivityAction.PART_REMOVED,
+          oldValue: `${existing.sparePart.name} ×${existing.quantity}`,
+          isFinancial: false,
+        },
+        tx,
+      );
 
       return existing;
     });
