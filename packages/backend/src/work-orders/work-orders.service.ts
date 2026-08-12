@@ -17,6 +17,10 @@ import {
 import {
   ACTIVITY_ORDER_STATUS_LABELS,
   ACTIVITY_PRIORITY_LABELS,
+  activityAuthorName,
+  formatActivityCollectionNumber,
+  formatActivityCurrency,
+  formatActivityDate,
 } from '../activity/activity-labels';
 import { ActivityService } from '../activity/activity.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
@@ -212,7 +216,7 @@ export class WorkOrdersService {
         include: WORK_ORDER_INCLUDE,
       });
 
-      const actorName = user.name.trim() || user.email;
+      const actorName = activityAuthorName(user);
 
       await this.activityService.record(
         {
@@ -473,11 +477,34 @@ export class WorkOrdersService {
         );
       }
 
-      const updated = await this.prisma.workOrder.update({
-        where: { id },
-        data: { billedAt: newBilledAt },
-        include: WORK_ORDER_INCLUDE,
+      const previousBilledAt = workOrder.billedAt;
+
+      // El update y su log de bitácora viajan en la misma transacción.
+      const updated = await this.prisma.$transaction(async (tx) => {
+        const result = await tx.workOrder.update({
+          where: { id },
+          data: { billedAt: newBilledAt },
+          include: WORK_ORDER_INCLUDE,
+        });
+
+        await this.activityService.recordFieldChange(
+          {
+            companyId: user.companyId,
+            workOrderId: id,
+            userId: user.userId,
+            userName: activityAuthorName(user),
+            action: ActivityAction.BILLED_AT_CHANGED,
+            field: 'Fecha de facturación',
+            oldValue: formatActivityDate(previousBilledAt),
+            newValue: formatActivityDate(newBilledAt),
+            isFinancial: true,
+          },
+          tx,
+        );
+
+        return result;
       });
+
       return this.toView(updated);
     }
 
@@ -579,17 +606,29 @@ export class WorkOrdersService {
         }
       | undefined;
 
+    // Campos de valorización: si cambia alguno, cada uno genera su propio
+    // evento BILLING_UPDATED (ver más abajo) — para eso necesitamos la
+    // moneda del tenant, sin importar si la orden se está completando o no.
+    const billingFieldsTouched =
+      dto.laborAmount !== undefined ||
+      dto.additionalAmount !== undefined ||
+      dto.additionalDescription !== undefined ||
+      dto.discountAmount !== undefined;
+
+    let currency: string | undefined;
+
     if (dto.status === OrderStatus.COMPLETED) {
       const [company, parts] = await Promise.all([
         this.prisma.company.findUniqueOrThrow({
           where: { id: user.companyId },
-          select: { taxRate: true },
+          select: { taxRate: true, currency: true },
         }),
         this.prisma.workOrderPart.findMany({
           where: { workOrderId: id, companyId: user.companyId },
           select: { unitPrice: true, quantity: true },
         }),
       ]);
+      currency = company.currency;
 
       const partsTotal = parts.reduce(
         (acc, p) => acc.add(p.unitPrice.mul(p.quantity)),
@@ -618,12 +657,18 @@ export class WorkOrdersService {
         totalAmount: total,
         billedAt: new Date(),
       };
+    } else if (billingFieldsTouched) {
+      const company = await this.prisma.company.findUniqueOrThrow({
+        where: { id: user.companyId },
+        select: { currency: true },
+      });
+      currency = company.currency;
     }
 
     // Snapshot ANTES del update: base de comparación para los eventos de la
     // bitácora (ver más abajo). workOrder ya viene de findOne(), con
     // user/equipments incluidos.
-    const actorName = user.name.trim() || user.email;
+    const actorName = activityAuthorName(user);
     const oldEquipmentIds = new Set(workOrder.equipments.map((e) => e.id));
     const oldEquipmentsById = new Map(
       workOrder.equipments.map((equipment) => [equipment.id, equipment]),
@@ -719,6 +764,79 @@ export class WorkOrdersService {
         },
         tx,
       );
+
+      // Valorización: un evento POR CAMPO, no uno agregado — así se ve
+      // exactamente qué cifra concreta se movió. recordFieldChange no
+      // escribe nada si el campo no cambió. Solo corre si currency quedó
+      // definido (COMPLETED o algún campo de valorización presente en el
+      // dto); si no, ningún monto pudo haber cambiado.
+      if (currency) {
+        await this.activityService.recordFieldChange(
+          {
+            companyId: user.companyId,
+            workOrderId: id,
+            userId: user.userId,
+            userName: actorName,
+            action: ActivityAction.BILLING_UPDATED,
+            field: 'Mano de obra',
+            oldValue: formatActivityCurrency(workOrder.laborAmount, currency),
+            newValue: formatActivityCurrency(result.laborAmount, currency),
+            isFinancial: true,
+          },
+          tx,
+        );
+
+        await this.activityService.recordFieldChange(
+          {
+            companyId: user.companyId,
+            workOrderId: id,
+            userId: user.userId,
+            userName: actorName,
+            action: ActivityAction.BILLING_UPDATED,
+            field: 'Cargos adicionales',
+            oldValue: formatActivityCurrency(
+              workOrder.additionalAmount,
+              currency,
+            ),
+            newValue: formatActivityCurrency(result.additionalAmount, currency),
+            isFinancial: true,
+          },
+          tx,
+        );
+
+        await this.activityService.recordFieldChange(
+          {
+            companyId: user.companyId,
+            workOrderId: id,
+            userId: user.userId,
+            userName: actorName,
+            action: ActivityAction.BILLING_UPDATED,
+            field: 'Descripción de cargos adicionales',
+            oldValue: workOrder.additionalDescription,
+            newValue: result.additionalDescription,
+            isFinancial: true,
+          },
+          tx,
+        );
+
+        await this.activityService.recordFieldChange(
+          {
+            companyId: user.companyId,
+            workOrderId: id,
+            userId: user.userId,
+            userName: actorName,
+            action: ActivityAction.BILLING_UPDATED,
+            field: 'Descuento',
+            oldValue: formatActivityCurrency(
+              workOrder.discountAmount,
+              currency,
+            ),
+            newValue: formatActivityCurrency(result.discountAmount, currency),
+            isFinancial: true,
+          },
+          tx,
+        );
+      }
 
       // Diagnóstico/observaciones/descripción: NUNCA se guarda el texto en
       // la bitácora (puede ser muy largo) — solo el evento, si de verdad
@@ -940,7 +1058,7 @@ export class WorkOrdersService {
         });
       }
 
-      return tx.workOrder.update({
+      const result = await tx.workOrder.update({
         where: { id },
         data: {
           collectionNumber: company.nextCollectionNumber - 1,
@@ -948,6 +1066,21 @@ export class WorkOrdersService {
         },
         include: WORK_ORDER_INCLUDE,
       });
+
+      await this.activityService.record(
+        {
+          companyId: user.companyId,
+          workOrderId: id,
+          userId: user.userId,
+          userName: activityAuthorName(user),
+          action: ActivityAction.COLLECTION_DOC_GENERATED,
+          newValue: formatActivityCollectionNumber(result.collectionNumber!),
+          isFinancial: true,
+        },
+        tx,
+      );
+
+      return result;
     });
 
     return this.toView(updated);
