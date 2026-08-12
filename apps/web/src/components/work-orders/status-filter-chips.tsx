@@ -10,16 +10,20 @@ const STATUSES = Object.keys(ORDER_STATUS_LABELS) as OrderStatus[];
 interface StatusFilterChipsProps {
   currentStatus?: OrderStatus;
   currentPriority?: string;
+  /** Término de búsqueda activo (parámetro `q`) — se propaga para no perderlo al cambiar de estado. */
+  currentSearch?: string;
 }
 
 export function StatusFilterChips({
   currentStatus,
   currentPriority,
+  currentSearch,
 }: StatusFilterChipsProps) {
   function hrefFor(status?: OrderStatus): string {
     const params = new URLSearchParams();
     if (status) params.set("status", status);
     if (currentPriority) params.set("priority", currentPriority);
+    if (currentSearch) params.set("q", currentSearch);
     const query = params.toString();
     return query ? `/ordenes?${query}` : "/ordenes";
   }
