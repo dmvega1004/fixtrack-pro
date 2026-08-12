@@ -69,6 +69,8 @@ export interface WorkOrderFilters {
   clientId?: string;
   equipmentId?: string;
   userId?: string;
+  /** Buscador de una sola casilla: OT, cuenta de cobro, cliente, NIT o descripción. */
+  search?: string;
   take?: number;
   skip?: number;
 }
@@ -81,6 +83,7 @@ function buildWorkOrderQuery(filters: WorkOrderFilters): string {
   if (filters.clientId) params.set("clientId", filters.clientId);
   if (filters.equipmentId) params.set("equipmentId", filters.equipmentId);
   if (filters.userId) params.set("userId", filters.userId);
+  if (filters.search) params.set("search", filters.search);
   if (filters.take !== undefined) params.set("take", String(filters.take));
   if (filters.skip !== undefined) params.set("skip", String(filters.skip));
   const query = params.toString();
