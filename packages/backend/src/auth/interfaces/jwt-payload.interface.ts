@@ -20,10 +20,13 @@ export interface JwtPayload {
 /**
  * Usuario autenticado que viaja en `request.user` tras validar el token.
  * Incluye el companyId: el candado Multi-Tenant que TODA consulta debe usar.
+ * `name` se lee fresco de la BD en cada request (ver JwtStrategy.validate) —
+ * a diferencia del `name` del JwtPayload, nunca queda desactualizado.
  */
 export interface AuthenticatedUser {
   userId: string;
   email: string;
+  name: string;
   role: Role;
   companyId: string;
 }
