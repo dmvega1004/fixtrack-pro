@@ -10,6 +10,7 @@ import { getEquipments } from "@/lib/api/equipments";
 import { getPhotos } from "@/lib/api/attachments";
 import { getCompany } from "@/lib/api/company";
 import { getWorkOrderPayments } from "@/lib/api/payments";
+import { getActivityLog } from "@/lib/api/activity-log";
 import { HttpError } from "@/lib/api/http";
 import { StatusChip } from "@/components/shared/status-chip";
 import { PriorityBadge } from "@/components/shared/priority-badge";
@@ -21,6 +22,7 @@ import { OrderStatusChanger } from "@/components/work-orders/order-status-change
 import { DetailsTab } from "@/components/work-orders/details-tab";
 import { PartsTab } from "@/components/work-orders/parts-tab";
 import { PhotosTab } from "@/components/work-orders/photos-tab";
+import { ActivityTab } from "@/components/work-orders/activity-tab";
 import { EquipmentSection } from "@/components/work-orders/equipment-section";
 import { CollectionDocumentButton } from "@/components/work-orders/collection-document-button";
 
@@ -54,16 +56,25 @@ export default async function OrdenDetallePage({
   const isTerminal = TERMINAL_STATUSES.includes(order.status);
   const isClosed = order.status === "COMPLETED" || order.status === "DELIVERED";
 
-  const [partsSummary, technicians, catalog, photos, company, clientEquipments, payments] =
-    await Promise.all([
-      getWorkOrderParts(id),
-      canManage ? getTechnicians() : Promise.resolve([]),
-      isTerminal ? Promise.resolve([]) : getSpareParts(),
-      getPhotos(id),
-      getCompany(),
-      canManage ? getEquipments({ clientId: order.clientId }) : Promise.resolve([]),
-      isAdmin && isClosed ? getWorkOrderPayments(id) : Promise.resolve([]),
-    ]);
+  const [
+    partsSummary,
+    technicians,
+    catalog,
+    photos,
+    company,
+    clientEquipments,
+    payments,
+    activityLog,
+  ] = await Promise.all([
+    getWorkOrderParts(id),
+    canManage ? getTechnicians() : Promise.resolve([]),
+    isTerminal ? Promise.resolve([]) : getSpareParts(),
+    getPhotos(id),
+    getCompany(),
+    canManage ? getEquipments({ clientId: order.clientId }) : Promise.resolve([]),
+    isAdmin && isClosed ? getWorkOrderPayments(id) : Promise.resolve([]),
+    getActivityLog(id),
+  ]);
 
   return (
     <div className="flex flex-1 flex-col pb-36 md:pb-6">
@@ -143,11 +154,7 @@ export default async function OrdenDetallePage({
             isTerminal={isTerminal}
           />
         }
-        historial={
-          <div className="p-4 text-sm text-muted-foreground md:p-6">
-            Bitácora de actividad — próximamente
-          </div>
-        }
+        historial={<ActivityTab entries={activityLog} />}
       />
     </div>
   );
