@@ -46,6 +46,27 @@ enum PaymentMethod {
   OTHER
 }
 
+enum ActivityAction {
+  ORDER_CREATED
+  STATUS_CHANGED
+  TECHNICIAN_ASSIGNED
+  PRIORITY_CHANGED
+  DIAGNOSIS_UPDATED
+  OBSERVATIONS_UPDATED
+  DESCRIPTION_UPDATED
+  EQUIPMENT_LINKED
+  EQUIPMENT_UNLINKED
+  PART_ADDED
+  PART_REMOVED
+  PHOTO_ADDED
+  PHOTO_REMOVED
+  BILLING_UPDATED
+  BILLED_AT_CHANGED
+  COLLECTION_DOC_GENERATED
+  PAYMENT_REGISTERED
+  PAYMENT_DELETED
+}
+
 model Company {
   id                    String               @id @default(uuid())
   name                  String
@@ -92,6 +113,7 @@ model Company {
   attachments           Attachment[]
   payments              Payment[]
   workOrderEquipment    WorkOrderEquipment[]
+  activityLogs          ActivityLog[]
 }
 
 model User {
@@ -111,6 +133,10 @@ model User {
   /// Pagos que este usuario registró; sobrevive a su eliminación
   /// (registeredById queda en null, el pago no se toca).
   payments    Payment[]
+  /// Eventos de bitácora de los que este usuario fue autor; sobrevive a su
+  /// eliminación (userId queda en null, ActivityLog.userName conserva el
+  /// nombre como snapshot).
+  activityLogs ActivityLog[]
 
   @@index([companyId])
 }
@@ -212,6 +238,7 @@ model WorkOrder {
   /// porque una orden puede abarcar varios equipos del mismo cliente (ej.
   /// un proyecto de adecuación sobre 5 portones cotizado como una sola OT).
   equipmentLinks        WorkOrderEquipment[]
+  activityLogs          ActivityLog[]
 
   @@unique([companyId, orderNumber])
   @@unique([companyId, collectionNumber])
@@ -309,6 +336,39 @@ model Payment {
   @@index([workOrderId])
   /// Rango "cobrado del mes" (paidAt dentro del mes actual).
   @@index([companyId, paidAt])
+}
+
+/// Bitácora de auditoría de la orden: quién la modificó, qué cambió y
+/// cuándo. Tabla de SOLO INSERCIÓN — no hay update ni delete individual; el
+/// único borrado posible es en cascada al eliminar la orden completa (ver
+/// onDelete: Cascade en workOrderId). No confundir con el historial de
+/// órdenes de la ficha del equipo, que es otra cosa.
+model ActivityLog {
+  id          String         @id @default(uuid())
+  companyId   String
+  company     Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  workOrderId String
+  workOrder   WorkOrder      @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  /// Autor del evento. SetNull para no perder el registro si se elimina el usuario.
+  userId      String?
+  user        User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  /// Snapshot del nombre del autor al momento del evento: sobrevive al borrado
+  /// del usuario y al cambio de nombre. La bitácora debe leerse igual dentro de
+  /// dos años.
+  userName    String
+  action      ActivityAction
+  /// Etiqueta legible del campo afectado, cuando aplica (ej. "Mano de obra").
+  field       String?
+  oldValue    String?
+  newValue    String?
+  /// Marca el evento como financiero AL ESCRIBIRLO. Es el filtro que aplica el
+  /// backend para el rol TECHNICIAN — así la regla vive en el dato y no hay que
+  /// mantener una lista de acciones sensibles en el frontend.
+  isFinancial Boolean        @default(false)
+  createdAt   DateTime       @default(now())
+
+  @@index([companyId])
+  @@index([workOrderId, createdAt])
 }
 
 /// Tabla intermedia orden↔equipo: una orden puede tener cero (servicio
