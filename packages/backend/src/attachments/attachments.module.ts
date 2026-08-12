@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
+import { ActivityModule } from '../activity/activity.module';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 import { WorkOrdersModule } from '../work-orders/work-orders.module';
 import { AttachmentsController } from './attachments.controller';
 import { AttachmentsService } from './attachments.service';
 
 @Module({
-  imports: [CloudinaryModule, WorkOrdersModule],
+  imports: [CloudinaryModule, WorkOrdersModule, ActivityModule],
   controllers: [AttachmentsController],
   providers: [AttachmentsService],
 })
