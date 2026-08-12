@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  ActivityAction,
   OrderStatus,
   PaymentStatus,
   Prisma,
@@ -13,6 +14,11 @@ import {
   Role,
   WorkOrder,
 } from 'database';
+import {
+  ACTIVITY_ORDER_STATUS_LABELS,
+  ACTIVITY_PRIORITY_LABELS,
+} from '../activity/activity-labels';
+import { ActivityService } from '../activity/activity.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { PrismaService } from '../prisma.service';
@@ -136,6 +142,7 @@ export class WorkOrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cloudinary: CloudinaryService,
+    private readonly activityService: ActivityService,
   ) {}
 
   async create(
@@ -179,7 +186,7 @@ export class WorkOrdersService {
         select: { nextOrderNumber: true },
       });
 
-      return tx.workOrder.create({
+      const workOrder = await tx.workOrder.create({
         data: {
           orderNumber: company.nextOrderNumber - 1,
           description: dto.description.trim(),
@@ -204,6 +211,39 @@ export class WorkOrdersService {
         },
         include: WORK_ORDER_INCLUDE,
       });
+
+      const actorName = user.name.trim() || user.email;
+
+      await this.activityService.record(
+        {
+          companyId: user.companyId,
+          workOrderId: workOrder.id,
+          userId: user.userId,
+          userName: actorName,
+          action: ActivityAction.ORDER_CREATED,
+          isFinancial: false,
+        },
+        tx,
+      );
+
+      if (workOrder.user) {
+        await this.activityService.record(
+          {
+            companyId: user.companyId,
+            workOrderId: workOrder.id,
+            userId: user.userId,
+            userName: actorName,
+            action: ActivityAction.TECHNICIAN_ASSIGNED,
+            field: 'Técnico asignado',
+            oldValue: null,
+            newValue: workOrder.user.name,
+            isFinancial: false,
+          },
+          tx,
+        );
+      }
+
+      return workOrder;
     });
 
     return this.toView(created);
@@ -580,42 +620,210 @@ export class WorkOrdersService {
       };
     }
 
-    const updated = await this.prisma.workOrder.update({
-      where: { id },
-      data: {
-        description: dto.description?.trim(),
-        diagnosis: dto.diagnosis?.trim(),
-        observations: dto.observations?.trim(),
-        status: dto.status,
-        priority: dto.priority,
-        clientId: dto.clientId,
-        userId: dto.userId,
-        laborAmount: dto.laborAmount,
-        additionalAmount: dto.additionalAmount,
-        additionalDescription: dto.additionalDescription?.trim(),
-        discountAmount: dto.discountAmount,
-        // Reemplaza el set completo de equipos de la orden (semántica PATCH):
-        // borra los vínculos actuales y crea los del array recibido. Un
-        // array vacío es válido y explícito: deja la orden sin equipos
-        // (servicio locativo). `undefined` (campo omitido) no toca nada.
-        ...(dto.equipmentIds !== undefined && {
-          equipmentLinks: {
-            deleteMany: {},
-            createMany: {
-              data: dto.equipmentIds.map((equipmentId) => ({
-                equipmentId,
-                companyId: user.companyId, // candado
-              })),
+    // Snapshot ANTES del update: base de comparación para los eventos de la
+    // bitácora (ver más abajo). workOrder ya viene de findOne(), con
+    // user/equipments incluidos.
+    const actorName = user.name.trim() || user.email;
+    const oldEquipmentIds = new Set(workOrder.equipments.map((e) => e.id));
+    const oldEquipmentsById = new Map(
+      workOrder.equipments.map((equipment) => [equipment.id, equipment]),
+    );
+
+    // El update y los eventos de bitácora viajan en la MISMA transacción:
+    // si el update falla o se revierte, ningún log de este cambio queda
+    // escrito.
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.workOrder.update({
+        where: { id },
+        data: {
+          description: dto.description?.trim(),
+          diagnosis: dto.diagnosis?.trim(),
+          observations: dto.observations?.trim(),
+          status: dto.status,
+          priority: dto.priority,
+          clientId: dto.clientId,
+          userId: dto.userId,
+          laborAmount: dto.laborAmount,
+          additionalAmount: dto.additionalAmount,
+          additionalDescription: dto.additionalDescription?.trim(),
+          discountAmount: dto.discountAmount,
+          // Reemplaza el set completo de equipos de la orden (semántica PATCH):
+          // borra los vínculos actuales y crea los del array recibido. Un
+          // array vacío es válido y explícito: deja la orden sin equipos
+          // (servicio locativo). `undefined` (campo omitido) no toca nada.
+          ...(dto.equipmentIds !== undefined && {
+            equipmentLinks: {
+              deleteMany: {},
+              createMany: {
+                data: dto.equipmentIds.map((equipmentId) => ({
+                  equipmentId,
+                  companyId: user.companyId, // candado
+                })),
+              },
             },
+          }),
+          ...(freeze && {
+            taxRateApplied: freeze.taxRateApplied,
+            totalAmount: freeze.totalAmount,
+            billedAt: freeze.billedAt,
+          }),
+        },
+        include: WORK_ORDER_INCLUDE,
+      });
+
+      // recordFieldChange no escribe si el campo no cambió (ej. status no
+      // vino en el dto: Prisma no lo tocó, result.status === workOrder.status).
+      await this.activityService.recordFieldChange(
+        {
+          companyId: user.companyId,
+          workOrderId: id,
+          userId: user.userId,
+          userName: actorName,
+          action: ActivityAction.STATUS_CHANGED,
+          field: 'Estado',
+          oldValue: ACTIVITY_ORDER_STATUS_LABELS[workOrder.status],
+          newValue: ACTIVITY_ORDER_STATUS_LABELS[result.status],
+          isFinancial: false,
+        },
+        tx,
+      );
+
+      await this.activityService.recordFieldChange(
+        {
+          companyId: user.companyId,
+          workOrderId: id,
+          userId: user.userId,
+          userName: actorName,
+          action: ActivityAction.PRIORITY_CHANGED,
+          field: 'Prioridad',
+          oldValue: ACTIVITY_PRIORITY_LABELS[workOrder.priority],
+          newValue: ACTIVITY_PRIORITY_LABELS[result.priority],
+          isFinancial: false,
+        },
+        tx,
+      );
+
+      // Cubre asignación inicial (oldValue null), reasignación y
+      // desasignación (newValue null) — con los NOMBRES, no los ids.
+      await this.activityService.recordFieldChange(
+        {
+          companyId: user.companyId,
+          workOrderId: id,
+          userId: user.userId,
+          userName: actorName,
+          action: ActivityAction.TECHNICIAN_ASSIGNED,
+          field: 'Técnico asignado',
+          oldValue: workOrder.user?.name ?? null,
+          newValue: result.user?.name ?? null,
+          isFinancial: false,
+        },
+        tx,
+      );
+
+      // Diagnóstico/observaciones/descripción: NUNCA se guarda el texto en
+      // la bitácora (puede ser muy largo) — solo el evento, si de verdad
+      // cambió.
+      if (
+        dto.diagnosis !== undefined &&
+        dto.diagnosis.trim() !== (workOrder.diagnosis ?? '')
+      ) {
+        await this.activityService.record(
+          {
+            companyId: user.companyId,
+            workOrderId: id,
+            userId: user.userId,
+            userName: actorName,
+            action: ActivityAction.DIAGNOSIS_UPDATED,
+            field: 'Diagnóstico',
+            isFinancial: false,
           },
-        }),
-        ...(freeze && {
-          taxRateApplied: freeze.taxRateApplied,
-          totalAmount: freeze.totalAmount,
-          billedAt: freeze.billedAt,
-        }),
-      },
-      include: WORK_ORDER_INCLUDE,
+          tx,
+        );
+      }
+
+      if (
+        dto.observations !== undefined &&
+        dto.observations.trim() !== (workOrder.observations ?? '')
+      ) {
+        await this.activityService.record(
+          {
+            companyId: user.companyId,
+            workOrderId: id,
+            userId: user.userId,
+            userName: actorName,
+            action: ActivityAction.OBSERVATIONS_UPDATED,
+            field: 'Observaciones',
+            isFinancial: false,
+          },
+          tx,
+        );
+      }
+
+      if (
+        dto.description !== undefined &&
+        dto.description.trim() !== workOrder.description
+      ) {
+        await this.activityService.record(
+          {
+            companyId: user.companyId,
+            workOrderId: id,
+            userId: user.userId,
+            userName: actorName,
+            action: ActivityAction.DESCRIPTION_UPDATED,
+            field: 'Descripción',
+            isFinancial: false,
+          },
+          tx,
+        );
+      }
+
+      if (dto.equipmentIds !== undefined) {
+        const newEquipmentIds = new Set(dto.equipmentIds);
+        const newEquipmentsById = new Map(
+          result.equipmentLinks.map((link) => [
+            link.equipment.id,
+            link.equipment,
+          ]),
+        );
+
+        for (const equipmentId of newEquipmentIds) {
+          if (oldEquipmentIds.has(equipmentId)) continue;
+          const equipment = newEquipmentsById.get(equipmentId);
+          if (!equipment) continue;
+          await this.activityService.record(
+            {
+              companyId: user.companyId,
+              workOrderId: id,
+              userId: user.userId,
+              userName: actorName,
+              action: ActivityAction.EQUIPMENT_LINKED,
+              newValue: this.formatEquipmentLabel(equipment),
+              isFinancial: false,
+            },
+            tx,
+          );
+        }
+
+        for (const equipmentId of oldEquipmentIds) {
+          if (newEquipmentIds.has(equipmentId)) continue;
+          const equipment = oldEquipmentsById.get(equipmentId);
+          if (!equipment) continue;
+          await this.activityService.record(
+            {
+              companyId: user.companyId,
+              workOrderId: id,
+              userId: user.userId,
+              userName: actorName,
+              action: ActivityAction.EQUIPMENT_UNLINKED,
+              newValue: this.formatEquipmentLabel(equipment),
+              isFinancial: false,
+            },
+            tx,
+          );
+        }
+      }
+
+      return result;
     });
 
     return this.toView(updated);
@@ -811,6 +1019,17 @@ export class WorkOrdersService {
         `Usuario ${userId} no encontrado en tu empresa`,
       );
     }
+  }
+
+  /** "Marca Modelo — Ubicación" para los eventos de bitácora de equipos vinculados/desvinculados. */
+  private formatEquipmentLabel(equipment: {
+    brand: string;
+    model: string;
+    location: string | null;
+  }): string {
+    return equipment.location
+      ? `${equipment.brand} ${equipment.model} — ${equipment.location}`
+      : `${equipment.brand} ${equipment.model}`;
   }
 
   /**
