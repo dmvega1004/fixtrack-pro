@@ -3,7 +3,19 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { OrderStatus, Payment, PaymentStatus, Prisma } from 'database';
+import {
+  ActivityAction,
+  OrderStatus,
+  Payment,
+  PaymentStatus,
+  Prisma,
+} from 'database';
+import {
+  ACTIVITY_PAYMENT_METHOD_LABELS,
+  activityAuthorName,
+  formatActivityCurrency,
+} from '../activity/activity-labels';
+import { ActivityService } from '../activity/activity.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { PrismaService } from '../prisma.service';
 import { derivePaymentStatus } from '../work-orders/billing.util';
@@ -35,7 +47,21 @@ export class PaymentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly workOrdersService: WorkOrdersService,
+    private readonly activityService: ActivityService,
   ) {}
+
+  /** "$150.000 · Transferencia (Ref. ABC123)" para el evento de bitácora del pago. */
+  private describePayment(
+    amount: Prisma.Decimal,
+    method: Payment['method'],
+    reference: string | null,
+    currency: string,
+  ): string {
+    const amountLabel = formatActivityCurrency(amount, currency);
+    const methodLabel = ACTIVITY_PAYMENT_METHOD_LABELS[method];
+    const referenceSuffix = reference ? ` (Ref. ${reference})` : '';
+    return `${amountLabel} · ${methodLabel}${referenceSuffix}`;
+  }
 
   async create(
     user: AuthenticatedUser,
@@ -58,6 +84,10 @@ export class PaymentsService {
     }
 
     const amount = new Prisma.Decimal(dto.amount);
+    const company = await this.prisma.company.findUniqueOrThrow({
+      where: { id: user.companyId },
+      select: { currency: true },
+    });
 
     return this.prisma.$transaction(async (tx) => {
       const paidAgg = await tx.payment.aggregate({
@@ -97,6 +127,24 @@ export class PaymentsService {
         },
       });
 
+      await this.activityService.record(
+        {
+          companyId: user.companyId,
+          workOrderId,
+          userId: user.userId,
+          userName: activityAuthorName(user),
+          action: ActivityAction.PAYMENT_REGISTERED,
+          newValue: this.describePayment(
+            payment.amount,
+            payment.method,
+            payment.reference,
+            company.currency,
+          ),
+          isFinancial: true,
+        },
+        tx,
+      );
+
       return payment;
     });
   }
@@ -128,10 +176,16 @@ export class PaymentsService {
       throw new NotFoundException(`Pago ${paymentId} no encontrado`);
     }
 
-    const order = await this.prisma.workOrder.findUniqueOrThrow({
-      where: { id: payment.workOrderId },
-      select: { totalAmount: true },
-    });
+    const [order, company] = await Promise.all([
+      this.prisma.workOrder.findUniqueOrThrow({
+        where: { id: payment.workOrderId },
+        select: { totalAmount: true },
+      }),
+      this.prisma.company.findUniqueOrThrow({
+        where: { id: user.companyId },
+        select: { currency: true },
+      }),
+    ]);
 
     return this.prisma.$transaction(async (tx) => {
       await tx.payment.delete({ where: { id: paymentId } });
@@ -150,6 +204,24 @@ export class PaymentsService {
             : PaymentStatus.PENDING, // sin total congelado no hay forma de derivar: vuelve al default
         },
       });
+
+      await this.activityService.record(
+        {
+          companyId: user.companyId,
+          workOrderId: payment.workOrderId,
+          userId: user.userId,
+          userName: activityAuthorName(user),
+          action: ActivityAction.PAYMENT_DELETED,
+          oldValue: this.describePayment(
+            payment.amount,
+            payment.method,
+            payment.reference,
+            company.currency,
+          ),
+          isFinancial: true,
+        },
+        tx,
+      );
 
       return payment;
     });
