@@ -11,7 +11,8 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { OrderStatus, PaymentStatus, Priority, Role } from 'database';
+import { ActivityLog, OrderStatus, PaymentStatus, Priority, Role } from 'database';
+import { ActivityService } from '../activity/activity.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
@@ -30,7 +31,10 @@ import {
  */
 @Controller('work-orders')
 export class WorkOrdersController {
-  constructor(private readonly workOrdersService: WorkOrdersService) {}
+  constructor(
+    private readonly workOrdersService: WorkOrdersService,
+    private readonly activityService: ActivityService,
+  ) {}
 
   /**
    * POST /work-orders — Admin/Coordinador crean y pueden asignar a cualquiera
@@ -139,6 +143,22 @@ export class WorkOrdersController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<WorkOrderView> {
     return this.workOrdersService.findOne(user, id);
+  }
+
+  /**
+   * GET /work-orders/:id/activity — bitácora de auditoría de la orden.
+   * Reutiliza findOne para la MISMA verificación de acceso que GET
+   * /work-orders/:id (candado + 404 si es de otra empresa o de otro
+   * técnico). El filtro de eventos financieros para TECHNICIAN se aplica
+   * en la consulta (ver ActivityService.findAllForWorkOrder).
+   */
+  @Get(':id/activity')
+  async getActivity(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ActivityLog[]> {
+    await this.workOrdersService.findOne(user, id);
+    return this.activityService.findAllForWorkOrder(user, id);
   }
 
   /**
