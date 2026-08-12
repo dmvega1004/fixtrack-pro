@@ -106,6 +106,13 @@ export interface WorkOrderFindAllFilters {
   equipmentId?: string;
   /** Filtro de query — para TECHNICIAN queda siempre pisado por su propio id. */
   userId?: string;
+  /**
+   * Buscador de una sola casilla: nombre/documento del cliente, descripción
+   * del servicio y, si el término trae dígitos, número de OT o de cuenta de
+   * cobro. Ver buildWhere() para el detalle — términos de menos de 2
+   * caracteres se ignoran.
+   */
+  search?: string;
   take?: number;
   skip?: number;
 }
@@ -391,6 +398,8 @@ export class WorkOrdersService {
     user: AuthenticatedUser,
     filters: Omit<WorkOrderFindAllFilters, 'take' | 'skip'>,
   ): Prisma.WorkOrderWhereInput {
+    const searchCondition = this.buildSearchCondition(filters.search);
+
     const where: Prisma.WorkOrderWhereInput = {
       companyId: user.companyId, // candado
       ...(filters.status ? { status: filters.status } : {}),
@@ -403,15 +412,67 @@ export class WorkOrdersService {
         ? { equipmentLinks: { some: { equipmentId: filters.equipmentId } } }
         : {}),
       ...(filters.userId ? { userId: filters.userId } : {}),
+      // El OR del buscador queda ANIDADO como una condición propia (AND),
+      // nunca mezclado al mismo nivel que los demás filtros: el resultado
+      // debe leerse "(empresa) Y (estado) Y (coincide con el término)". Si
+      // quedara suelto en el mismo nivel del where, anularía el candado
+      // companyId y el RBAC del técnico (ver más abajo).
+      ...(searchCondition ? { AND: searchCondition } : {}),
     };
 
     if (user.role === Role.TECHNICIAN) {
       // RBAC fino: el técnico SOLO ve sus órdenes asignadas — gana sobre
-      // cualquier userId que haya llegado por query.
+      // cualquier userId que haya llegado por query, y también sobre
+      // cualquier resultado que el buscador hubiera encontrado en órdenes
+      // ajenas.
       where.userId = user.userId;
     }
 
     return where;
+  }
+
+  /**
+   * Buscador de una sola casilla (ver WorkOrderFindAllFilters.search):
+   * arma el OR entre cliente (nombre/documento), descripción y — si el
+   * término trae al menos un dígito — número de OT y de cuenta de cobro.
+   * Términos de menos de 2 caracteres se ignoran (no filtran nada).
+   * Devuelve null cuando no hay nada que buscar.
+   *
+   * LIMITACIÓN CONOCIDA: el documento del cliente se guarda tal como se
+   * digitó (sin normalizar puntos/guiones), así que "900.826.705-4" no
+   * aparece si se busca "900826705". No se resuelve acá — requeriría una
+   * columna normalizada + backfill.
+   */
+  private buildSearchCondition(
+    search: string | undefined,
+  ): Prisma.WorkOrderWhereInput | null {
+    const term = search?.trim();
+    if (!term || term.length < 2) {
+      return null;
+    }
+
+    const conditions: Prisma.WorkOrderWhereInput[] = [
+      { client: { name: { contains: term, mode: 'insensitive' } } },
+      { client: { documentNumber: { contains: term, mode: 'insensitive' } } },
+      { description: { contains: term, mode: 'insensitive' } },
+    ];
+
+    // "OT-0015", "N.º 0125", "0015", "15": se queda solo con los dígitos y
+    // les quita los ceros a la izquierda antes de convertir, para que
+    // "0015" encuentre la OT-0015 (orderNumber = 15 en BD, sin padding).
+    const digits = term.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+    if (digits.length > 0) {
+      const numericTerm = Number(digits);
+      // Protege la conversión: si el término numérico no cabe en un entero
+      // seguro (ej. un NIT muy largo), se omiten estas dos condiciones en
+      // vez de romper la consulta.
+      if (Number.isSafeInteger(numericTerm)) {
+        conditions.push({ orderNumber: numericTerm });
+        conditions.push({ collectionNumber: numericTerm });
+      }
+    }
+
+    return { OR: conditions };
   }
 
   async findOne(user: AuthenticatedUser, id: string): Promise<WorkOrderView> {

@@ -58,11 +58,12 @@ export class WorkOrdersController {
   }
 
   /**
-   * GET /work-orders[?status=&priority=&paymentStatus=&clientId=&equipmentId=&userId=&take=&skip=]
+   * GET /work-orders[?status=&priority=&paymentStatus=&clientId=&equipmentId=&userId=&search=&take=&skip=]
    * Admin/Coordinador ven todas las de su empresa; el Técnico SOLO las
    * asignadas a él — el filtro `userId` de query NUNCA puede ampliar eso
    * (ver el candado aplicado al final en el service, después de mezclar
-   * los filtros opcionales).
+   * los filtros opcionales). `search` es el buscador de una sola casilla:
+   * OT, cuenta de cobro, cliente, documento o descripción.
    */
   @Get()
   findAll(
@@ -80,6 +81,7 @@ export class WorkOrdersController {
     @Query('equipmentId', new ParseUUIDPipe({ optional: true }))
     equipmentId?: string,
     @Query('userId', new ParseUUIDPipe({ optional: true })) userId?: string,
+    @Query('search') search?: string,
     @Query('take', new ParseIntPipe({ optional: true })) take?: number,
     @Query('skip', new ParseIntPipe({ optional: true })) skip?: number,
   ): Promise<WorkOrderView[]> {
@@ -90,6 +92,7 @@ export class WorkOrdersController {
       clientId,
       equipmentId,
       userId,
+      search,
       take,
       skip,
     });
@@ -115,6 +118,7 @@ export class WorkOrdersController {
     @Query('equipmentId', new ParseUUIDPipe({ optional: true }))
     equipmentId?: string,
     @Query('userId', new ParseUUIDPipe({ optional: true })) userId?: string,
+    @Query('search') search?: string,
   ): Promise<{ count: number }> {
     return this.workOrdersService
       .count(user, {
@@ -124,6 +128,7 @@ export class WorkOrdersController {
         clientId,
         equipmentId,
         userId,
+        search,
       })
       .then((count) => ({ count }));
   }
