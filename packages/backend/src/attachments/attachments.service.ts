@@ -9,7 +9,7 @@ import { ActivityAction, Attachment, OrderStatus } from 'database';
 import { activityAuthorName } from '../activity/activity-labels';
 import { ActivityService } from '../activity/activity.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
-import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { cloudinaryRootFolder, CloudinaryService } from '../cloudinary/cloudinary.service';
 import { validateImageFile } from '../cloudinary/validate-image-file';
 import { PrismaService } from '../prisma.service';
 import { WorkOrdersService } from '../work-orders/work-orders.service';
@@ -51,7 +51,7 @@ export class AttachmentsService {
     let uploaded;
     try {
       uploaded = await this.cloudinary.uploadBuffer(file.buffer, {
-        folder: `fixtrack/${user.companyId}/orders/${workOrderId}`,
+        folder: `${cloudinaryRootFolder()}/${user.companyId}/orders/${workOrderId}`,
         maxDimension: MAX_PHOTO_DIMENSION,
       });
     } catch (error) {

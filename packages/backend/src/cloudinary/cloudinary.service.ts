@@ -11,7 +11,7 @@ import {
 } from 'cloudinary';
 
 export interface UploadImageOptions {
-  /** Carpeta destino, ej. fixtrack/{companyId}/orders/{orderId} */
+  /** Carpeta destino, ej. {cloudinaryRootFolder()}/{companyId}/orders/{orderId} */
   folder: string;
   /** Lado máximo (px) para la transformación `limit` — no recorta, solo evita archivos gigantes. */
   maxDimension?: number;
@@ -28,6 +28,18 @@ const PLACEHOLDER_PATTERNS = [/^tu_/i, /^your_/i, /xxx/i];
 
 function looksLikePlaceholder(value: string): boolean {
   return PLACEHOLDER_PATTERNS.some((pattern) => pattern.test(value));
+}
+
+/**
+ * Carpeta raíz en Cloudinary, separada por entorno para no mezclar fotos de
+ * prueba locales con las fotos reales de las órdenes de TAELCO — misma
+ * cuenta de Cloudinary para ambos entornos, así que el aislamiento es solo
+ * de carpeta. Deriva de APP_ENV (sin variable nueva): cualquier valor
+ * distinto de 'development' (incluido no definirla) se trata como
+ * producción, el comportamiento de siempre.
+ */
+export function cloudinaryRootFolder(): string {
+  return process.env.APP_ENV === 'development' ? 'fixtrack-dev' : 'fixtrack';
 }
 
 /**

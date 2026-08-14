@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Company } from 'database';
-import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { cloudinaryRootFolder, CloudinaryService } from '../cloudinary/cloudinary.service';
 import { validateImageFile } from '../cloudinary/validate-image-file';
 import { PrismaService } from '../prisma.service';
 import { UpdateCompanyDto } from './dto/update-company.dto';
@@ -161,7 +161,7 @@ export class CompanyService {
     });
 
     const uploaded = await this.cloudinary.uploadBuffer(file.buffer, {
-      folder: `fixtrack/${companyId}/brand`,
+      folder: `${cloudinaryRootFolder()}/${companyId}/brand`,
       maxDimension: MAX_LOGO_DIMENSION,
     });
 
