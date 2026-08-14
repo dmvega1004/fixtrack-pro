@@ -28,3 +28,6 @@ Thumbs.db
 *.log
 npm-debug.log*
 pnpm-debug.log*
+
+# --- Respaldos de base de datos (contienen datos de clientes, nunca a git) ---
+/backups/

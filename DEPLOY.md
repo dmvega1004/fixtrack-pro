@@ -74,6 +74,23 @@ Vercel provee HTTPS automático en `*.vercel.app` y en dominios custom.
 
 ---
 
+## 4. Respaldo y restauración de la base de datos
+
+```
+pnpm --filter database run backup
+```
+
+Genera un volcado comprimido (`pg_dump -Fc`) de `DATABASE_URL` en
+`backups/fixtrack-YYYY-MM-DD-HHmm.dump` (raíz del repo, fuera de git —
+contiene datos de clientes). Requiere `pg_dump` instalado (`brew install
+libpq` en macOS); el script avisa claramente si falta.
+
+Corre un respaldo **antes** de cada `migrate:deploy` contra producción y
+antes de correr `reset-pilot`. Instrucciones de restauración (`pg_restore`,
+completo o por tabla) en `packages/database/README.md`.
+
+---
+
 ## Notas de arquitectura relevantes para el despliegue
 
 - **Cookie de sesión**: la cookie `fixtrack_session` la emite el propio Next.js (Route Handler `apps/web/src/app/api/auth/login/route.ts`), es `httpOnly`, `sameSite: "lax"` y `secure` en producción. Nunca viaja al dominio del backend — el servidor de Next.js la lee y reenvía el JWT como header `Authorization: Bearer` (`apps/web/src/lib/api/server-fetch.ts`). Por eso **no** se necesita `sameSite: "none"` aunque backend y frontend vivan en dominios distintos: la cookie es de un solo dominio (el de Vercel).
