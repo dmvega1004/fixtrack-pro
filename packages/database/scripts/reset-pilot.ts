@@ -21,6 +21,16 @@ import dotenv from 'dotenv';
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 dotenv.config({ path: path.resolve(__dirname, '../../backend/.env') });
 
+import { assertDevelopment } from './guards';
+// Primera operación del script, antes de leer o conectar nada más: corta
+// la ejecución si esto no es inequívocamente la base local de desarrollo.
+try {
+  assertDevelopment();
+} catch (error) {
+  console.error(error instanceof Error ? error.message : error);
+  process.exit(1);
+}
+
 import { PrismaClient } from '../index.js';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { v2 as cloudinary } from 'cloudinary';
