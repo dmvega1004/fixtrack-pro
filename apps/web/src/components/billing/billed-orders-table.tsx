@@ -24,14 +24,14 @@ export function BilledOrdersTable({ items, currency }: BilledOrdersTableProps) {
   return (
     <>
       <div className="hidden overflow-x-auto rounded-lg border border-border md:block">
-        <table className="w-full text-left text-sm">
+        <table className="w-full table-fixed text-left text-sm">
           <thead className="border-b border-border text-xs uppercase text-muted-foreground">
             <tr>
-              <th className="px-4 py-3 font-medium">Orden</th>
+              <th className="w-28 px-4 py-3 font-medium">Orden</th>
               <th className="px-4 py-3 font-medium">Cliente</th>
-              <th className="px-4 py-3 font-medium">Fecha de facturación</th>
-              <th className="px-4 py-3 font-medium">Total</th>
-              <th className="px-4 py-3 font-medium">Estado de pago</th>
+              <th className="w-32 px-4 py-3 font-medium">Fecha de facturación</th>
+              <th className="w-36 px-4 py-3 text-right font-medium">Total</th>
+              <th className="w-40 px-4 py-3 font-medium">Estado de pago</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -41,18 +41,18 @@ export function BilledOrdersTable({ items, currency }: BilledOrdersTableProps) {
                 <tr key={item.orderId} className="hover:bg-muted/50">
                   <td className="p-0">
                     <Link href={href} className="flex flex-col px-4 py-3">
-                      <span className="font-medium">
+                      <span className="whitespace-nowrap font-medium">
                         {formatOrderNumber(item.orderNumber)}
                       </span>
                       {item.collectionNumber !== null && (
-                        <span className="text-xs text-muted-foreground">
+                        <span className="whitespace-nowrap text-xs text-muted-foreground">
                           {formatCollectionNumber(item.collectionNumber)}
                         </span>
                       )}
                     </Link>
                   </td>
                   <td className="p-0">
-                    <Link href={href} className="block px-4 py-3">
+                    <Link href={href} className="block truncate px-4 py-3" title={item.clientName}>
                       {item.clientName}
                     </Link>
                   </td>
@@ -62,7 +62,7 @@ export function BilledOrdersTable({ items, currency }: BilledOrdersTableProps) {
                     </Link>
                   </td>
                   <td className="p-0">
-                    <Link href={href} className="block px-4 py-3 tabular-nums">
+                    <Link href={href} className="block px-4 py-3 text-right tabular-nums">
                       {formatCurrency(item.total, currency)}
                     </Link>
                   </td>

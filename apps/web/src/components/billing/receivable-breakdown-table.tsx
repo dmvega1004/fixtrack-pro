@@ -33,15 +33,15 @@ export function ReceivableBreakdownTable({
   return (
     <>
       <div className="hidden overflow-x-auto rounded-lg border border-border md:block">
-        <table className="w-full text-left text-sm">
+        <table className="w-full table-fixed text-left text-sm">
           <thead className="border-b border-border text-xs uppercase text-muted-foreground">
             <tr>
-              <th className="px-4 py-3 font-medium">Orden</th>
+              <th className="w-28 px-4 py-3 font-medium">Orden</th>
               <th className="px-4 py-3 font-medium">Cliente</th>
-              <th className="px-4 py-3 font-medium">Total</th>
-              <th className="px-4 py-3 font-medium">Abonado</th>
-              <th className="px-4 py-3 font-medium">Saldo</th>
-              <th className="px-4 py-3 font-medium">Días transcurridos</th>
+              <th className="w-36 px-4 py-3 text-right font-medium">Total</th>
+              <th className="w-36 px-4 py-3 text-right font-medium">Abonado</th>
+              <th className="w-36 px-4 py-3 text-right font-medium">Saldo</th>
+              <th className="w-44 px-4 py-3 font-medium">Días transcurridos</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -51,33 +51,36 @@ export function ReceivableBreakdownTable({
                 <tr key={item.orderId} className="hover:bg-muted/50">
                   <td className="p-0">
                     <Link href={href} className="flex flex-col px-4 py-3">
-                      <span className="font-medium">
+                      <span className="whitespace-nowrap font-medium">
                         {formatOrderNumber(item.orderNumber)}
                       </span>
                       {item.collectionNumber !== null && (
-                        <span className="text-xs text-muted-foreground">
+                        <span className="whitespace-nowrap text-xs text-muted-foreground">
                           {formatCollectionNumber(item.collectionNumber)}
                         </span>
                       )}
                     </Link>
                   </td>
                   <td className="p-0">
-                    <Link href={href} className="block px-4 py-3">
+                    <Link href={href} className="block truncate px-4 py-3" title={item.clientName}>
                       {item.clientName}
                     </Link>
                   </td>
                   <td className="p-0">
-                    <Link href={href} className="block px-4 py-3 tabular-nums">
+                    <Link href={href} className="block px-4 py-3 text-right tabular-nums">
                       {formatCurrency(item.total, currency)}
                     </Link>
                   </td>
                   <td className="p-0">
-                    <Link href={href} className="block px-4 py-3 tabular-nums">
+                    <Link href={href} className="block px-4 py-3 text-right tabular-nums">
                       {formatCurrency(item.paid, currency)}
                     </Link>
                   </td>
                   <td className="p-0">
-                    <Link href={href} className="block px-4 py-3 font-medium tabular-nums">
+                    <Link
+                      href={href}
+                      className="block px-4 py-3 text-right font-medium tabular-nums"
+                    >
                       {formatCurrency(item.balance, currency)}
                     </Link>
                   </td>

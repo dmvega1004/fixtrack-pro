@@ -30,7 +30,7 @@ const FILTERS: { key: ReceivablesFilter; label: string }[] = [
 
 function PaidBadge() {
   return (
-    <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+    <span className="inline-flex items-center whitespace-nowrap rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
       Pagada
     </span>
   );
@@ -81,16 +81,16 @@ export function ReceivablesPanel({ rows, activeFilter, currency }: ReceivablesPa
       ) : (
         <>
           <div className="hidden overflow-x-auto rounded-lg border border-border md:block">
-            <table className="w-full text-left text-sm">
+            <table className="w-full table-fixed text-left text-sm">
               <thead className="border-b border-border text-xs uppercase text-muted-foreground">
                 <tr>
-                  <th className="px-4 py-3 font-medium">Orden</th>
-                  <th className="px-4 py-3 font-medium">Cliente</th>
+                  <th className="w-28 px-4 py-3 font-medium">Orden</th>
+                  <th className="w-52 px-4 py-3 font-medium">Cliente</th>
                   <th className="px-4 py-3 font-medium">Descripción</th>
-                  <th className="px-4 py-3 font-medium">Total</th>
-                  <th className="px-4 py-3 font-medium">Abonado</th>
-                  <th className="px-4 py-3 font-medium">Saldo</th>
-                  <th className="px-4 py-3 font-medium">Estado</th>
+                  <th className="w-32 px-4 py-3 text-right font-medium">Total</th>
+                  <th className="w-32 px-4 py-3 text-right font-medium">Abonado</th>
+                  <th className="w-32 px-4 py-3 text-right font-medium">Saldo</th>
+                  <th className="w-40 px-4 py-3 font-medium">Estado</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -100,41 +100,48 @@ export function ReceivablesPanel({ rows, activeFilter, currency }: ReceivablesPa
                     <tr key={row.orderId} className="hover:bg-muted/50">
                       <td className="p-0">
                         <Link href={href} className="flex flex-col px-4 py-3">
-                          <span className="font-medium">
+                          <span className="whitespace-nowrap font-medium">
                             {formatOrderNumber(row.orderNumber)}
                           </span>
                           {row.collectionNumber !== null && (
-                            <span className="text-xs text-muted-foreground">
+                            <span className="whitespace-nowrap text-xs text-muted-foreground">
                               {formatCollectionNumber(row.collectionNumber)}
                             </span>
                           )}
                         </Link>
                       </td>
                       <td className="p-0">
-                        <Link href={href} className="block px-4 py-3">
+                        <Link
+                          href={href}
+                          className="block truncate px-4 py-3"
+                          title={row.clientName}
+                        >
                           {row.clientName}
                         </Link>
                       </td>
                       <td className="p-0">
                         <Link
                           href={href}
-                          className="block max-w-52 truncate px-4 py-3 text-muted-foreground"
+                          className="block truncate px-4 py-3 text-muted-foreground"
                         >
                           {row.description}
                         </Link>
                       </td>
                       <td className="p-0">
-                        <Link href={href} className="block px-4 py-3">
+                        <Link href={href} className="block px-4 py-3 text-right tabular-nums">
                           {formatCurrency(row.total, currency)}
                         </Link>
                       </td>
                       <td className="p-0">
-                        <Link href={href} className="block px-4 py-3">
+                        <Link href={href} className="block px-4 py-3 text-right tabular-nums">
                           {formatCurrency(row.paid, currency)}
                         </Link>
                       </td>
                       <td className="p-0">
-                        <Link href={href} className="block px-4 py-3 font-medium">
+                        <Link
+                          href={href}
+                          className="block px-4 py-3 text-right font-medium tabular-nums"
+                        >
                           {formatCurrency(row.balance, currency)}
                         </Link>
                       </td>
