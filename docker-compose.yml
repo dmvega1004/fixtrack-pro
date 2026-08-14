@@ -1,0 +1,27 @@
+# Base de datos de DESARROLLO local — separada de producción (Supabase,
+# configurada solo desde las variables de Railway; ver DEPLOY.md).
+#
+# Versión mayor fijada a la de producción (PostgreSQL 17, verificado con
+# SELECT version() contra Supabase) para no desarrollar contra un motor
+# distinto al que corre en producción. Nunca "latest".
+services:
+  db:
+    image: postgres:17
+    container_name: fixtrack_dev_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: fixtrack_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - fixtrack_dev_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d fixtrack_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  fixtrack_dev_db_data:
