@@ -76,6 +76,12 @@ Vercel provee HTTPS automático en `*.vercel.app` y en dominios custom.
 
 ## 4. Respaldo y restauración de la base de datos
 
+Esta sección es sobre la base de **producción** (Supabase). Para cómo está
+separada de la base local de desarrollo en Docker, y los candados que
+impiden que los scripts destructivos del paquete (`seed:dev`,
+`reset-pilot`) corran por error contra producción, ver "Entornos" en
+`packages/database/README.md`.
+
 ```
 pnpm --filter database run backup
 ```

@@ -3,6 +3,112 @@
 Schema y migraciones de Prisma. Ver `DEPLOY.md` en la raíz del repo para el
 flujo de `generate` / `migrate:deploy` en despliegue.
 
+## Entornos
+
+Hay **dos bases de datos completamente separadas**:
+
+- **Local (desarrollo)**: PostgreSQL corriendo en Docker en tu máquina
+  (`docker-compose.yml`, raíz del repo). Vacía hasta que corres las
+  migraciones y el seed — ver más abajo. Nadie más la ve; se puede borrar y
+  recrear sin consecuencias.
+- **Supabase (producción)**: la base real, con los clientes y la cartera de
+  TAELCO. Accesible **solo** desde las variables de entorno configuradas en
+  Railway (`DATABASE_URL` del servicio backend) — nunca desde un `.env` de
+  este repo, ni de este equipo, ni de ningún otro.
+
+Antes de esta separación, desarrollo y producción compartían la misma base
+de Supabase: cada prueba local escribía sobre datos reales. Ya no.
+
+### Levantar y detener la base local
+
+```
+pnpm run db:levantar   # levanta el contenedor (docker compose up -d)
+pnpm run db:detener    # lo detiene, conserva los datos
+pnpm run db:borrar     # lo detiene Y borra el volumen — pierdes todos los datos locales
+```
+
+**Si el puerto 5432 ya está ocupado** (por ejemplo, tienes un PostgreSQL
+instalado directamente en tu Mac corriendo como servicio): párralo antes de
+levantar el contenedor, o cambia el puerto publicado en
+`docker-compose.yml` (`"5432:5432"` → `"5433:5432"`, por ejemplo) y ajusta
+el puerto en tu `DATABASE_URL` para que coincida.
+
+### Cómo saber a cuál base estás apuntando
+
+Los scripts destructivos del paquete (`seed:dev`, `reset-pilot`) siempre
+imprimen el host de destino como primera línea, antes de hacer nada más:
+
+```
+>> Base de datos destino: localhost
+```
+
+Si alguna vez tienes dudas fuera de esos scripts, revisa el host en
+`DATABASE_URL` de tu `.env` — `localhost` es la base local, cualquier otra
+cosa (ej. `*.pooler.supabase.com`) es producción.
+
+### Usuarios y contraseñas de desarrollo
+
+Después de correr `pnpm --filter database run seed:dev` (ver sección
+"Escenario de desarrollo" más abajo), la aplicación local tiene estos
+usuarios, todos con la misma contraseña:
+
+| Correo | Rol | Contraseña |
+|---|---|---|
+| `admin@example.com` | ADMIN | `FixtrackDemo123!` |
+| `coordinador@example.com` | COORDINATOR | `FixtrackDemo123!` |
+| `tecnico@example.com` | TECHNICIAN | `FixtrackDemo123!` |
+
+### Migraciones nuevas
+
+Las migraciones se crean y se prueban **siempre** contra la base local
+(`prisma migrate dev` apuntando a `localhost`). Solo llegan a producción
+cuando ese commit se sube a `main` y Railway corre `migrate:deploy` en el
+arranque (ver `DEPLOY.md`) — nunca se corre una migración a mano contra
+Supabase.
+
+### Si alguna vez hay que conectarse a producción a propósito
+
+Ocurre — depurar un dato real, revisar un incidente. Cuando pase:
+
+1. **Corre un respaldo primero, sin excepción**: `pnpm --filter database run backup`
+   (ver sección "Respaldo" abajo). No hay excepción razonable a este paso.
+2. Usa una consulta de solo lectura si es posible. Si necesitas escribir,
+   confirma dos veces contra qué base estás apuntando antes de ejecutar
+   nada.
+3. Los scripts `seed:dev` y `reset-pilot` de este paquete **no van a dejarte
+   correrlos contra producción** aunque lo intentes por error — cortan si
+   `APP_ENV` no es `development` o si el host no es `localhost`/`127.0.0.1`
+   (ver `scripts/guards.ts`). `backup.ts` es la única excepción a propósito:
+   respaldar producción es justo lo que debe poder hacer.
+
+## Escenario de desarrollo (seed)
+
+```
+pnpm --filter database run seed:dev
+```
+
+Requiere la base local levantada y con las migraciones aplicadas
+(`pnpm --filter database run migrate:deploy`). Crea un tenant ficticio
+completo — empresa, usuarios, clientes, equipos, repuestos y 12 órdenes
+que cubren los casos típicos que hay que poder probar (cada estado, varios
+equipos, servicio locativo, sin técnico asignado, repuestos y fotos, una
+cuenta vencida, una pagada, una con abono parcial, una con cuenta de cobro
+generada) — ver el código comentado en `scripts/seed-dev.ts` para el
+detalle completo del escenario.
+
+**IDEMPOTENTE**: se puede correr las veces que haga falta. Cada corrida
+borra el tenant de desarrollo anterior (identificado por un id fijo) y lo
+vuelve a crear desde cero — mismo resultado siempre.
+
+⚠️ Todos los nombres son claramente ficticios a propósito (empresa
+"Taller Demo FixTrack S.A.S.", clientes "Ejemplo Uno/Dos/Tres/Cuatro") y
+los consecutivos de orden/cuenta de cobro arrancan en 7000/9000 — muy
+distintos a los de TAELCO — para que nadie confunda esta pantalla con
+datos reales.
+
+Igual que `reset-pilot`, este script se niega a correr fuera de la base
+local de desarrollo (ver "Entornos" arriba).
+
 ## Respaldo
 
 ```
