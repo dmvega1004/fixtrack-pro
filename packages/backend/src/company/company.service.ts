@@ -34,6 +34,14 @@ const COMPANY_SELECT = {
   signerRole: true,
   collectionDocFootnote: true,
   nextCollectionNumber: true,
+  nextQuoteNumber: true,
+  defaultPaymentTerms: true,
+  defaultDeliveryTime: true,
+  defaultWarrantyTerms: true,
+  defaultExclusions: true,
+  defaultValidityDays: true,
+  quoteFollowUpDays: true,
+  quoteFootnote: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -59,6 +67,14 @@ export type PublicCompany = Pick<
   | 'signerRole'
   | 'collectionDocFootnote'
   | 'nextCollectionNumber'
+  | 'nextQuoteNumber'
+  | 'defaultPaymentTerms'
+  | 'defaultDeliveryTime'
+  | 'defaultWarrantyTerms'
+  | 'defaultExclusions'
+  | 'defaultValidityDays'
+  | 'quoteFollowUpDays'
+  | 'quoteFootnote'
   | 'createdAt'
   | 'updatedAt'
 >;
@@ -132,6 +148,14 @@ export class CompanyService {
         signerRole: dto.signerRole?.trim(),
         collectionDocFootnote: dto.collectionDocFootnote?.trim(),
         nextCollectionNumber: dto.nextCollectionNumber,
+        nextQuoteNumber: dto.nextQuoteNumber,
+        defaultPaymentTerms: dto.defaultPaymentTerms?.trim(),
+        defaultDeliveryTime: dto.defaultDeliveryTime?.trim(),
+        defaultWarrantyTerms: dto.defaultWarrantyTerms?.trim(),
+        defaultExclusions: dto.defaultExclusions?.trim(),
+        defaultValidityDays: dto.defaultValidityDays,
+        quoteFollowUpDays: dto.quoteFollowUpDays,
+        quoteFootnote: dto.quoteFootnote?.trim(),
       },
       select: COMPANY_SELECT,
     });

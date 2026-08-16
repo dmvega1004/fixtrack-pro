@@ -117,4 +117,53 @@ export class UpdateCompanyDto {
   @IsInt({ message: 'nextCollectionNumber debe ser un entero positivo' })
   @Min(1, { message: 'nextCollectionNumber debe ser un entero positivo' })
   nextCollectionNumber?: number;
+
+  // --- Cotizaciones (valores por defecto) ---
+
+  /**
+   * Próximo consecutivo de cotización a asignar. Igual criterio que
+   * nextCollectionNumber: solo aplica a la próxima que se ENVÍE (no
+   * reescribe quoteNumber de cotizaciones ya enviadas).
+   */
+  @IsOptional()
+  @IsInt({ message: 'nextQuoteNumber debe ser un entero positivo' })
+  @Min(1, { message: 'nextQuoteNumber debe ser un entero positivo' })
+  nextQuoteNumber?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  defaultPaymentTerms?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  defaultDeliveryTime?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  defaultWarrantyTerms?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  defaultExclusions?: string;
+
+  @IsOptional()
+  @IsInt({ message: 'defaultValidityDays debe ser un entero' })
+  @Min(1)
+  @Max(365)
+  defaultValidityDays?: number;
+
+  @IsOptional()
+  @IsInt({ message: 'quoteFollowUpDays debe ser un entero' })
+  @Min(1)
+  @Max(365)
+  quoteFollowUpDays?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  quoteFootnote?: string;
 }

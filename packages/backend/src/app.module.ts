@@ -14,6 +14,7 @@ import { CompanyModule } from './company/company.module';
 import { EquipmentsModule } from './equipments/equipments.module';
 import { PaymentsModule } from './payments/payments.module';
 import { PrismaModule } from './prisma.module';
+import { QuotesModule } from './quotes/quotes.module';
 import { SparePartsModule } from './spare-parts/spare-parts.module';
 import { UsersModule } from './users/users.module';
 import { WorkOrdersModule } from './work-orders/work-orders.module';
@@ -33,6 +34,7 @@ import { WorkOrdersModule } from './work-orders/work-orders.module';
     CompanyModule,
     EquipmentsModule,
     PaymentsModule,
+    QuotesModule,
     WorkOrdersModule,
     SparePartsModule,
     UsersModule,
