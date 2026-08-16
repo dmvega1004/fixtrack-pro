@@ -5,6 +5,7 @@ import {
   ClipboardList,
   Users,
   Boxes,
+  CalendarClock,
   Package,
   Wallet,
   UserCog,
@@ -25,6 +26,12 @@ export const NAV_SECTIONS: NavSection[] = [
   { href: "/ordenes", label: "Órdenes", icon: ClipboardList, roles: ALL_ROLES },
   { href: "/clientes", label: "Clientes", icon: Users, roles: ALL_ROLES },
   { href: "/equipos", label: "Equipos", icon: Boxes, roles: ALL_ROLES },
+  {
+    href: "/mantenimiento",
+    label: "Mantenimiento",
+    icon: CalendarClock,
+    roles: ["ADMIN", "COORDINATOR"],
+  },
   { href: "/inventario", label: "Inventario", icon: Package, roles: ALL_ROLES },
   {
     href: "/cobros",

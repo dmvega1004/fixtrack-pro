@@ -300,22 +300,27 @@ export class EquipmentsService {
   }
 
   /**
-   * GET /equipments/maintenance-due — equipos con plan activo cuya
-   * nextMaintenanceAt cae dentro de MAINTENANCE_DUE_WINDOW_DAYS días o ya
-   * pasó. La ALERTA es por EQUIPO (cada uno con su propio ciclo); es la
-   * pantalla de "Programar mantenimiento" la que los agrupa por cliente
-   * para proponer una sola orden (regla de negocio del frontend/una orden
-   * por cobro).
+   * GET /equipments/maintenance-due — equipos con plan activo. Por defecto
+   * (windowDays = MAINTENANCE_DUE_WINDOW_DAYS) solo los que vencen dentro
+   * de esa ventana o ya pasaron — la ALERTA es por EQUIPO (cada uno con su
+   * propio ciclo); es la pantalla de "Programar mantenimiento" la que los
+   * agrupa por cliente para proponer una sola orden (regla de negocio del
+   * frontend/una orden por cobro). windowDays=null quita el tope superior
+   * (vista "Todos los planes" de /mantenimiento): misma consulta, sin
+   * duplicarla, para que ambas vistas no puedan desincronizarse.
    */
-  async findMaintenanceDue(companyId: string): Promise<MaintenanceDueItem[]> {
+  async findMaintenanceDue(
+    companyId: string,
+    windowDays: number | null = MAINTENANCE_DUE_WINDOW_DAYS,
+  ): Promise<MaintenanceDueItem[]> {
     const today = todayDateOnly();
-    const cutoff = addDaysUTC(today, MAINTENANCE_DUE_WINDOW_DAYS);
+    const cutoff = windowDays !== null ? addDaysUTC(today, windowDays) : null;
 
     const equipments = await this.prisma.equipment.findMany({
       where: {
         companyId,
         maintenanceEnabled: true,
-        nextMaintenanceAt: { lte: cutoff },
+        ...(cutoff !== null ? { nextMaintenanceAt: { lte: cutoff } } : {}),
       },
       select: {
         id: true,

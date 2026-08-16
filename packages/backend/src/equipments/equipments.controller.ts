@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  ParseBoolPipe,
   ParseUUIDPipe,
   Patch,
   Post,
@@ -57,8 +58,12 @@ export class EquipmentsController {
   }
 
   /**
-   * GET /equipments/maintenance-due — equipos con plan activo por vencer o
-   * ya vencidos (ver EquipmentsService.findMaintenanceDue). Antes de
+   * GET /equipments/maintenance-due[?all=true] — equipos con plan activo.
+   * Sin `all`: solo los por vencer o ya vencidos (ventana de
+   * MAINTENANCE_DUE_WINDOW_DAYS). Con `all=true`: TODOS los equipos con
+   * plan activo, sin importar cuándo vencen — vista "Todos los planes" de
+   * /mantenimiento. Misma consulta parametrizada (ver
+   * EquipmentsService.findMaintenanceDue), no una duplicada. Antes de
    * ':id' en el orden de rutas: si no, Nest intentaría resolver
    * "maintenance-due" como un :id y fallaría el ParseUUIDPipe.
    */
@@ -66,8 +71,12 @@ export class EquipmentsController {
   @Get('maintenance-due')
   findMaintenanceDue(
     @CurrentUser('companyId') companyId: string,
+    @Query('all', new ParseBoolPipe({ optional: true })) all?: boolean,
   ): Promise<MaintenanceDueItem[]> {
-    return this.equipmentsService.findMaintenanceDue(companyId);
+    return this.equipmentsService.findMaintenanceDue(
+      companyId,
+      all ? null : undefined,
+    );
   }
 
   /** GET /equipments/:id — 404 si el equipo es de otra empresa */

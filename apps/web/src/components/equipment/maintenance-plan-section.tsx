@@ -15,6 +15,11 @@ import {
   toDateInputValue,
   todayDateInputValue,
 } from "@/lib/format/date-only";
+import {
+  MAINTENANCE_TONE_STYLES,
+  maintenanceDaysLabel,
+  maintenanceTone,
+} from "@/lib/maintenance";
 import { updateEquipmentAction } from "@/app/(dashboard)/equipos/actions";
 
 const INTERVAL_PRESETS = [3, 4, 6, 12] as const;
@@ -67,28 +72,17 @@ function Toggle({
 /** Verde &gt;30 días, ámbar ≤30, rojo ya vencido (con los días de retraso). */
 function MaintenanceSemaphore({ nextMaintenanceAt }: { nextMaintenanceAt: string }) {
   const days = daysUntilDateOnly(nextMaintenanceAt);
-  const tone = days < 0 ? "red" : days <= 30 ? "amber" : "green";
-  const toneStyles: Record<typeof tone, string> = {
-    green: "bg-green-100 text-green-800",
-    amber: "bg-amber-100 text-amber-800",
-    red: "bg-red-100 text-red-800",
-  };
-  const label =
-    days < 0
-      ? `Venció hace ${Math.abs(days)} día${Math.abs(days) === 1 ? "" : "s"}`
-      : days === 0
-        ? "Vence hoy"
-        : `Faltan ${days} día${days === 1 ? "" : "s"}`;
+  const tone = maintenanceTone(days);
 
   return (
     <div className="flex flex-col gap-1">
       <span
         className={cn(
           "inline-flex w-fit items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
-          toneStyles[tone],
+          MAINTENANCE_TONE_STYLES[tone],
         )}
       >
-        {label}
+        {maintenanceDaysLabel(days)}
       </span>
       <span className="text-xs text-muted-foreground">
         Próximo mantenimiento: {formatDateOnly(nextMaintenanceAt)}

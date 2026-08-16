@@ -129,12 +129,15 @@ export function updateEquipment(
 }
 
 /**
- * GET /equipments/maintenance-due. Solo ADMIN/COORDINATOR. Equipos con plan
- * activo por vencer (30 días) o ya vencidos, del más vencido al menos
- * urgente (mismo orden que devuelve el backend).
+ * GET /equipments/maintenance-due[?all=true]. Solo ADMIN/COORDINATOR.
+ * Equipos con plan activo, del más vencido al menos urgente (mismo orden
+ * que devuelve el backend). Por defecto, solo por vencer (30 días) o ya
+ * vencidos; `all: true` trae TODOS los equipos con plan activo sin importar
+ * cuándo vencen (vista "Todos los planes" de /mantenimiento).
  */
-export function getMaintenanceDue(): Promise<MaintenanceDueItem[]> {
-  return serverFetch<MaintenanceDueItem[]>("/equipments/maintenance-due");
+export function getMaintenanceDue(options: { all?: boolean } = {}): Promise<MaintenanceDueItem[]> {
+  const query = options.all ? "?all=true" : "";
+  return serverFetch<MaintenanceDueItem[]>(`/equipments/maintenance-due${query}`);
 }
 
 /**
