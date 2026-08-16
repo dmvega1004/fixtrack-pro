@@ -19,7 +19,8 @@ export type ActivityAction =
   | "BILLED_AT_CHANGED"
   | "COLLECTION_DOC_GENERATED"
   | "PAYMENT_REGISTERED"
-  | "PAYMENT_DELETED";
+  | "PAYMENT_DELETED"
+  | "MAINTENANCE_UPDATED";
 
 // Debe reflejar exactamente el modelo ActivityLog de
 // packages/database/prisma/schema.prisma

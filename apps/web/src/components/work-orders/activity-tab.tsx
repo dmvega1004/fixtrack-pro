@@ -187,6 +187,13 @@ function describeEvent({
           {oldValue ? <> de {oldValue}</> : null}
         </>
       );
+    case "MAINTENANCE_UPDATED":
+      return (
+        <>
+          {userName} actualizó el mantenimiento preventivo
+          {newValue ? <>: {newValue}</> : null}
+        </>
+      );
     default:
       return <>{userName} realizó un cambio en la orden</>;
   }

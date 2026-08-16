@@ -1,4 +1,4 @@
-import { Priority } from 'database';
+import { Priority, ServiceType } from 'database';
 import {
   ArrayUnique,
   IsArray,
@@ -70,4 +70,15 @@ export class CreateWorkOrderDto {
   @IsOptional()
   @IsEnum(Priority, { message: 'priority debe ser LOW, MEDIUM o HIGH' })
   priority?: Priority;
+
+  /**
+   * Opcional: si no se envía, Prisma aplica el default CORRECTIVE. Lo usa
+   * "Programar mantenimiento" (precarga PREVENTIVE) y cualquier orden que
+   * el usuario quiera marcar como inspección/instalación desde el inicio.
+   */
+  @IsOptional()
+  @IsEnum(ServiceType, {
+    message: 'serviceType debe ser CORRECTIVE, PREVENTIVE, INSPECTION o INSTALLATION',
+  })
+  serviceType?: ServiceType;
 }

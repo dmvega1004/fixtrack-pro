@@ -12,6 +12,7 @@ import {
   Prisma,
   Priority,
   Role,
+  ServiceType,
   WorkOrder,
 } from 'database';
 import {
@@ -25,6 +26,8 @@ import {
 import { ActivityService } from '../activity/activity.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { addMonthsUTC, formatDateOnly, todayDateOnly } from '../common/date-only.util';
+import { EquipmentsService } from '../equipments/equipments.service';
 import { PrismaService } from '../prisma.service';
 import { calculateBilling } from './billing.util';
 import { CreateWorkOrderDto } from './dto/create-work-order.dto';
@@ -136,6 +139,8 @@ export interface WorkOrderDashboardStats {
   avgResolutionDays: number | null;
   technicianRanking: WorkOrderTechnicianRankingEntry[];
   recentOrders: WorkOrderView[];
+  /** Equipos con plan de mantenimiento activo por vencer o ya vencidos (ver EquipmentsService.countMaintenanceDue). */
+  maintenanceDueCount: number;
 }
 
 /**
@@ -154,6 +159,7 @@ export class WorkOrdersService {
     private readonly prisma: PrismaService,
     private readonly cloudinary: CloudinaryService,
     private readonly activityService: ActivityService,
+    private readonly equipmentsService: EquipmentsService,
   ) {}
 
   async create(
@@ -204,6 +210,7 @@ export class WorkOrdersService {
           diagnosis: dto.diagnosis?.trim(),
           observations: dto.observations?.trim(),
           priority: dto.priority, // undefined → default MEDIUM
+          serviceType: dto.serviceType, // undefined → default CORRECTIVE
           clientId: dto.clientId,
           userId: assignedUserId,
           companyId: user.companyId, // candado
@@ -306,6 +313,7 @@ export class WorkOrdersService {
       rankingGroups,
       technicians,
       recentOrders,
+      maintenanceDueCount,
     ] = await Promise.all([
       this.prisma.workOrder.groupBy({
         by: ['status'],
@@ -347,6 +355,7 @@ export class WorkOrdersService {
         orderBy: { createdAt: 'desc' },
         take: 5,
       }),
+      this.equipmentsService.countMaintenanceDue(companyId),
     ]);
 
     const countByStatus = new Map(
@@ -385,6 +394,7 @@ export class WorkOrdersService {
       avgResolutionDays,
       technicianRanking,
       recentOrders: recentOrders.map((order) => this.toView(order)),
+      maintenanceDueCount,
     };
   }
 
@@ -590,6 +600,7 @@ export class WorkOrdersService {
       const forbiddenFields: string[] = [];
       if (dto.description !== undefined) forbiddenFields.push('description');
       if (dto.priority !== undefined) forbiddenFields.push('priority');
+      if (dto.serviceType !== undefined) forbiddenFields.push('serviceType');
       if (dto.clientId !== undefined) forbiddenFields.push('clientId');
       if (dto.equipmentIds !== undefined) forbiddenFields.push('equipmentIds');
       if (dto.userId !== undefined) forbiddenFields.push('userId');
@@ -726,6 +737,17 @@ export class WorkOrdersService {
       currency = company.currency;
     }
 
+    // Mantenimiento preventivo: solo en la TRANSICIÓN a COMPLETED (no en un
+    // reenvío del mismo estado, ej. al corregir un monto) de una orden cuyo
+    // serviceType resultante es PREVENTIVE. `resultingServiceType` mira el
+    // dto primero porque esta misma llamada puede traer el cambio de tipo
+    // de servicio junto con el cierre.
+    const resultingServiceType = dto.serviceType ?? workOrder.serviceType;
+    const isCompletingNow =
+      dto.status === OrderStatus.COMPLETED && workOrder.status !== OrderStatus.COMPLETED;
+    const shouldUpdateMaintenance =
+      isCompletingNow && resultingServiceType === ServiceType.PREVENTIVE;
+
     // Snapshot ANTES del update: base de comparación para los eventos de la
     // bitácora (ver más abajo). workOrder ya viene de findOne(), con
     // user/equipments incluidos.
@@ -747,6 +769,7 @@ export class WorkOrdersService {
           observations: dto.observations?.trim(),
           status: dto.status,
           priority: dto.priority,
+          serviceType: dto.serviceType,
           clientId: dto.clientId,
           userId: dto.userId,
           laborAmount: dto.laborAmount,
@@ -999,6 +1022,78 @@ export class WorkOrdersService {
             },
             tx,
           );
+        }
+      }
+
+      // Mantenimiento preventivo: DENTRO de esta misma transacción — si el
+      // cierre se revierte, ninguna fecha de mantenimiento queda movida.
+      // Cada equipo se recalcula con SU PROPIO intervalo (nunca uno común):
+      // tres equipos con ciclos de 3, 4 y 6 meses en la misma orden deben
+      // quedar con tres próximas fechas distintas.
+      if (shouldUpdateMaintenance) {
+        const linkedEquipmentIds = result.equipmentLinks.map(
+          (link) => link.equipment.id,
+        );
+
+        if (linkedEquipmentIds.length > 0) {
+          // Solo los equipos CON PLAN ACTIVO — uno sin plan dentro de la
+          // misma orden preventiva no se toca (no hay intervalo con qué
+          // recalcular, y no fue el usuario quien pidió vigilarlo).
+          const eligibleEquipments = await tx.equipment.findMany({
+            where: {
+              id: { in: linkedEquipmentIds },
+              companyId: user.companyId,
+              maintenanceEnabled: true,
+            },
+            select: {
+              id: true,
+              brand: true,
+              model: true,
+              location: true,
+              maintenanceIntervalMonths: true,
+            },
+          });
+
+          if (eligibleEquipments.length > 0) {
+            const closureDate = todayDateOnly();
+            const updatedLabels: string[] = [];
+
+            for (const equipment of eligibleEquipments) {
+              // Invariante garantizada por EquipmentsService: si
+              // maintenanceEnabled=true, el intervalo siempre está seteado.
+              const nextMaintenanceAt = addMonthsUTC(
+                closureDate,
+                equipment.maintenanceIntervalMonths!,
+              );
+
+              await tx.equipment.update({
+                where: { id: equipment.id },
+                data: {
+                  lastMaintenanceAt: closureDate,
+                  nextMaintenanceAt,
+                },
+              });
+
+              const label = equipment.location
+                ? `${equipment.brand} ${equipment.model} — ${equipment.location}`
+                : `${equipment.brand} ${equipment.model}`;
+              updatedLabels.push(`${label}: próxima ${formatDateOnly(nextMaintenanceAt)}`);
+            }
+
+            await this.activityService.record(
+              {
+                companyId: user.companyId,
+                workOrderId: id,
+                userId: user.userId,
+                userName: actorName,
+                action: ActivityAction.MAINTENANCE_UPDATED,
+                field: 'Mantenimiento',
+                newValue: updatedLabels.join('; '),
+                isFinancial: false,
+              },
+              tx,
+            );
+          }
         }
       }
 
