@@ -2,10 +2,12 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getQuote } from "@/lib/api/quotes";
 import { getCompany } from "@/lib/api/company";
+import { getSession } from "@/lib/session";
 import { HttpError } from "@/lib/api/http";
 import { QuoteStatusChip } from "@/components/shared/quote-status-chip";
 import { QuoteValidityChip } from "@/components/quotes/quote-validity-chip";
 import { QuoteActions } from "@/components/quotes/quote-actions";
+import { DeleteQuoteButton } from "@/components/quotes/delete-quote-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatQuoteNumber } from "@/lib/format/quote-number";
 import { formatCurrency } from "@/lib/format/currency";
@@ -40,7 +42,8 @@ export default async function CotizacionDetallePage({ params }: CotizacionDetall
     throw error;
   }
 
-  const company = await getCompany();
+  const [company, session] = await Promise.all([getCompany(), getSession()]);
+  const isAdmin = session?.role === "ADMIN";
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
@@ -219,6 +222,16 @@ export default async function CotizacionDetallePage({ params }: CotizacionDetall
           </CardContent>
         </Card>
       </div>
+
+      {isAdmin && quote.status === "DRAFT" && (
+        <div className="mt-2 flex flex-col gap-2 border-t border-border pt-4">
+          <h2 className="text-sm font-medium">Zona de riesgo</h2>
+          <DeleteQuoteButton
+            quoteId={quote.id}
+            quoteLabel={formatQuoteNumber(quote.quoteNumber)}
+          />
+        </div>
+      )}
     </div>
   );
 }

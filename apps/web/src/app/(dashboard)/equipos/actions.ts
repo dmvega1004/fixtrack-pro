@@ -5,6 +5,7 @@ import { HttpError } from "@/lib/api/http";
 import {
   createEquipment,
   updateEquipment,
+  deleteEquipment,
   type CreateEquipmentInput,
   type UpdateEquipmentInput,
 } from "@/lib/api/equipments";
@@ -46,4 +47,19 @@ export async function updateEquipmentAction(
     }
     throw error;
   }
+}
+
+/** DELETE /equipments/:id — solo ADMIN (RBAC en el backend). 409 si tiene órdenes asociadas. */
+export async function deleteEquipmentAction(id: string): Promise<EquipmentActionResult> {
+  try {
+    await deleteEquipment(id);
+  } catch (error) {
+    if (error instanceof HttpError) {
+      return { ok: false, message: error.message };
+    }
+    throw error;
+  }
+
+  revalidatePath("/equipos");
+  return { ok: true };
 }

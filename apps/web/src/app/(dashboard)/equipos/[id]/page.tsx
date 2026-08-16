@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EquipmentStatusBadge } from "@/components/equipment/equipment-status-badge";
 import { MaintenancePlanSection } from "@/components/equipment/maintenance-plan-section";
 import { QrCodeImage } from "@/components/equipment/qr-code-image";
+import { DeleteEquipmentButton } from "@/components/equipment/delete-equipment-button";
 import { StatusChip } from "@/components/shared/status-chip";
 import { formatOrderNumber } from "@/lib/format/order-number";
 import { formatDate } from "@/lib/format/dates";
@@ -52,6 +53,10 @@ export default async function EquipoDetallePage({
   // el backend); el TECHNICIAN ve la sección en modo lectura.
   const canManageMaintenance =
     session?.role === "ADMIN" || session?.role === "COORDINATOR";
+  const isAdmin = session?.role === "ADMIN";
+  const itemLabel = `el equipo ${equipment.brand} ${equipment.model}${
+    equipment.location ? ` — ${equipment.location}` : ""
+  }`;
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
@@ -180,6 +185,23 @@ export default async function EquipoDetallePage({
           )}
         </CardContent>
       </Card>
+
+      {isAdmin && (
+        <div className="mt-2 flex flex-col gap-2 border-t border-border pt-4">
+          <h2 className="text-sm font-medium">Zona de riesgo</h2>
+          <DeleteEquipmentButton equipmentId={equipment.id} itemLabel={itemLabel} />
+          {history.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Este equipo tiene órdenes asociadas, así que no se puede
+              eliminar. Si ya no está en servicio, márcalo como{" "}
+              <Link href={`/equipos/${equipment.id}/editar`} className="underline">
+                Retirado
+              </Link>{" "}
+              para conservar su historial.
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

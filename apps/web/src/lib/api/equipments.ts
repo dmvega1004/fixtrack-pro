@@ -129,6 +129,15 @@ export function updateEquipment(
 }
 
 /**
+ * DELETE /equipments/:id. Solo ADMIN (RBAC en el backend). 409 si el equipo
+ * tiene órdenes de trabajo asociadas — el mensaje del backend explica qué
+ * hacer en su lugar (marcarlo como Retirado).
+ */
+export function deleteEquipment(id: string): Promise<Equipment> {
+  return serverFetch<Equipment>(`/equipments/${id}`, { method: "DELETE" });
+}
+
+/**
  * GET /equipments/maintenance-due[?all=true]. Solo ADMIN/COORDINATOR.
  * Equipos con plan activo, del más vencido al menos urgente (mismo orden
  * que devuelve el backend). Por defecto, solo por vencer (30 días) o ya
