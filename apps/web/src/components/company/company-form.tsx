@@ -34,6 +34,14 @@ interface CompanyFormState {
   signerRole: string;
   collectionDocFootnote: string;
   nextCollectionNumber: string;
+  nextQuoteNumber: string;
+  defaultPaymentTerms: string;
+  defaultDeliveryTime: string;
+  defaultWarrantyTerms: string;
+  defaultExclusions: string;
+  defaultValidityDays: string;
+  quoteFollowUpDays: string;
+  quoteFootnote: string;
 }
 
 function toFormState(company: Company): CompanyFormState {
@@ -55,6 +63,14 @@ function toFormState(company: Company): CompanyFormState {
     signerRole: company.signerRole ?? "",
     collectionDocFootnote: company.collectionDocFootnote ?? "",
     nextCollectionNumber: String(company.nextCollectionNumber),
+    nextQuoteNumber: String(company.nextQuoteNumber),
+    defaultPaymentTerms: company.defaultPaymentTerms ?? "",
+    defaultDeliveryTime: company.defaultDeliveryTime ?? "",
+    defaultWarrantyTerms: company.defaultWarrantyTerms ?? "",
+    defaultExclusions: company.defaultExclusions ?? "",
+    defaultValidityDays: String(company.defaultValidityDays),
+    quoteFollowUpDays: String(company.quoteFollowUpDays),
+    quoteFootnote: company.quoteFootnote ?? "",
   };
 }
 
@@ -118,9 +134,38 @@ export function CompanyForm({ company }: CompanyFormProps) {
     Number.isInteger(nextCollectionNumber) &&
     nextCollectionNumber >= 1;
 
+  const nextQuoteNumber = Number(form.nextQuoteNumber);
+  const isNextQuoteNumberValid =
+    form.nextQuoteNumber.trim() !== "" &&
+    Number.isInteger(nextQuoteNumber) &&
+    nextQuoteNumber >= 1;
+
+  const defaultValidityDays = Number(form.defaultValidityDays);
+  const isDefaultValidityDaysValid =
+    form.defaultValidityDays.trim() !== "" &&
+    Number.isInteger(defaultValidityDays) &&
+    defaultValidityDays >= 1 &&
+    defaultValidityDays <= 365;
+
+  const quoteFollowUpDays = Number(form.quoteFollowUpDays);
+  const isQuoteFollowUpDaysValid =
+    form.quoteFollowUpDays.trim() !== "" &&
+    Number.isInteger(quoteFollowUpDays) &&
+    quoteFollowUpDays >= 1 &&
+    quoteFollowUpDays <= 365;
+
+  const isQuoteSectionValid =
+    isNextQuoteNumberValid && isDefaultValidityDaysValid && isQuoteFollowUpDaysValid;
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!form.name.trim() || !isTaxRateValid || !isNextCollectionNumberValid) return;
+    if (
+      !form.name.trim() ||
+      !isTaxRateValid ||
+      !isNextCollectionNumberValid ||
+      !isQuoteSectionValid
+    )
+      return;
 
     setIsSaving(true);
     const result = await saveCompanyAction({
@@ -141,6 +186,14 @@ export function CompanyForm({ company }: CompanyFormProps) {
       signerRole: form.signerRole.trim() || undefined,
       collectionDocFootnote: form.collectionDocFootnote.trim() || undefined,
       nextCollectionNumber,
+      nextQuoteNumber,
+      defaultPaymentTerms: form.defaultPaymentTerms.trim() || undefined,
+      defaultDeliveryTime: form.defaultDeliveryTime.trim() || undefined,
+      defaultWarrantyTerms: form.defaultWarrantyTerms.trim() || undefined,
+      defaultExclusions: form.defaultExclusions.trim() || undefined,
+      defaultValidityDays,
+      quoteFollowUpDays,
+      quoteFootnote: form.quoteFootnote.trim() || undefined,
     });
     setIsSaving(false);
 
@@ -403,10 +456,119 @@ export function CompanyForm({ company }: CompanyFormProps) {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Cotizaciones</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          <p className="text-xs text-muted-foreground">
+            Condiciones comerciales por defecto de una cotización nueva —
+            se copian a cada cotización al crearla y son editables ahí
+            mientras siga en borrador.
+          </p>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="defaultPaymentTerms">Forma de pago</Label>
+            <Input
+              id="defaultPaymentTerms"
+              value={form.defaultPaymentTerms}
+              onChange={updateField("defaultPaymentTerms")}
+              placeholder="Ej. 50% anticipo, 50% contra entrega"
+            />
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="defaultDeliveryTime">Tiempo de entrega</Label>
+              <Input
+                id="defaultDeliveryTime"
+                value={form.defaultDeliveryTime}
+                onChange={updateField("defaultDeliveryTime")}
+                placeholder="Ej. 8 días hábiles"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="defaultWarrantyTerms">Garantía</Label>
+              <Input
+                id="defaultWarrantyTerms"
+                value={form.defaultWarrantyTerms}
+                onChange={updateField("defaultWarrantyTerms")}
+                placeholder="Ej. 12 meses por defectos de fabricación"
+              />
+            </div>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="defaultExclusions">Exclusiones</Label>
+            <Input
+              id="defaultExclusions"
+              value={form.defaultExclusions}
+              onChange={updateField("defaultExclusions")}
+              placeholder="Ej. No incluye obra civil"
+            />
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="defaultValidityDays">Días de validez</Label>
+              <Input
+                id="defaultValidityDays"
+                type="number"
+                min={1}
+                max={365}
+                step={1}
+                value={form.defaultValidityDays}
+                onChange={updateField("defaultValidityDays")}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="quoteFollowUpDays">
+                Días para el recordatorio de seguimiento
+              </Label>
+              <Input
+                id="quoteFollowUpDays"
+                type="number"
+                min={1}
+                max={365}
+                step={1}
+                value={form.quoteFollowUpDays}
+                onChange={updateField("quoteFollowUpDays")}
+              />
+            </div>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="quoteFootnote">Nota al pie</Label>
+            <Input
+              id="quoteFootnote"
+              value={form.quoteFootnote}
+              onChange={updateField("quoteFootnote")}
+              placeholder="Ej. Precios sujetos a cambio sin previo aviso."
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="nextQuoteNumber">
+              Numeración: próximo consecutivo a asignar
+            </Label>
+            <Input
+              id="nextQuoteNumber"
+              type="number"
+              min={1}
+              step={1}
+              value={form.nextQuoteNumber}
+              onChange={updateField("nextQuoteNumber")}
+            />
+            <p className="text-xs text-muted-foreground">
+              Se consume recién cuando se ENVÍA una cotización, no cuando se
+              crea el borrador.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
       <Button
         type="submit"
         disabled={
-          isSaving || !form.name.trim() || !isTaxRateValid || !isNextCollectionNumberValid
+          isSaving ||
+          !form.name.trim() ||
+          !isTaxRateValid ||
+          !isNextCollectionNumberValid ||
+          !isQuoteSectionValid
         }
         className="w-full md:w-auto md:self-end"
       >

@@ -29,6 +29,15 @@ export interface Company {
   collectionDocFootnote: string | null;
   /** Próximo consecutivo a asignar — solo aplica a documentos futuros. */
   nextCollectionNumber: number;
+  /** Próximo consecutivo de cotización — solo aplica a la próxima que se ENVÍE. */
+  nextQuoteNumber: number;
+  defaultPaymentTerms: string | null;
+  defaultDeliveryTime: string | null;
+  defaultWarrantyTerms: string | null;
+  defaultExclusions: string | null;
+  defaultValidityDays: number;
+  quoteFollowUpDays: number;
+  quoteFootnote: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -51,6 +60,14 @@ export interface UpdateCompanyInput {
   signerRole?: string;
   collectionDocFootnote?: string;
   nextCollectionNumber?: number;
+  nextQuoteNumber?: number;
+  defaultPaymentTerms?: string;
+  defaultDeliveryTime?: string;
+  defaultWarrantyTerms?: string;
+  defaultExclusions?: string;
+  defaultValidityDays?: number;
+  quoteFollowUpDays?: number;
+  quoteFootnote?: string;
 }
 
 export interface UpdateCompanyResult extends Company {

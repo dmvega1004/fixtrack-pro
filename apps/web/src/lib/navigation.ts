@@ -3,6 +3,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard,
   ClipboardList,
+  FileText,
   Users,
   Boxes,
   CalendarClock,
@@ -24,6 +25,12 @@ const ALL_ROLES: Role[] = ["ADMIN", "COORDINATOR", "TECHNICIAN"];
 export const NAV_SECTIONS: NavSection[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard, roles: ALL_ROLES },
   { href: "/ordenes", label: "Órdenes", icon: ClipboardList, roles: ALL_ROLES },
+  {
+    href: "/cotizaciones",
+    label: "Cotizaciones",
+    icon: FileText,
+    roles: ["ADMIN", "COORDINATOR"],
+  },
   { href: "/clientes", label: "Clientes", icon: Users, roles: ALL_ROLES },
   { href: "/equipos", label: "Equipos", icon: Boxes, roles: ALL_ROLES },
   {
