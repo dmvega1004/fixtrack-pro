@@ -4,6 +4,7 @@ import { DiagnosisEditor } from "./diagnosis-editor";
 import { ObservationsEditor } from "./observations-editor";
 import { ReassignTechnician } from "./reassign-technician";
 import { PriorityEditor } from "./priority-editor";
+import { ServiceTypeEditor } from "./service-type-editor";
 import { DeleteOrderButton } from "./delete-order-button";
 
 interface DetailsTabProps {
@@ -53,6 +54,11 @@ export function DetailsTab({
           <PriorityEditor
             orderId={order.id}
             currentPriority={order.priority}
+            isTerminal={isTerminal}
+          />
+          <ServiceTypeEditor
+            orderId={order.id}
+            currentServiceType={order.serviceType}
             isTerminal={isTerminal}
           />
         </>

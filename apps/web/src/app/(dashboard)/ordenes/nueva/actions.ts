@@ -6,6 +6,7 @@ import { HttpError } from "@/lib/api/http";
 import type { Client, DocumentType } from "@/lib/api/clients";
 import type { Equipment } from "@/lib/api/equipments";
 import type { Priority } from "@/components/shared/priority-badge";
+import type { ServiceType } from "@/components/shared/service-type-badge";
 
 interface NewClientData {
   name: string;
@@ -44,6 +45,8 @@ export interface CreateOrderInput {
   equipment: EquipmentSelection;
   description: string;
   priority: Priority;
+  /** Opcional: si se omite, el backend aplica el default CORRECTIVE. */
+  serviceType?: ServiceType;
   userId?: string;
 }
 
@@ -104,6 +107,7 @@ export async function createWorkOrderChainedAction(
         clientId,
         ...(equipmentIds.length > 0 ? { equipmentIds } : {}),
         ...(input.userId ? { userId: input.userId } : {}),
+        ...(input.serviceType ? { serviceType: input.serviceType } : {}),
       },
     });
 

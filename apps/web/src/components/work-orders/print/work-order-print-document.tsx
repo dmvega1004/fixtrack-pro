@@ -6,6 +6,7 @@ import type { WorkOrderPartsSummary } from "@/lib/api/work-order-parts";
 import { DOCUMENT_TYPE_LABELS, type DocumentType } from "@/lib/document-type";
 import { ORDER_STATUS_LABELS } from "@/components/shared/status-chip";
 import { PRIORITY_LABELS } from "@/components/shared/priority-badge";
+import { SERVICE_TYPE_LABELS } from "@/components/shared/service-type-badge";
 import { formatOrderNumber } from "@/lib/format/order-number";
 import { formatDate } from "@/lib/format/dates";
 import { formatCurrency } from "@/lib/format/currency";
@@ -157,6 +158,7 @@ export function WorkOrderPrintDocument({
         <MetaItem label="Fecha" value={formatDate(order.createdAt)} />
         <MetaItem label="Cliente" value={clientMeta} />
         <MetaItem label="Estado" value={ORDER_STATUS_LABELS[order.status]} />
+        <MetaItem label="Tipo de servicio" value={SERVICE_TYPE_LABELS[order.serviceType]} />
       </div>
 
       <section className="mt-6 flex flex-col gap-3">

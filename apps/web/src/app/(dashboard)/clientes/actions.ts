@@ -9,6 +9,10 @@ import {
   type CreateClientInput,
   type UpdateClientInput,
 } from "@/lib/api/clients";
+import {
+  activateMaintenanceBatch,
+  type ActivateMaintenanceBatchInput,
+} from "@/lib/api/equipments";
 
 export interface ClientActionResult {
   ok: boolean;
@@ -55,6 +59,34 @@ export async function deleteClientAction(id: string): Promise<ClientActionResult
     await deleteClient(id);
     revalidatePath("/clientes");
     return { ok: true };
+  } catch (error) {
+    if (error instanceof HttpError) {
+      return { ok: false, message: error.message };
+    }
+    throw error;
+  }
+}
+
+export interface ActivateMaintenanceBatchResult {
+  ok: boolean;
+  message?: string;
+  updated?: number;
+}
+
+/**
+ * POST /equipments/maintenance/activate-batch — activa el plan de varios
+ * equipos de un mismo cliente en una sola operación (ver diálogo "Activar
+ * plan de mantenimiento" en la ficha del cliente). Solo ADMIN/COORDINATOR
+ * (403 desde el backend para el resto).
+ */
+export async function activateMaintenanceBatchAction(
+  dto: ActivateMaintenanceBatchInput,
+): Promise<ActivateMaintenanceBatchResult> {
+  try {
+    const { updated } = await activateMaintenanceBatch(dto);
+    revalidatePath(`/clientes/${dto.clientId}`);
+    revalidatePath("/equipos");
+    return { ok: true, updated };
   } catch (error) {
     if (error instanceof HttpError) {
       return { ok: false, message: error.message };

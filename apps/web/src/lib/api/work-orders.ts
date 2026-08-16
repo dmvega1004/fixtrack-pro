@@ -1,6 +1,7 @@
 import { cache } from "react";
 import type { OrderStatus } from "@/components/shared/status-chip";
 import type { Priority } from "@/components/shared/priority-badge";
+import type { ServiceType } from "@/components/shared/service-type-badge";
 import { serverFetch } from "./server-fetch";
 
 // Debe reflejar exactamente el shape de WORK_ORDER_INCLUDE en
@@ -36,6 +37,8 @@ export interface WorkOrder {
   observations: string | null;
   status: OrderStatus;
   priority: Priority;
+  /** CORRECTIVE por defecto. El técnico no puede cambiarlo tras la creación. */
+  serviceType: ServiceType;
   /** Cliente dueño de la orden — vínculo principal, siempre presente. */
   clientId: string;
   userId: string | null;
@@ -139,6 +142,8 @@ export interface WorkOrderDashboardStats {
   avgResolutionDays: number | null;
   technicianRanking: WorkOrderTechnicianRankingEntry[];
   recentOrders: WorkOrder[];
+  /** Equipos con plan de mantenimiento activo por vencer o ya vencidos. */
+  maintenanceDueCount: number;
 }
 
 /** GET /work-orders/stats. Solo ADMIN/COORDINATOR (403 para Técnico). */

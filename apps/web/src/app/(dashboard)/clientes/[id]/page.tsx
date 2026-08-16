@@ -11,6 +11,7 @@ import { getCompany } from "@/lib/api/company";
 import { HttpError } from "@/lib/api/http";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ActivateMaintenanceDialog } from "@/components/client/activate-maintenance-dialog";
 import { EquipmentStatusBadge } from "@/components/equipment/equipment-status-badge";
 import { StatusChip } from "@/components/shared/status-chip";
 import { PaymentStatusChip } from "@/components/shared/payment-status-chip";
@@ -43,6 +44,8 @@ export default async function ClienteDetallePage({ params }: ClienteDetallePageP
   // batch previo aunque no dependieran de él.
   const session = await getSession();
   const isAdmin = session?.role === "ADMIN";
+  const canManageMaintenance =
+    session?.role === "ADMIN" || session?.role === "COORDINATOR";
 
   // GET /equipments?clientId= y GET /work-orders?clientId= — antes se pedía
   // TODO lo visible para el rol actual (equipos y órdenes de la empresa
@@ -130,6 +133,9 @@ export default async function ClienteDetallePage({ params }: ClienteDetallePageP
           <Pencil className="size-4" />
           Editar
         </Link>
+        {canManageMaintenance && (
+          <ActivateMaintenanceDialog clientId={client.id} equipments={clientEquipments} />
+        )}
       </div>
 
       <Card>

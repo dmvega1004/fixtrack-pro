@@ -4,10 +4,12 @@ import { Printer, Pencil, Plus } from "lucide-react";
 import { getEquipment } from "@/lib/api/equipments";
 import { getClient } from "@/lib/api/clients";
 import { getWorkOrders } from "@/lib/api/work-orders";
+import { getSession } from "@/lib/session";
 import { HttpError } from "@/lib/api/http";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EquipmentStatusBadge } from "@/components/equipment/equipment-status-badge";
+import { MaintenancePlanSection } from "@/components/equipment/maintenance-plan-section";
 import { QrCodeImage } from "@/components/equipment/qr-code-image";
 import { StatusChip } from "@/components/shared/status-chip";
 import { formatOrderNumber } from "@/lib/format/order-number";
@@ -36,14 +38,20 @@ export default async function EquipoDetallePage({
   // rol actual y se filtraba acá. Sigue trayendo órdenes que abarcan varios
   // equipos (ej. un proyecto sobre 5 portones): el filtro es del lado del
   // backend sobre la tabla puente WorkOrderEquipment.
-  const [client, history] = await Promise.all([
+  const [client, history, session] = await Promise.all([
     getClient(equipment.clientId),
     getWorkOrders({ equipmentId: equipment.id }).then((orders) =>
       [...orders].sort(
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
       ),
     ),
+    getSession(),
   ]);
+
+  // Configurar el plan de mantenimiento es solo ADMIN/COORDINATOR (RBAC en
+  // el backend); el TECHNICIAN ve la sección en modo lectura.
+  const canManageMaintenance =
+    session?.role === "ADMIN" || session?.role === "COORDINATOR";
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
@@ -111,6 +119,12 @@ export default async function EquipoDetallePage({
           </CardContent>
         </Card>
       </div>
+
+      <MaintenancePlanSection
+        equipmentId={equipment.id}
+        equipment={equipment}
+        canManage={canManageMaintenance}
+      />
 
       <Card>
         <CardHeader>

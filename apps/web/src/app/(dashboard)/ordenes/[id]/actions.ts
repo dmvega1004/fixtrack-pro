@@ -5,6 +5,7 @@ import { serverFetch } from "@/lib/api/server-fetch";
 import { HttpError } from "@/lib/api/http";
 import type { OrderStatus } from "@/components/shared/status-chip";
 import type { Priority } from "@/components/shared/priority-badge";
+import type { ServiceType } from "@/components/shared/service-type-badge";
 import type { PaymentMethod } from "@/lib/api/payments";
 
 export interface ActionResult {
@@ -108,6 +109,19 @@ export async function changePriorityAction(
     serverFetch(`/work-orders/${orderId}`, {
       method: "PATCH",
       body: { priority },
+    }),
+  );
+}
+
+/** El backend rechaza este cambio si lo intenta un TECHNICIAN (403). */
+export async function changeServiceTypeAction(
+  orderId: string,
+  serviceType: ServiceType,
+): Promise<ActionResult> {
+  return runMutation(orderId, () =>
+    serverFetch(`/work-orders/${orderId}`, {
+      method: "PATCH",
+      body: { serviceType },
     }),
   );
 }

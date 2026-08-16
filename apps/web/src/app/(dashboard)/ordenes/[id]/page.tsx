@@ -14,6 +14,7 @@ import { getActivityLog } from "@/lib/api/activity-log";
 import { HttpError } from "@/lib/api/http";
 import { StatusChip } from "@/components/shared/status-chip";
 import { PriorityBadge } from "@/components/shared/priority-badge";
+import { ServiceTypeBadge } from "@/components/shared/service-type-badge";
 import { buttonVariants } from "@/components/ui/button";
 import { formatOrderNumber } from "@/lib/format/order-number";
 import { formatDate } from "@/lib/format/dates";
@@ -86,6 +87,7 @@ export default async function OrdenDetallePage({
             </h1>
             <StatusChip status={order.status} />
             <PriorityBadge priority={order.priority} />
+            <ServiceTypeBadge serviceType={order.serviceType} />
           </div>
           <div className="flex flex-wrap gap-2">
             <Link

@@ -22,10 +22,15 @@ import {
   PRIORITY_LABELS,
   type Priority,
 } from "@/components/shared/priority-badge";
+import {
+  SERVICE_TYPE_LABELS,
+  type ServiceType,
+} from "@/components/shared/service-type-badge";
 import { formatOrderNumber } from "@/lib/format/order-number";
 import { createWorkOrderChainedAction } from "@/app/(dashboard)/ordenes/nueva/actions";
 
 const PRIORITIES = Object.keys(PRIORITY_LABELS) as Priority[];
+const SERVICE_TYPES = Object.keys(SERVICE_TYPE_LABELS) as ServiceType[];
 const UNASSIGNED_VALUE = "";
 
 interface NewClientDraft {
@@ -70,9 +75,13 @@ interface NewOrderFormProps {
   equipments: Equipment[];
   technicians: Technician[];
   canAssign: boolean;
-  /** Preselección desde /ordenes/nueva?equipo=id (ej. desde la ficha de un equipo). */
+  /** Preselección desde /ordenes/nueva?equipo=id o ?equipos=id1,id2,... (ficha de equipo o "Programar mantenimiento"). */
   initialClientId?: string;
-  initialEquipmentId?: string;
+  initialEquipmentIds?: string[];
+  /** "Programar mantenimiento" precarga PREVENTIVE; el usuario puede cambiarlo. */
+  initialServiceType?: ServiceType;
+  /** Descripción sugerida (ej. desde "Programar mantenimiento") — editable, nunca se crea la orden sin que el usuario la revise. */
+  initialDescription?: string;
 }
 
 export function NewOrderForm({
@@ -81,7 +90,9 @@ export function NewOrderForm({
   technicians,
   canAssign,
   initialClientId,
-  initialEquipmentId,
+  initialEquipmentIds,
+  initialServiceType,
+  initialDescription,
 }: NewOrderFormProps) {
   const router = useRouter();
 
@@ -95,15 +106,18 @@ export function NewOrderForm({
     "selection" | "none"
   >("selection");
   const [selectedEquipmentIds, setSelectedEquipmentIds] = useState<string[]>(
-    initialEquipmentId ? [initialEquipmentId] : [],
+    initialEquipmentIds ?? [],
   );
   const [draftEquipments, setDraftEquipments] = useState<NewEquipmentDraft[]>([]);
   const [isAddingEquipment, setIsAddingEquipment] = useState(false);
   const [newEquipmentDraft, setNewEquipmentDraft] =
     useState<NewEquipmentDraft>(EMPTY_NEW_EQUIPMENT);
 
-  const [description, setDescription] = useState("");
+  const [description, setDescription] = useState(initialDescription ?? "");
   const [priority, setPriority] = useState<Priority>("MEDIUM");
+  const [serviceType, setServiceType] = useState<ServiceType>(
+    initialServiceType ?? "CORRECTIVE",
+  );
   const [assignedUserId, setAssignedUserId] = useState(UNASSIGNED_VALUE);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -282,6 +296,7 @@ export function NewOrderForm({
       equipment: equipmentPayload,
       description: description.trim(),
       priority,
+      serviceType,
       userId: canAssign && assignedUserId ? assignedUserId : undefined,
     });
 
@@ -578,20 +593,37 @@ export function NewOrderForm({
             />
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="priority">Prioridad</Label>
-            <select
-              id="priority"
-              value={priority}
-              onChange={(event) => setPriority(event.target.value as Priority)}
-              className="h-9 rounded-lg border border-border bg-background px-2.5 text-sm text-foreground"
-            >
-              {PRIORITIES.map((value) => (
-                <option key={value} value={value}>
-                  {PRIORITY_LABELS[value]}
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="serviceType">Tipo de servicio</Label>
+              <select
+                id="serviceType"
+                value={serviceType}
+                onChange={(event) => setServiceType(event.target.value as ServiceType)}
+                className="h-9 rounded-lg border border-border bg-background px-2.5 text-sm text-foreground"
+              >
+                {SERVICE_TYPES.map((value) => (
+                  <option key={value} value={value}>
+                    {SERVICE_TYPE_LABELS[value]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="priority">Prioridad</Label>
+              <select
+                id="priority"
+                value={priority}
+                onChange={(event) => setPriority(event.target.value as Priority)}
+                className="h-9 rounded-lg border border-border bg-background px-2.5 text-sm text-foreground"
+              >
+                {PRIORITIES.map((value) => (
+                  <option key={value} value={value}>
+                    {PRIORITY_LABELS[value]}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {canAssign && (

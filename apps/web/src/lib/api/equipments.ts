@@ -20,6 +20,13 @@ export interface Equipment {
   location: string | null;
   qrCode: string;
   status: EquipmentStatus;
+  /** Plan de mantenimiento preventivo — la alerta es POR EQUIPO. */
+  maintenanceEnabled: boolean;
+  maintenanceIntervalMonths: number | null;
+  /** Fechas @db.Date — ISO con medianoche UTC. Usar SIEMPRE
+   * lib/format/date-only.ts para leerlas, nunca formatDate() de ./dates. */
+  lastMaintenanceAt: string | null;
+  nextMaintenanceAt: string | null;
   clientId: string;
   companyId: string;
   createdAt: string;
@@ -45,10 +52,36 @@ export interface UpdateEquipmentInput {
   location?: string;
   clientId?: string;
   status?: EquipmentStatus;
+  /** Solo ADMIN/COORDINATOR (403 para el resto — ver RBAC en el backend). */
+  maintenanceEnabled?: boolean;
+  maintenanceIntervalMonths?: number;
+  /** "YYYY-MM-DD", sin hora. No puede ser futura. */
+  lastMaintenanceAt?: string;
 }
 
 export interface EquipmentFilters {
   clientId?: string;
+}
+
+// Debe reflejar exactamente MaintenanceDueItem en
+// packages/backend/src/equipments/equipments.service.ts
+export interface MaintenanceDueItem {
+  id: string;
+  brand: string;
+  model: string;
+  location: string | null;
+  client: EquipmentClient;
+  nextMaintenanceAt: string;
+  /** Negativo = vencido hace N días. */
+  daysRemaining: number;
+  maintenanceIntervalMonths: number;
+}
+
+export interface ActivateMaintenanceBatchInput {
+  clientId: string;
+  equipmentIds: string[];
+  maintenanceIntervalMonths: number;
+  lastMaintenanceAt: string;
 }
 
 /** GET /equipments[?clientId=]. Devuelve orderCount agregado por el backend. */
@@ -80,13 +113,40 @@ export function createEquipment(dto: CreateEquipmentInput): Promise<Equipment> {
   return serverFetch<Equipment>("/equipments", { method: "POST", body: dto });
 }
 
-/** PATCH /equipments/:id. Cualquier rol autenticado puede editar (incluido el estado). */
+/**
+ * PATCH /equipments/:id. Cualquier rol autenticado puede editar campos
+ * generales; el plan de mantenimiento (maintenanceEnabled/IntervalMonths/
+ * lastMaintenanceAt) es SOLO ADMIN/COORDINATOR — 403 para TECHNICIAN.
+ */
 export function updateEquipment(
   id: string,
   dto: UpdateEquipmentInput,
 ): Promise<Equipment> {
   return serverFetch<Equipment>(`/equipments/${id}`, {
     method: "PATCH",
+    body: dto,
+  });
+}
+
+/**
+ * GET /equipments/maintenance-due. Solo ADMIN/COORDINATOR. Equipos con plan
+ * activo por vencer (30 días) o ya vencidos, del más vencido al menos
+ * urgente (mismo orden que devuelve el backend).
+ */
+export function getMaintenanceDue(): Promise<MaintenanceDueItem[]> {
+  return serverFetch<MaintenanceDueItem[]>("/equipments/maintenance-due");
+}
+
+/**
+ * POST /equipments/maintenance/activate-batch. Solo ADMIN/COORDINATOR.
+ * Activa el plan de varios equipos de UN cliente con el mismo intervalo y
+ * fecha base, en una sola operación transaccional.
+ */
+export function activateMaintenanceBatch(
+  dto: ActivateMaintenanceBatchInput,
+): Promise<{ updated: number }> {
+  return serverFetch<{ updated: number }>("/equipments/maintenance/activate-batch", {
+    method: "POST",
     body: dto,
   });
 }

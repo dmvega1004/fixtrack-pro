@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ClipboardList, UserRoundX, PackageX, Wallet } from "lucide-react";
+import { ClipboardList, UserRoundX, PackageX, Wallet, Wrench } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { getCompany } from "@/lib/api/company";
 import { getWorkOrderStats } from "@/lib/api/work-orders";
@@ -90,6 +90,13 @@ export async function AdminDashboard({ session }: AdminDashboardProps) {
           value={lowStockParts.length}
           icon={PackageX}
           tone={lowStockParts.length > 0 ? "danger" : "default"}
+        />
+        <KpiCard
+          href="/mantenimiento"
+          label="Mantenimientos por vencer"
+          value={stats.maintenanceDueCount}
+          icon={Wrench}
+          tone={stats.maintenanceDueCount > 0 ? "warning" : "default"}
         />
         {billingSummary && (
           <Link
