@@ -59,3 +59,13 @@ export function todayDateInputValue(): string {
   const d = String(now.getUTCDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
 }
+
+/** `value` (date-only) + `days` días, en UTC — "YYYY-MM-DD". Usada para previsualizar fechas que aún no se han calculado (ej. validUntil de una cotización en borrador). */
+export function addDaysToDateOnly(value: string, days: number): string {
+  const [year, month, day] = extractDateOnly(value).split("-").map(Number);
+  const shifted = new Date(Date.UTC(year, month - 1, day) + days * DAY_MS);
+  const y = String(shifted.getUTCFullYear()).padStart(4, "0");
+  const m = String(shifted.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(shifted.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}

@@ -88,6 +88,11 @@ model Company {
   id                    String               @id @default(uuid())
   name                  String
   slogan                String?
+  /// NIT (u otro documento tributario) de la empresa — distinto de
+  /// payeeDocument, que es el documento del BENEFICIARIO del pago (puede
+  /// ser una persona o razón social distinta). Aparece en el membrete de
+  /// los documentos imprimibles (ej. cotización).
+  taxId                 String?
   phone                 String?
   email                 String?
   address               String?

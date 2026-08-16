@@ -9,6 +9,8 @@ export interface Company {
   id: string;
   name: string;
   slogan: string | null;
+  /** NIT (u otro documento tributario) de la empresa — para el membrete de documentos imprimibles. */
+  taxId: string | null;
   phone: string | null;
   email: string | null;
   address: string | null;
@@ -45,6 +47,7 @@ export interface Company {
 export interface UpdateCompanyInput {
   name?: string;
   slogan?: string;
+  taxId?: string;
   phone?: string;
   email?: string;
   address?: string;

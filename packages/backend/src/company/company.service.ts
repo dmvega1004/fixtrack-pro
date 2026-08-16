@@ -18,6 +18,7 @@ const COMPANY_SELECT = {
   id: true,
   name: true,
   slogan: true,
+  taxId: true,
   phone: true,
   email: true,
   address: true,
@@ -51,6 +52,7 @@ export type PublicCompany = Pick<
   | 'id'
   | 'name'
   | 'slogan'
+  | 'taxId'
   | 'phone'
   | 'email'
   | 'address'
@@ -133,6 +135,7 @@ export class CompanyService {
       data: {
         name: dto.name?.trim(),
         slogan: dto.slogan?.trim(),
+        taxId: dto.taxId?.trim(),
         phone: dto.phone?.trim(),
         email: dto.email?.toLowerCase().trim(),
         address: dto.address?.trim(),

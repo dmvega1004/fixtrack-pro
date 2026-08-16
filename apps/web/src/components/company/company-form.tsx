@@ -19,6 +19,7 @@ interface UploadErrorBody {
 interface CompanyFormState {
   name: string;
   slogan: string;
+  taxId: string;
   phone: string;
   email: string;
   address: string;
@@ -48,6 +49,7 @@ function toFormState(company: Company): CompanyFormState {
   return {
     name: company.name,
     slogan: company.slogan ?? "",
+    taxId: company.taxId ?? "",
     phone: company.phone ?? "",
     email: company.email ?? "",
     address: company.address ?? "",
@@ -171,6 +173,7 @@ export function CompanyForm({ company }: CompanyFormProps) {
     const result = await saveCompanyAction({
       name: form.name.trim(),
       slogan: form.slogan.trim() || undefined,
+      taxId: form.taxId.trim() || undefined,
       phone: form.phone.trim() || undefined,
       email: form.email.trim() || undefined,
       address: form.address.trim() || undefined,
@@ -234,6 +237,18 @@ export function CompanyForm({ company }: CompanyFormProps) {
               onChange={updateField("slogan")}
               placeholder="Una frase corta que te describa"
             />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="taxId">NIT</Label>
+            <Input
+              id="taxId"
+              value={form.taxId}
+              onChange={updateField("taxId")}
+              placeholder="900.123.456-7"
+            />
+            <p className="text-xs text-muted-foreground">
+              Aparece en el membrete de los documentos imprimibles (ej. cotizaciones).
+            </p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">

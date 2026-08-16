@@ -28,6 +28,12 @@ export class UpdateCompanyDto {
   @MaxLength(200)
   slogan?: string;
 
+  /** NIT (u otro documento tributario) de la empresa — para el membrete de documentos imprimibles. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  taxId?: string;
+
   @IsOptional()
   @IsString()
   @Matches(/^[+\d\s().-]{7,25}$/, {
