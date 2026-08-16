@@ -4,15 +4,12 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { CheckCircle2, Copy, Pencil, Send } from "lucide-react";
+import { CheckCircle2, Copy, Eye, FileText, Pencil } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import type { QuoteStatus } from "@/lib/api/quotes";
+import { EmitQuoteDialog } from "./emit-quote-dialog";
 import { RejectQuoteDialog } from "./reject-quote-dialog";
-import {
-  sendQuoteAction,
-  decideQuoteAction,
-  duplicateQuoteAction,
-} from "@/app/(dashboard)/cotizaciones/actions";
+import { decideQuoteAction, duplicateQuoteAction } from "@/app/(dashboard)/cotizaciones/actions";
 
 interface QuoteActionsProps {
   quoteId: string;
@@ -20,32 +17,18 @@ interface QuoteActionsProps {
 }
 
 /**
- * Botones según el estado: Borrador → Editar/Enviar. Enviada → decidir o
- * duplicar. Cerrada (ACCEPTED/REJECTED) → solo duplicar. La cotización
- * enviada NUNCA muestra controles de edición acá — ese es justo el punto:
- * que el botón no exista, no un botón deshabilitado.
+ * Botones según el estado:
+ * - DRAFT: Editar · Vista previa (el documento con marca de agua) · Emitir.
+ * - SENT: "Ver documento" es el botón PRINCIPAL — emitir y entregar son un
+ *   solo movimiento en la práctica. Debajo, decidir o duplicar.
+ * - Cerrada (ACCEPTED/REJECTED): Ver documento · Duplicar.
+ * La cotización enviada NUNCA muestra controles de edición acá — ese es
+ * justo el punto: que el botón no exista, no un botón deshabilitado.
  */
 export function QuoteActions({ quoteId, status }: QuoteActionsProps) {
   const router = useRouter();
-  const [isSending, setIsSending] = useState(false);
   const [isAccepting, setIsAccepting] = useState(false);
   const [isDuplicating, setIsDuplicating] = useState(false);
-
-  async function handleSend() {
-    if (!window.confirm("¿Enviar esta cotización? Se asignará el número y los valores quedarán congelados.")) {
-      return;
-    }
-    setIsSending(true);
-    const result = await sendQuoteAction(quoteId);
-    setIsSending(false);
-
-    if (!result.ok) {
-      toast.error(result.message ?? "No se pudo enviar la cotización");
-      return;
-    }
-    toast.success("Cotización enviada");
-    router.refresh();
-  }
 
   async function handleAccept() {
     setIsAccepting(true);
@@ -83,10 +66,14 @@ export function QuoteActions({ quoteId, status }: QuoteActionsProps) {
           <Pencil className="size-4" />
           Editar
         </Link>
-        <Button size="sm" onClick={() => void handleSend()} disabled={isSending}>
-          <Send className="size-4" />
-          {isSending ? "Enviando..." : "Enviar"}
-        </Button>
+        <Link
+          href={`/cotizaciones/${quoteId}/documento`}
+          className={buttonVariants({ variant: "outline", size: "sm" })}
+        >
+          <Eye className="size-4" />
+          Vista previa
+        </Link>
+        <EmitQuoteDialog quoteId={quoteId} />
       </div>
     );
   }
@@ -94,7 +81,19 @@ export function QuoteActions({ quoteId, status }: QuoteActionsProps) {
   if (status === "SENT") {
     return (
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" onClick={() => void handleAccept()} disabled={isAccepting}>
+        <Link
+          href={`/cotizaciones/${quoteId}/documento`}
+          className={buttonVariants({ variant: "default", size: "sm" })}
+        >
+          <FileText className="size-4" />
+          Ver documento
+        </Link>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => void handleAccept()}
+          disabled={isAccepting}
+        >
           <CheckCircle2 className="size-4" />
           {isAccepting ? "Guardando..." : "Marcar aceptada"}
         </Button>
@@ -115,6 +114,13 @@ export function QuoteActions({ quoteId, status }: QuoteActionsProps) {
   // ACCEPTED / REJECTED — cerrada.
   return (
     <div className="flex flex-wrap gap-2">
+      <Link
+        href={`/cotizaciones/${quoteId}/documento`}
+        className={buttonVariants({ variant: "default", size: "sm" })}
+      >
+        <FileText className="size-4" />
+        Ver documento
+      </Link>
       <Button
         size="sm"
         variant="outline"
