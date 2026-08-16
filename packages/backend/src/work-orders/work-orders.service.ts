@@ -1117,6 +1117,32 @@ export class WorkOrdersService {
     // El guard @Roles(ADMIN) ya filtró el rol; verificamos tenant + existencia
     const order = await this.findOne(user, id);
 
+    // Una orden con cuenta de cobro o con pagos es evidencia contable:
+    // eliminar debe servir para corregir un error de digitación, no para
+    // borrar historia. Para eso existe el estado Cancelada, que conserva
+    // el registro. Ambos candados van antes de la transacción, así no hay
+    // nada que revertir si alguno dispara.
+    if (order.collectionNumber !== null) {
+      throw new ConflictException(
+        `No se puede eliminar: esta orden tiene la cuenta de cobro ${formatActivityCollectionNumber(order.collectionNumber)} emitida. Borrarla dejaría un hueco en el consecutivo. Si el servicio no se ejecutó, márcala como Cancelada.`,
+      );
+    }
+
+    const paidAgg = await this.prisma.payment.aggregate({
+      where: { workOrderId: id, companyId: user.companyId }, // candado
+      _sum: { amount: true },
+    });
+    const totalPaid = paidAgg._sum.amount ?? new Prisma.Decimal(0);
+    if (totalPaid.greaterThan(0)) {
+      const company = await this.prisma.company.findUniqueOrThrow({
+        where: { id: user.companyId },
+        select: { currency: true },
+      });
+      throw new ConflictException(
+        `No se puede eliminar: esta orden tiene pagos registrados por ${formatActivityCurrency(totalPaid, company.currency)}. Elimina primero los pagos si fueron un error, o márcala como Cancelada.`,
+      );
+    }
+
     const attachments = await this.prisma.attachment.findMany({
       where: { workOrderId: id, companyId: user.companyId }, // candado
       select: { publicId: true },
