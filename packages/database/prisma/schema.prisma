@@ -46,6 +46,13 @@ enum PaymentMethod {
   OTHER
 }
 
+enum ServiceType {
+  CORRECTIVE
+  PREVENTIVE
+  INSPECTION
+  INSTALLATION
+}
+
 enum ActivityAction {
   ORDER_CREATED
   STATUS_CHANGED
@@ -65,6 +72,7 @@ enum ActivityAction {
   COLLECTION_DOC_GENERATED
   PAYMENT_REGISTERED
   PAYMENT_DELETED
+  MAINTENANCE_UPDATED
 }
 
 model Company {
@@ -117,22 +125,22 @@ model Company {
 }
 
 model User {
-  id          String       @id @default(uuid())
-  email       String       @unique
-  password    String
-  name        String
-  role        Role         @default(TECHNICIAN)
-  companyId   String
-  company     Company      @relation(fields: [companyId], references: [id])
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  workOrders  WorkOrder[]
+  id           String        @id @default(uuid())
+  email        String        @unique
+  password     String
+  name         String
+  role         Role          @default(TECHNICIAN)
+  companyId    String
+  company      Company       @relation(fields: [companyId], references: [id])
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  workOrders   WorkOrder[]
   /// Fotos que este usuario subió a órdenes; sobrevive a su eliminación
   /// (uploadedById queda en null, la foto y su orden no se tocan).
-  attachments Attachment[]
+  attachments  Attachment[]
   /// Pagos que este usuario registró; sobrevive a su eliminación
   /// (registeredById queda en null, el pago no se toca).
-  payments    Payment[]
+  payments     Payment[]
   /// Eventos de bitácora de los que este usuario fue autor; sobrevive a su
   /// eliminación (userId queda en null, ActivityLog.userName conserva el
   /// nombre como snapshot).
@@ -165,29 +173,48 @@ model Client {
 }
 
 model Equipment {
-  id                 String               @id @default(uuid())
-  brand              String
-  model              String
-  serialNumber       String?
+  id                        String               @id @default(uuid())
+  brand                     String
+  model                     String
+  serialNumber              String?
   /// Ubicación física del equipo en la sede del cliente (ej. "CC La Cuesta,
   /// Piedecuesta — Local AME2170 Americanino"). Un cliente puede tener
   /// varias sedes; este campo identifica dónde está instalado ESTE equipo.
-  location           String?
-  qrCode             String               @unique @default(uuid())
-  status             EquipmentStatus      @default(ACTIVE)
-  clientId           String
-  client             Client               @relation(fields: [clientId], references: [id])
-  companyId          String
-  company            Company              @relation(fields: [companyId], references: [id])
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
+  location                  String?
+  qrCode                    String               @unique @default(uuid())
+  status                    EquipmentStatus      @default(ACTIVE)
+  /// Plan de mantenimiento preventivo — la alerta es POR EQUIPO, cada
+  /// aparato tiene su propio ciclo (ver módulo de mantenimiento).
+  maintenanceEnabled        Boolean              @default(false)
+  /// 1..60 (validado en el DTO). Obligatorio si maintenanceEnabled=true.
+  maintenanceIntervalMonths Int?
+  /// Fecha del último mantenimiento, SE GUARDA explícitamente (no se
+  /// deduce de la última orden preventiva): al activar el plan de un
+  /// cliente con historial previo al sistema, hay que poder escribir esa
+  /// fecha aunque nunca haya pasado por una orden acá. Semántica de FECHA
+  /// sin hora (@db.Date) — evita desfases de un día por zona horaria.
+  lastMaintenanceAt         DateTime?            @db.Date
+  /// Calculada como lastMaintenanceAt + maintenanceIntervalMonths y
+  /// GUARDADA (no derivada al vuelo) para que la consulta del panel de
+  /// vencimientos pueda usar el índice de abajo. Se recalcula cada vez que
+  /// cambia el intervalo o la última fecha. Semántica de FECHA sin hora.
+  nextMaintenanceAt         DateTime?            @db.Date
+  clientId                  String
+  client                    Client               @relation(fields: [clientId], references: [id])
+  companyId                 String
+  company                   Company              @relation(fields: [companyId], references: [id])
+  createdAt                 DateTime             @default(now())
+  updatedAt                 DateTime             @updatedAt
   /// Órdenes en las que participa este equipo — vía la tabla intermedia
   /// WorkOrderEquipment: una orden puede tener varios equipos y un equipo
   /// puede aparecer en varias órdenes.
-  workOrderEquipment WorkOrderEquipment[]
+  workOrderEquipment        WorkOrderEquipment[]
 
   @@index([companyId])
   @@index([clientId])
+  /// Alimenta GET /equipments/maintenance-due, consultado en cada carga
+  /// del panel de mantenimientos por vencer.
+  @@index([companyId, nextMaintenanceAt])
 }
 
 model WorkOrder {
@@ -199,6 +226,10 @@ model WorkOrder {
   diagnosis             String?
   /// Notas del servicio realizado, separadas del diagnóstico inicial.
   observations          String?
+  /// CORRECTIVE por defecto: valor honesto para las órdenes existentes al
+  /// introducir este campo (nadie sabía que eran inspecciones) — el
+  /// usuario corrige las que en realidad lo fueron.
+  serviceType           ServiceType          @default(CORRECTIVE)
   status                OrderStatus          @default(PENDING)
   priority              Priority             @default(MEDIUM)
   /// Mano de obra cobrada en la orden.
