@@ -32,6 +32,7 @@ interface SparePartFormState {
   salePrice: string;
   stock: string;
   minStock: string;
+  trackStock: boolean;
 }
 
 const EMPTY_FORM: SparePartFormState = {
@@ -43,6 +44,7 @@ const EMPTY_FORM: SparePartFormState = {
   salePrice: "",
   stock: "0",
   minStock: "0",
+  trackStock: true,
 };
 
 function toFormState(part: SparePart): SparePartFormState {
@@ -55,6 +57,7 @@ function toFormState(part: SparePart): SparePartFormState {
     salePrice: part.salePrice,
     stock: String(part.stock),
     minStock: String(part.minStock),
+    trackStock: part.trackStock,
   };
 }
 
@@ -129,6 +132,7 @@ export function SparePartForm({
       salePrice,
       stock: stockValue,
       minStock: minStockValue,
+      trackStock: form.trackStock,
     };
 
     const result =
@@ -251,6 +255,31 @@ export function SparePartForm({
             </p>
           )}
 
+          <div className="flex items-start gap-2 rounded-lg border border-border p-3">
+            <input
+              id="trackStock"
+              type="checkbox"
+              className="mt-0.5"
+              checked={!form.trackStock}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  trackStock: !event.target.checked,
+                }))
+              }
+            />
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="trackStock" className="font-normal">
+                No gestionar existencias
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Para equipos que se piden contra pedido y no se mantienen en
+                bodega. No aparecerán en la alerta de existencias bajas y su
+                stock no se moverá al usarlos en una orden.
+              </p>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="stock">Stock *</Label>
@@ -261,6 +290,7 @@ export function SparePartForm({
                 step="1"
                 value={form.stock}
                 onChange={updateField("stock")}
+                disabled={!form.trackStock}
                 required
               />
             </div>
@@ -273,6 +303,7 @@ export function SparePartForm({
                 step="1"
                 value={form.minStock}
                 onChange={updateField("minStock")}
+                disabled={!form.trackStock}
                 required
               />
             </div>

@@ -10,6 +10,7 @@ import {
   SPARE_PART_CATEGORIES,
   type SparePartCategory,
 } from "@/lib/spare-part-category";
+import { needsRestock } from "@/lib/inventory/stock-status";
 
 function parseCategory(value?: string): SparePartCategory | undefined {
   return value &&
@@ -39,12 +40,10 @@ export default async function InventarioPage({
   // Derivado de la respuesta real, no del rol: si el backend redactó `cost`
   // para este usuario, ningún repuesto lo traerá.
   const showCost = allParts.some((part) => part.cost !== undefined);
-  const lowStockCount = allParts.filter(
-    (part) => part.stock <= part.minStock,
-  ).length;
+  const lowStockCount = allParts.filter(needsRestock).length;
 
   let visibleParts = lowStockOnly
-    ? allParts.filter((part) => part.stock <= part.minStock)
+    ? allParts.filter(needsRestock)
     : allParts;
   if (category) {
     visibleParts = visibleParts.filter((part) => part.category === category);

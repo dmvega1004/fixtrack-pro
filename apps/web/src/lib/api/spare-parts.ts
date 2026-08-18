@@ -11,6 +11,8 @@ export interface SparePart {
   category: string;
   stock: number;
   minStock: number;
+  /** false = se pide contra pedido: no entra en alertas ni mueve stock. */
+  trackStock: boolean;
   salePrice: string;
   /** Redactado por el backend para todo rol distinto de ADMIN. */
   cost?: string;
@@ -26,6 +28,7 @@ export interface CreateSparePartInput {
   category?: SparePartCategory;
   stock: number;
   minStock?: number;
+  trackStock?: boolean;
   cost: number;
   salePrice: number;
 }

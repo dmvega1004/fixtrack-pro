@@ -96,7 +96,11 @@ export function InventoryCatalog({
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <StockBadge stock={part.stock} minStock={part.minStock} />
+                        <StockBadge
+                          stock={part.stock}
+                          minStock={part.minStock}
+                          trackStock={part.trackStock}
+                        />
                       </td>
                       <td className="px-4 py-3">
                         {formatCurrency(part.salePrice, currency)}
@@ -156,7 +160,11 @@ export function InventoryCatalog({
                         SKU {part.sku}
                       </span>
                     </div>
-                    <StockBadge stock={part.stock} minStock={part.minStock} />
+                    <StockBadge
+                      stock={part.stock}
+                      minStock={part.minStock}
+                      trackStock={part.trackStock}
+                    />
                   </div>
                   <CategoryBadge category={part.category} />
                   <div className="flex flex-col gap-1 text-sm">
