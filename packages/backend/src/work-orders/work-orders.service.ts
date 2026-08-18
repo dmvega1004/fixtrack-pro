@@ -29,6 +29,7 @@ import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { addMonthsUTC, formatDateOnly, todayDateOnly } from '../common/date-only.util';
 import { EquipmentsService } from '../equipments/equipments.service';
 import { PrismaService } from '../prisma.service';
+import { QuotesService } from '../quotes/quotes.service';
 import { calculateBilling } from './billing.util';
 import { CreateWorkOrderDto } from './dto/create-work-order.dto';
 import { UpdateWorkOrderDto } from './dto/update-work-order.dto';
@@ -141,6 +142,8 @@ export interface WorkOrderDashboardStats {
   recentOrders: WorkOrderView[];
   /** Equipos con plan de mantenimiento activo por vencer o ya vencidos (ver EquipmentsService.countMaintenanceDue). */
   maintenanceDueCount: number;
+  /** Cotizaciones SENT sin decisión cuyo followUpAt ya pasó o es hoy (ver QuotesService.countFollowUpDue). */
+  quotesFollowUpCount: number;
 }
 
 /**
@@ -160,6 +163,7 @@ export class WorkOrdersService {
     private readonly cloudinary: CloudinaryService,
     private readonly activityService: ActivityService,
     private readonly equipmentsService: EquipmentsService,
+    private readonly quotesService: QuotesService,
   ) {}
 
   async create(
@@ -314,6 +318,7 @@ export class WorkOrdersService {
       technicians,
       recentOrders,
       maintenanceDueCount,
+      quotesFollowUpCount,
     ] = await Promise.all([
       this.prisma.workOrder.groupBy({
         by: ['status'],
@@ -356,6 +361,7 @@ export class WorkOrdersService {
         take: 5,
       }),
       this.equipmentsService.countMaintenanceDue(companyId),
+      this.quotesService.countFollowUpDue(companyId),
     ]);
 
     const countByStatus = new Map(
@@ -395,6 +401,7 @@ export class WorkOrdersService {
       technicianRanking,
       recentOrders: recentOrders.map((order) => this.toView(order)),
       maintenanceDueCount,
+      quotesFollowUpCount,
     };
   }
 

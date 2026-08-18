@@ -16,10 +16,11 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { CreateQuoteDto } from './dto/create-quote.dto';
 import { DecideQuoteDto } from './dto/decide-quote.dto';
+import { PostponeFollowUpDto } from './dto/postpone-follow-up.dto';
 import { UpdateQuoteDto } from './dto/update-quote.dto';
 import { QuotesService, QuoteStatusFilter, QuoteView } from './quotes.service';
 
-const QUOTE_STATUS_VALUES = ['DRAFT', 'SENT', 'ACCEPTED', 'REJECTED', 'EXPIRED'] as const;
+const QUOTE_STATUS_VALUES = ['DRAFT', 'SENT', 'ACCEPTED', 'REJECTED', 'EXPIRED', 'FOLLOW_UP'] as const;
 
 function parseStatusFilter(value?: string): QuoteStatusFilter | undefined {
   return value && (QUOTE_STATUS_VALUES as readonly string[]).includes(value)
@@ -113,6 +114,16 @@ export class QuotesController {
     @Body() dto: DecideQuoteDto,
   ): Promise<QuoteView> {
     return this.quotesService.decide(companyId, id, dto);
+  }
+
+  /** POST /quotes/:id/postpone-follow-up — recalcula followUpAt = hoy + days. Solo SENT. */
+  @Post(':id/postpone-follow-up')
+  postponeFollowUp(
+    @CurrentUser('companyId') companyId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: PostponeFollowUpDto,
+  ): Promise<QuoteView> {
+    return this.quotesService.postponeFollowUp(companyId, id, dto);
   }
 
   /** POST /quotes/:id/duplicate — nuevo DRAFT con los mismos datos e ítems, sin número. */

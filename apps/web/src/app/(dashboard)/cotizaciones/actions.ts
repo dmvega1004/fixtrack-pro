@@ -10,6 +10,7 @@ import {
   decideQuote,
   duplicateQuote,
   deleteQuote,
+  postponeFollowUp,
   type CreateQuoteInput,
   type UpdateQuoteInput,
   type DecideQuoteInput,
@@ -114,6 +115,21 @@ export async function duplicateQuoteAction(id: string): Promise<QuoteActionResul
     const duplicated = await duplicateQuote(id);
     revalidatePath("/cotizaciones");
     return { ok: true, id: duplicated.id };
+  } catch (error) {
+    if (error instanceof HttpError) {
+      return { ok: false, message: error.message };
+    }
+    throw error;
+  }
+}
+
+/** POST /quotes/:id/postpone-follow-up — recalcula followUpAt = hoy + days. Solo SENT. */
+export async function postponeFollowUpAction(id: string, days: number): Promise<QuoteActionResult> {
+  try {
+    await postponeFollowUp(id, days);
+    revalidatePath("/cotizaciones");
+    revalidatePath(`/cotizaciones/${id}`);
+    return { ok: true, id };
   } catch (error) {
     if (error instanceof HttpError) {
       return { ok: false, message: error.message };

@@ -9,6 +9,7 @@ import { addDaysUTC, todayDateOnly } from '../common/date-only.util';
 import { PrismaService } from '../prisma.service';
 import { CreateQuoteDto } from './dto/create-quote.dto';
 import { DecideQuoteDto } from './dto/decide-quote.dto';
+import { PostponeFollowUpDto } from './dto/postpone-follow-up.dto';
 import { UpdateQuoteDto } from './dto/update-quote.dto';
 import { calculateQuoteBilling } from './quote-billing.util';
 
@@ -73,7 +74,7 @@ export type QuoteView = Omit<Quote, 'items'> & {
 };
 
 /** Filtro especial de listado: no es un QuoteStatus real, se traduce en buildWhere. */
-export type QuoteStatusFilter = QuoteStatus | 'EXPIRED';
+export type QuoteStatusFilter = QuoteStatus | 'EXPIRED' | 'FOLLOW_UP';
 
 export interface QuoteFindAllFilters {
   status?: QuoteStatusFilter;
@@ -167,11 +168,17 @@ export class QuotesService {
   }
 
   async findAll(companyId: string, filters: QuoteFindAllFilters = {}): Promise<QuoteView[]> {
+    // FOLLOW_UP se ordena de más antigua a más reciente (sentAt asc): la
+    // primera fila es a quien hay que llamar primero. El resto del listado
+    // mantiene el orden por creación más reciente de siempre.
+    const orderBy: Prisma.QuoteOrderByWithRelationInput[] =
+      filters.status === 'FOLLOW_UP' ? [{ sentAt: 'asc' }] : [{ createdAt: 'desc' }];
+
     const [quotes, company] = await Promise.all([
       this.prisma.quote.findMany({
         where: this.buildWhere(companyId, filters),
         include: QUOTE_INCLUDE,
-        orderBy: [{ createdAt: 'desc' }],
+        orderBy,
         take: filters.take,
         skip: filters.skip,
       }),
@@ -186,6 +193,11 @@ export class QuotesService {
 
   count(companyId: string, filters: Omit<QuoteFindAllFilters, 'take' | 'skip'> = {}): Promise<number> {
     return this.prisma.quote.count({ where: this.buildWhere(companyId, filters) });
+  }
+
+  /** Ver GET /work-orders/stats — reutiliza count()/buildWhere para no duplicar el where. */
+  countFollowUpDue(companyId: string): Promise<number> {
+    return this.count(companyId, { status: 'FOLLOW_UP' });
   }
 
   async findOne(companyId: string, id: string): Promise<QuoteView> {
@@ -322,6 +334,33 @@ export class QuotesService {
     const updated = await this.prisma.quote.update({
       where: { id },
       data: { followUpAt: new Date(dto.followUpAt) },
+      include: QUOTE_INCLUDE,
+    });
+
+    return this.toView(updated, company.taxRate);
+  }
+
+  /**
+   * POST /quotes/:id/postpone-follow-up — recalcula followUpAt = hoy +
+   * days. Solo sobre cotizaciones SENT: sin decisión que tomar, es la
+   * única forma de sacar una cotización de "por seguir" cuando el cliente
+   * pidió más tiempo (si no, quedaría marcada como pendiente de
+   * seguimiento indefinidamente).
+   */
+  async postponeFollowUp(companyId: string, id: string, dto: PostponeFollowUpDto): Promise<QuoteView> {
+    const current = await this.requireQuote(companyId, id);
+    if (current.status !== QuoteStatus.SENT) {
+      throw new ConflictException('Solo se puede posponer el seguimiento de una cotización enviada');
+    }
+
+    const company = await this.prisma.company.findUniqueOrThrow({
+      where: { id: companyId },
+      select: { taxRate: true },
+    });
+
+    const updated = await this.prisma.quote.update({
+      where: { id },
+      data: { followUpAt: addDaysUTC(todayDateOnly(), dto.days) },
       include: QUOTE_INCLUDE,
     });
 
@@ -531,6 +570,13 @@ export class QuotesService {
       statusCondition = {
         status: QuoteStatus.SENT,
         validUntil: { lt: todayDateOnly() },
+      };
+    } else if (filters.status === 'FOLLOW_UP') {
+      // Derivado, nunca guardado: SENT sin decisión cuyo followUpAt ya
+      // pasó o es hoy — incluye las vencidas a propósito.
+      statusCondition = {
+        status: QuoteStatus.SENT,
+        followUpAt: { lte: todayDateOnly() },
       };
     } else if (filters.status) {
       statusCondition = { status: filters.status };

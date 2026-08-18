@@ -8,6 +8,7 @@ const FILTERS: { key: QuoteStatusFilter; label: string }[] = [
   { key: "ACCEPTED", label: "Aceptadas" },
   { key: "REJECTED", label: "Rechazadas" },
   { key: "EXPIRED", label: "Vencidas" },
+  { key: "FOLLOW_UP", label: "Por seguir" },
 ];
 
 interface QuoteStatusFilterChipsProps {
@@ -22,7 +23,13 @@ export function QuoteStatusFilterChips({
 }: QuoteStatusFilterChipsProps) {
   function hrefFor(status?: QuoteStatusFilter): string {
     const params = new URLSearchParams();
-    if (status) params.set("status", status);
+    // "por-seguir" viaja en su propio parámetro (?filter=), mismo patrón
+    // que /cobros?filter= — ver resolveStatus() en la página del listado.
+    if (status === "FOLLOW_UP") {
+      params.set("filter", "por-seguir");
+    } else if (status) {
+      params.set("status", status);
+    }
     if (currentSearch) params.set("q", currentSearch);
     const query = params.toString();
     return query ? `/cotizaciones?${query}` : "/cotizaciones";

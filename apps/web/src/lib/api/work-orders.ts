@@ -144,6 +144,8 @@ export interface WorkOrderDashboardStats {
   recentOrders: WorkOrder[];
   /** Equipos con plan de mantenimiento activo por vencer o ya vencidos. */
   maintenanceDueCount: number;
+  /** Cotizaciones enviadas sin decisión cuyo followUpAt ya pasó o es hoy. */
+  quotesFollowUpCount: number;
 }
 
 /** GET /work-orders/stats. Solo ADMIN/COORDINATOR (403 para Técnico). */

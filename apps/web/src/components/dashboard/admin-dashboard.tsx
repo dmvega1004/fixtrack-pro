@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ClipboardList, UserRoundX, PackageX, Wallet, Wrench } from "lucide-react";
+import { ClipboardList, UserRoundX, PackageX, PhoneCall, Wallet, Wrench } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { getCompany } from "@/lib/api/company";
 import { getWorkOrderStats } from "@/lib/api/work-orders";
@@ -97,6 +97,13 @@ export async function AdminDashboard({ session }: AdminDashboardProps) {
           value={stats.maintenanceDueCount}
           icon={Wrench}
           tone={stats.maintenanceDueCount > 0 ? "warning" : "default"}
+        />
+        <KpiCard
+          href="/cotizaciones?filter=por-seguir"
+          label="Cotizaciones por seguir"
+          value={stats.quotesFollowUpCount}
+          icon={PhoneCall}
+          tone={stats.quotesFollowUpCount > 0 ? "warning" : "default"}
         />
         {billingSummary && (
           <Link

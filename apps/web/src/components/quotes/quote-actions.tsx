@@ -8,6 +8,7 @@ import { CheckCircle2, Copy, Eye, FileText, Pencil } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import type { QuoteStatus } from "@/lib/api/quotes";
 import { EmitQuoteDialog } from "./emit-quote-dialog";
+import { PostponeFollowUpDialog } from "./postpone-follow-up-dialog";
 import { RejectQuoteDialog } from "./reject-quote-dialog";
 import { decideQuoteAction, duplicateQuoteAction } from "@/app/(dashboard)/cotizaciones/actions";
 
@@ -98,6 +99,7 @@ export function QuoteActions({ quoteId, status }: QuoteActionsProps) {
           {isAccepting ? "Guardando..." : "Marcar aceptada"}
         </Button>
         <RejectQuoteDialog quoteId={quoteId} />
+        <PostponeFollowUpDialog quoteId={quoteId} />
         <Button
           size="sm"
           variant="outline"

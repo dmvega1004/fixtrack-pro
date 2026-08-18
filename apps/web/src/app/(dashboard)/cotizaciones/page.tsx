@@ -17,12 +17,22 @@ function parseStatus(value?: string): QuoteStatusFilter | undefined {
 }
 
 interface CotizacionesPageProps {
-  searchParams: Promise<{ status?: string; q?: string }>;
+  searchParams: Promise<{ status?: string; q?: string; filter?: string }>;
+}
+
+/**
+ * "por-seguir" viaja en su propio parámetro (?filter=), no en ?status=,
+ * mismo patrón que /cobros?filter= — es un cruce de estado ya enviado +
+ * fecha, no un estado más de la pastilla de siempre.
+ */
+function resolveStatus(params: { status?: string; filter?: string }): QuoteStatusFilter | undefined {
+  if (params.filter === "por-seguir") return "FOLLOW_UP";
+  return parseStatus(params.status);
 }
 
 export default async function CotizacionesPage({ searchParams }: CotizacionesPageProps) {
   const params = await searchParams;
-  const status = parseStatus(params.status);
+  const status = resolveStatus(params);
   const search = params.q?.trim() || undefined;
 
   const [quotes, company] = await Promise.all([
@@ -49,7 +59,11 @@ export default async function CotizacionesPage({ searchParams }: CotizacionesPag
 
       <QuoteStatusFilterChips currentStatus={status} currentSearch={search} />
 
-      <QuotesTable quotes={quotes} currency={company.currency} />
+      <QuotesTable
+        quotes={quotes}
+        currency={company.currency}
+        showDaysSinceSent={status === "FOLLOW_UP"}
+      />
     </div>
   );
 }

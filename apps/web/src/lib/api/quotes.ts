@@ -4,8 +4,8 @@ import { serverFetch } from "./server-fetch";
 // Debe reflejar exactamente el enum QuoteStatus de packages/database/prisma/schema.prisma
 export type QuoteStatus = "DRAFT" | "SENT" | "ACCEPTED" | "REJECTED";
 
-/** Filtro de listado: EXPIRED no es un QuoteStatus real — se deriva en el backend. */
-export type QuoteStatusFilter = QuoteStatus | "EXPIRED";
+/** Filtro de listado: EXPIRED y FOLLOW_UP no son QuoteStatus reales — se derivan en el backend. */
+export type QuoteStatusFilter = QuoteStatus | "EXPIRED" | "FOLLOW_UP";
 
 export interface QuoteClient {
   id: string;
@@ -177,4 +177,12 @@ export function duplicateQuote(id: string): Promise<Quote> {
 /** DELETE /quotes/:id — solo DRAFT. */
 export function deleteQuote(id: string): Promise<Quote> {
   return serverFetch<Quote>(`/quotes/${id}`, { method: "DELETE" });
+}
+
+/** POST /quotes/:id/postpone-follow-up — recalcula followUpAt = hoy + days. Solo SENT. */
+export function postponeFollowUp(id: string, days: number): Promise<Quote> {
+  return serverFetch<Quote>(`/quotes/${id}/postpone-follow-up`, {
+    method: "POST",
+    body: { days },
+  });
 }

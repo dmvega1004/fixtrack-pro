@@ -4,14 +4,23 @@ import { QuoteStatusChip } from "@/components/shared/quote-status-chip";
 import { QuoteValidityChip } from "./quote-validity-chip";
 import { formatQuoteNumber } from "@/lib/format/quote-number";
 import { formatCurrency } from "@/lib/format/currency";
+import { daysUntilDateOnly } from "@/lib/format/date-only";
 
 interface QuotesTableProps {
   quotes: Quote[];
   currency: string;
+  /** Vista "por seguir": agrega la columna de días transcurridos desde el envío. */
+  showDaysSinceSent?: boolean;
+}
+
+function daysSinceSentLabel(sentAt: string | null): string {
+  if (!sentAt) return "—";
+  const days = -daysUntilDateOnly(sentAt);
+  return `${days} día${days === 1 ? "" : "s"}`;
 }
 
 /** Listado de cotizaciones: tabla en escritorio, tarjetas en móvil — mismo patrón que ReceivablesPanel. */
-export function QuotesTable({ quotes, currency }: QuotesTableProps) {
+export function QuotesTable({ quotes, currency, showDaysSinceSent = false }: QuotesTableProps) {
   if (quotes.length === 0) {
     return (
       <p className="rounded-lg border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
@@ -32,6 +41,9 @@ export function QuotesTable({ quotes, currency }: QuotesTableProps) {
               <th className="w-32 px-4 py-3 text-right font-medium">Total</th>
               <th className="w-28 px-4 py-3 font-medium">Estado</th>
               <th className="w-40 px-4 py-3 font-medium">Validez</th>
+              {showDaysSinceSent && (
+                <th className="w-40 px-4 py-3 font-medium">Días transcurridos</th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -69,6 +81,13 @@ export function QuotesTable({ quotes, currency }: QuotesTableProps) {
                       <QuoteValidityChip quote={quote} />
                     </Link>
                   </td>
+                  {showDaysSinceSent && (
+                    <td className="p-0">
+                      <Link href={href} className="block px-4 py-3 tabular-nums">
+                        {daysSinceSentLabel(quote.sentAt)}
+                      </Link>
+                    </td>
+                  )}
                 </tr>
               );
             })}
@@ -95,6 +114,11 @@ export function QuotesTable({ quotes, currency }: QuotesTableProps) {
               <QuoteValidityChip quote={quote} />
               <span className="font-semibold">{formatCurrency(quote.billing.total, currency)}</span>
             </div>
+            {showDaysSinceSent && (
+              <span className="text-xs text-muted-foreground">
+                Enviada hace {daysSinceSentLabel(quote.sentAt)}
+              </span>
+            )}
           </Link>
         ))}
       </div>
