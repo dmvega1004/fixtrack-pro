@@ -1158,10 +1158,19 @@ export class WorkOrdersService {
     await this.prisma.$transaction(async (tx) => {
       const parts = await tx.workOrderPart.findMany({
         where: { workOrderId: id, companyId: user.companyId }, // candado
-        select: { sparePartId: true, quantity: true },
+        select: {
+          sparePartId: true,
+          quantity: true,
+          sparePart: { select: { trackStock: true } },
+        },
       });
 
       for (const part of parts) {
+        // "Contra pedido" (trackStock=false) nunca descontó stock al
+        // agregarse a la orden: devolverlo acá crearía existencias fantasma
+        // que nadie sabría de dónde salieron.
+        if (!part.sparePart.trackStock) continue;
+
         await tx.sparePart.update({
           where: { id: part.sparePartId },
           data: { stock: { increment: part.quantity } },

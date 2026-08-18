@@ -26,7 +26,9 @@ const TERMINAL_STATUSES: OrderStatus[] = [
 ];
 
 const PART_SUMMARY = {
-  sparePart: { select: { id: true, sku: true, name: true } },
+  sparePart: {
+    select: { id: true, sku: true, name: true, trackStock: true },
+  },
 } as const;
 
 /** Línea de repuesto con unitCost opcionalmente omitido (RBAC financiero). */
@@ -111,21 +113,26 @@ export class WorkOrderPartsService {
         );
       }
 
-      // Descuento atómico y a prueba de carreras: solo descuenta si alcanza
-      const decremented = await tx.sparePart.updateMany({
-        where: {
-          id: part.id,
-          companyId: user.companyId,
-          stock: { gte: dto.quantity },
-        },
-        data: { stock: { decrement: dto.quantity } },
-      });
+      // "Contra pedido" (trackStock=false): no se mantiene en bodega, así
+      // que ni se valida stock suficiente ni se descuenta. Pedir contra
+      // pedido significa, literalmente, que no hay existencias.
+      if (part.trackStock) {
+        // Descuento atómico y a prueba de carreras: solo descuenta si alcanza
+        const decremented = await tx.sparePart.updateMany({
+          where: {
+            id: part.id,
+            companyId: user.companyId,
+            stock: { gte: dto.quantity },
+          },
+          data: { stock: { decrement: dto.quantity } },
+        });
 
-      if (decremented.count === 0) {
-        throw new ConflictException(
-          `Stock insuficiente de ${part.sku}: quedan ${part.stock} unidades ` +
-            `y se solicitaron ${dto.quantity}`,
-        );
+        if (decremented.count === 0) {
+          throw new ConflictException(
+            `Stock insuficiente de ${part.sku}: quedan ${part.stock} unidades ` +
+              `y se solicitaron ${dto.quantity}`,
+          );
+        }
       }
 
       // Línea de la orden: crea con fotografía de precios, o suma cantidad
@@ -194,11 +201,15 @@ export class WorkOrderPartsService {
 
       await tx.workOrderPart.delete({ where: { id: existing.id } });
 
-      // Devolución del stock: el inventario queda cuadrado
-      await tx.sparePart.update({
-        where: { id: sparePartId },
-        data: { stock: { increment: existing.quantity } },
-      });
+      // Devolución del stock: el inventario queda cuadrado. "Contra pedido"
+      // (trackStock=false) nunca movió stock al agregarse, así que tampoco
+      // se le devuelve nada acá (si no, se crean existencias fantasma).
+      if (existing.sparePart.trackStock) {
+        await tx.sparePart.update({
+          where: { id: sparePartId },
+          data: { stock: { increment: existing.quantity } },
+        });
+      }
 
       // isFinancial: false — mismo criterio que PART_ADDED: solo nombre y
       // cantidad, nunca unitCost/unitPrice.
