@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsIn,
   IsInt,
   IsNotEmpty,
@@ -58,6 +59,15 @@ export class CreateSparePartDto {
   @IsInt()
   @Min(0)
   minStock?: number;
+
+  /**
+   * false = artículo que se pide contra pedido y no se mantiene en bodega:
+   * no entra en alertas de existencias y su stock no se mueve al usarlo en
+   * una orden. Default true (comportamiento actual).
+   */
+  @IsOptional()
+  @IsBoolean()
+  trackStock?: boolean;
 
   /** Costo para la empresa (dato financiero: visible solo para ADMIN). */
   @IsNumber(

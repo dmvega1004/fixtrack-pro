@@ -35,6 +35,7 @@ export class SparePartsService {
           category: dto.category,
           stock: dto.stock,
           minStock: dto.minStock ?? 0,
+          trackStock: dto.trackStock,
           cost: dto.cost,
           salePrice: dto.salePrice,
           companyId: user.companyId, // candado
@@ -62,9 +63,18 @@ export class SparePartsService {
     const parts = await this.prisma.sparePart.findMany({
       where: {
         companyId: user.companyId, // candado
-        // Alerta de reabastecimiento: stock <= minStock (comparación entre columnas)
         ...(lowStock
-          ? { stock: { lte: this.prisma.sparePart.fields.minStock } }
+          ? {
+              // "Contra pedido" (trackStock=false): nunca en la alerta, no
+              // se mantienen en bodega a propósito.
+              trackStock: true,
+              // Punto de reorden: stock <= minStock (comparación entre
+              // columnas). Único criterio de "existencias bajas" — debe
+              // coincidir exactamente con isLowStock() en
+              // apps/web/src/lib/inventory/stock-status.ts (frontend, sin
+              // paquete compartido con el backend).
+              stock: { lte: this.prisma.sparePart.fields.minStock },
+            }
           : {}),
       },
       orderBy: { name: 'asc' },
@@ -102,6 +112,7 @@ export class SparePartsService {
           category: dto.category,
           stock: dto.stock,
           minStock: dto.minStock,
+          trackStock: dto.trackStock,
           cost: dto.cost,
           salePrice: dto.salePrice,
         },
