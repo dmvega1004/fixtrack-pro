@@ -129,18 +129,23 @@
   }
 }
 
-/* Documento imprimible (orden de trabajo): tamaño Carta fijo — sin esto,
-   el navegador usa el tamaño de papel que cada dispositivo considere por
-   defecto (un celular puede generar hojas más anchas que un desktop).
-   Sin margen de página: así Chrome no tiene dónde pintar su header/footer
-   automático (URL, fecha). El margen visual lo da el padding del propio
-   documento (ver WorkOrderPrintDocument, que también fija su ancho en mm
-   para no re-fluirse según el viewport), que además reserva espacio abajo
-   para nuestro pie de página fijo. Fondo blanco/tipografía negra sin
-   importar el tema activo. */
+/* Documentos imprimibles (orden de trabajo, cuenta de cobro, cotización):
+   tamaño Carta fijo — sin esto, el navegador usa el tamaño de papel que
+   cada dispositivo considere por defecto (un celular puede generar hojas
+   más anchas que un desktop).
+   El margen se define ACÁ, en @page, y no como padding del documento:
+   así el navegador lo repite automáticamente en TODAS las hojas cuando
+   el contenido ocupa varias páginas. Un padding puesto en el contenedor
+   del documento solo se aplica en la primera hoja (padding-top) y en la
+   última (padding-bottom) — en las hojas intermedias el contenido queda
+   pegado al borde, que es justo el bug que este comentario reemplaza.
+   Nota: si el usuario tiene activado "Encabezados y pies de página" en
+   el diálogo de impresión, Chrome dibuja esa info (URL/fecha) dentro de
+   este margen; el navegador recuerda la preferencia por sitio, así que
+   basta con desactivarla una vez. */
 @page {
   size: letter portrait;
-  margin: 0;
+  margin: 12mm 14mm 18mm 14mm;
 }
 
 @media print {

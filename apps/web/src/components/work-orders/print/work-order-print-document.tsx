@@ -145,7 +145,7 @@ export function WorkOrderPrintDocument({
     : "Documento generado por FixTrack Pro";
 
   return (
-    <div className="mx-auto w-full max-w-[210mm] bg-white p-6 text-neutral-900 sm:p-10 print:w-[216mm] print:max-w-none print:px-[14mm] print:pt-[12mm] print:pb-[18mm]">
+    <div className="mx-auto w-full max-w-[210mm] bg-white p-6 text-neutral-900 sm:p-10 print:w-full print:max-w-none print:p-0">
       <PrintLetterhead company={company} />
 
       <hr className="mt-4 border-t-4" style={{ borderColor: BRAND_BLUE }} />
@@ -199,7 +199,7 @@ export function WorkOrderPrintDocument({
             </thead>
             <tbody>
               {equipments.map((item) => (
-                <tr key={item.id} className="border-b border-neutral-200">
+                <tr key={item.id} className="break-inside-avoid border-b border-neutral-200">
                   <td className="py-1.5 pr-2">{item.brand}</td>
                   <td className="py-1.5 pr-2">{item.model}</td>
                   <td className="py-1.5 pr-2 text-neutral-600">
@@ -223,7 +223,7 @@ export function WorkOrderPrintDocument({
       </section>
 
       {order.diagnosis && (
-        <div className="mt-4">
+        <div className="mt-4 break-inside-avoid">
           <Callout variant="amber" title="Hallazgo técnico / Diagnóstico">
             {order.diagnosis}
           </Callout>
@@ -231,7 +231,7 @@ export function WorkOrderPrintDocument({
       )}
 
       {order.observations && (
-        <div className="mt-4">
+        <div className="mt-4 break-inside-avoid">
           <Callout variant="blue" title="Observaciones y recomendaciones">
             {order.observations}
           </Callout>
@@ -264,7 +264,7 @@ export function WorkOrderPrintDocument({
                 const unitPrice = Number(item.unitPrice);
                 const subtotal = unitPrice * item.quantity;
                 return (
-                  <tr key={item.id} className="border-b border-neutral-200">
+                  <tr key={item.id} className="break-inside-avoid border-b border-neutral-200">
                     <td className="py-1.5 pr-2">{item.sparePart.name}</td>
                     <td className="py-1.5 pr-2 text-neutral-600">
                       {item.sparePart.sku}
@@ -284,7 +284,7 @@ export function WorkOrderPrintDocument({
         </table>
       </section>
 
-      <section className="mt-4 flex flex-col gap-2">
+      <section className="mt-4 flex flex-col gap-2 break-inside-avoid">
         <SectionTitle>Cierre económico</SectionTitle>
         <table className="w-full border-collapse text-sm">
           <tbody>
@@ -369,7 +369,7 @@ export function WorkOrderPrintDocument({
         </section>
       )}
 
-      <footer className="mt-10 flex flex-col gap-8">
+      <footer className="mt-10 flex flex-col gap-8 break-inside-avoid">
         <div className="grid grid-cols-1 gap-10 sm:grid-cols-2">
           <SignatureBox title="Técnico responsable" />
           <SignatureBox title="Recibido por el cliente" />
@@ -382,8 +382,8 @@ export function WorkOrderPrintDocument({
       </footer>
 
       {/* Pie fijo de impresión: position:fixed en contexto de impresión se
-          repite en cada hoja. Fondo blanco para que el contenido que cae
-          justo ahí no se le superponga (ver padding-bottom del contenedor). */}
+          repite en cada hoja, dentro del margen inferior reservado por
+          @page (ver globals.css) — ya no puede solaparse con contenido. */}
       <p className="hidden bg-white py-2 text-center text-[10px] text-neutral-400 print:fixed print:inset-x-0 print:bottom-0 print:z-10 print:block">
         {printFooterText}
       </p>

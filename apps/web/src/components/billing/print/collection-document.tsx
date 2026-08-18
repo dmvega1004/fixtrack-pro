@@ -69,7 +69,7 @@ function ValueRow({
   currency: string;
 }) {
   return (
-    <tr className="border-b border-neutral-200">
+    <tr className="break-inside-avoid border-b border-neutral-200">
       <td className="py-1.5 pr-2">{concept}</td>
       <td className="py-1.5 pr-2 text-right">{quantity}</td>
       <td className="py-1.5 pr-2 text-right">{formatCurrency(unitPrice, currency)}</td>
@@ -153,7 +153,7 @@ export function CollectionDocument({
   }
 
   return (
-    <div className="mx-auto w-full max-w-[210mm] bg-white p-6 text-neutral-900 sm:p-10 print:w-[216mm] print:max-w-none print:px-[14mm] print:pt-[12mm] print:pb-[18mm]">
+    <div className="mx-auto w-full max-w-[210mm] bg-white p-6 text-neutral-900 sm:p-10 print:w-full print:max-w-none print:p-0">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <PrintLetterhead company={company} />
         <div className="flex flex-col items-end text-right">
@@ -236,7 +236,7 @@ export function CollectionDocument({
         </table>
       </section>
 
-      <section className="mt-4 flex justify-end">
+      <section className="mt-4 flex justify-end break-inside-avoid">
         <table className="w-72 border-collapse text-sm">
           <tbody>
             {Number(billing.discountAmount) > 0 && (
@@ -273,7 +273,7 @@ export function CollectionDocument({
         </table>
       </section>
 
-      <section className="mt-2 flex justify-end">
+      <section className="mt-2 flex justify-end break-inside-avoid">
         <div className="print-color-exact flex w-72 items-center justify-between rounded-md bg-blue-600 px-4 py-3 text-white">
           <span className="text-sm font-bold tracking-wide uppercase">Saldo a pagar</span>
           <span className="text-lg font-bold">{formatCurrency(balance, currency)}</span>
@@ -284,7 +284,7 @@ export function CollectionDocument({
         {amountInWords(balance, currency)}
       </p>
 
-      <footer className="mt-10 flex flex-col gap-6">
+      <footer className="mt-10 flex flex-col gap-6 break-inside-avoid">
         <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
           <div className="flex flex-col gap-1.5 text-sm text-neutral-700">
             <p className="text-xs font-semibold tracking-wide uppercase" style={{ color: BRAND_BLUE }}>
@@ -313,8 +313,20 @@ export function CollectionDocument({
         <p className="text-center text-xs text-neutral-500 italic">
           {company.collectionDocFootnote ?? DEFAULT_FOOTNOTE}
         </p>
-        <p className="text-center text-[11px] text-neutral-400">{printFooterText}</p>
+        {/* En pantalla se ve acá; al imprimir la reemplaza el pie fijo de
+            abajo, que se repite en TODAS las hojas (esta solo aparecería
+            en la última). */}
+        <p className="text-center text-[11px] text-neutral-400 print:hidden">
+          {printFooterText}
+        </p>
       </footer>
+
+      {/* Pie fijo de impresión: position:fixed en contexto de impresión se
+          repite en cada hoja, dentro del margen inferior reservado por
+          @page (ver globals.css). */}
+      <p className="hidden bg-white py-2 text-center text-[10px] text-neutral-400 print:fixed print:inset-x-0 print:bottom-0 print:z-10 print:block">
+        {printFooterText}
+      </p>
     </div>
   );
 }

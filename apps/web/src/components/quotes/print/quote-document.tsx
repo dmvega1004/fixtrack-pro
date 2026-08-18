@@ -110,7 +110,7 @@ export function QuoteDocument({ quote, client, company }: QuoteDocumentProps) {
     quote.paymentTerms || quote.deliveryTime || quote.warrantyTerms;
 
   return (
-    <div className="relative mx-auto w-full max-w-[210mm] overflow-hidden bg-white p-6 text-neutral-900 sm:p-10 print:w-[216mm] print:max-w-none print:overflow-visible print:px-[14mm] print:pt-[12mm] print:pb-[18mm]">
+    <div className="relative mx-auto w-full max-w-[210mm] overflow-hidden bg-white p-6 text-neutral-900 sm:p-10 print:w-full print:max-w-none print:overflow-visible print:p-0">
       {isDraft && (
         <div
           aria-hidden
