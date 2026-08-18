@@ -335,6 +335,10 @@ model SparePart {
   category       String          @default("REPUESTO")
   stock          Int             @default(0)
   minStock       Int             @default(0)
+  /// false = artículo que se pide contra pedido y no se mantiene en
+  /// bodega: no entra en alertas de existencias y su stock no se mueve al
+  /// usarlo en una orden.
+  trackStock     Boolean         @default(true)
   cost           Decimal         @db.Decimal(12, 2)
   salePrice      Decimal         @db.Decimal(12, 2)
   companyId      String
