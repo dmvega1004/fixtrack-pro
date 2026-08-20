@@ -1,8 +1,10 @@
-import { Wallet, TrendingUp, Clock, AlertTriangle } from "lucide-react";
+import Link from "next/link";
+import { Wallet, TrendingUp, Clock, AlertTriangle, LineChart } from "lucide-react";
 import { getBillingSummary, getReceivables, getClientBalances } from "@/lib/api/billing";
 import { getWorkOrders } from "@/lib/api/work-orders";
 import { getCompany } from "@/lib/api/company";
 import { KpiCard } from "@/components/dashboard/kpi-card";
+import { buttonVariants } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/format/currency";
 import { buildReceivableRows } from "@/lib/billing/receivable-rows";
 import {
@@ -47,9 +49,15 @@ export default async function CobrosPage({ searchParams }: CobrosPageProps) {
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Cobros</h1>
-        <p className="text-sm text-muted-foreground">Facturación y cartera</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Cobros</h1>
+          <p className="text-sm text-muted-foreground">Facturación y cartera</p>
+        </div>
+        <Link href="/cobros/rentabilidad" className={buttonVariants({ variant: "outline", size: "sm" })}>
+          <LineChart className="size-4" />
+          Rentabilidad
+        </Link>
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
