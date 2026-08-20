@@ -78,4 +78,26 @@ export class UpdateWorkOrderDto extends PartialType(CreateWorkOrderDto) {
     { message: 'billedAt debe ser una fecha válida (ISO 8601)' },
   )
   billedAt?: string;
+
+  /**
+   * Costos internos (pestaña «Valores», bloque "Costos internos"): lo que
+   * el trabajo costó por fuera del inventario (torno, subcontratos,
+   * consumibles). NUNCA se factura al cliente. Mismo patrón que billedAt:
+   * solo ADMIN (RBAC en el service), se envían solos (sin combinar con
+   * otros campos) y funcionan incluso con la orden en estado terminal —
+   * la factura del proveedor suele llegar días después de entregado el
+   * trabajo.
+   */
+  @IsOptional()
+  @IsNumber(
+    { maxDecimalPlaces: 2 },
+    { message: 'directCostAmount debe ser un número con máximo 2 decimales' },
+  )
+  @Min(0)
+  directCostAmount?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  directCostDescription?: string;
 }

@@ -26,7 +26,11 @@ import {
 import { ActivityService } from '../activity/activity.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
-import { addMonthsUTC, formatDateOnly, todayDateOnly } from '../common/date-only.util';
+import {
+  addMonthsUTC,
+  formatDateOnly,
+  todayDateOnly,
+} from '../common/date-only.util';
 import { EquipmentsService } from '../equipments/equipments.service';
 import { PrismaService } from '../prisma.service';
 import { QuotesService } from '../quotes/quotes.service';
@@ -73,8 +77,19 @@ export interface WorkOrderEquipmentSummary {
   qrCode: string;
 }
 
-/** Vista pública de una orden: WorkOrder + client/user incluidos + equipments ya aplanado. */
-export type WorkOrderView = WorkOrder & {
+/**
+ * Vista pública de una orden: WorkOrder + client/user incluidos + equipments
+ * ya aplanado. directCostAmount/directCostDescription (costos internos, ver
+ * módulo de Rentabilidad) quedan OPCIONALES a propósito: toView() los omite
+ * para todo rol distinto de ADMIN — mismo criterio RBAC financiero que
+ * WorkOrderPart.unitCost.
+ */
+export type WorkOrderView = Omit<
+  WorkOrder,
+  'directCostAmount' | 'directCostDescription'
+> & {
+  directCostAmount?: WorkOrder['directCostAmount'];
+  directCostDescription?: WorkOrder['directCostDescription'];
   client: { id: string; name: string };
   user: { id: string; name: string; email: string } | null;
   equipments: WorkOrderEquipmentSummary[];
@@ -268,7 +283,7 @@ export class WorkOrdersService {
       return workOrder;
     });
 
-    return this.toView(created);
+    return this.toView(created, user.role);
   }
 
   async findAll(
@@ -283,7 +298,7 @@ export class WorkOrdersService {
       skip: filters.skip,
     });
 
-    return orders.map((order) => this.toView(order));
+    return orders.map((order) => this.toView(order, user.role));
   }
 
   /** GET /work-orders/count — mismo `where` que findAll, sin traer filas. */
@@ -399,7 +414,7 @@ export class WorkOrdersService {
       unassignedActiveCount,
       avgResolutionDays,
       technicianRanking,
-      recentOrders: recentOrders.map((order) => this.toView(order)),
+      recentOrders: recentOrders.map((order) => this.toView(order, user.role)),
       maintenanceDueCount,
       quotesFollowUpCount,
     };
@@ -507,7 +522,7 @@ export class WorkOrdersService {
       throw new NotFoundException(`Orden de trabajo ${id} no encontrada`);
     }
 
-    return this.toView(workOrder);
+    return this.toView(workOrder, user.role);
   }
 
   async update(
@@ -583,7 +598,7 @@ export class WorkOrdersService {
         return result;
       });
 
-      return this.toView(updated);
+      return this.toView(updated, user.role);
     }
 
     // billedAt combinado con otros campos: el resto del método no lo
@@ -592,6 +607,93 @@ export class WorkOrdersService {
     if (dto.billedAt !== undefined) {
       throw new ConflictException(
         'billedAt debe enviarse solo, sin combinar con otros campos',
+      );
+    }
+
+    // Costos internos (módulo de Rentabilidad): mismo patrón de excepción
+    // que billedAt arriba — ADMIN puede corregirlos incluso con la orden
+    // ya sellada (DELIVERED/CANCELLED), porque la factura del proveedor
+    // (torno, materiales de la obra) suele llegar días después de
+    // entregado el trabajo. Se envían solos, sin combinar con otros
+    // campos, para no tener que reconciliar esta excepción con el resto
+    // del método (RBAC, congelamiento, etc.).
+    const isDirectCostOnlyEdit =
+      (dto.directCostAmount !== undefined ||
+        dto.directCostDescription !== undefined) &&
+      Object.entries(dto).every(
+        ([key, value]) =>
+          key === 'directCostAmount' ||
+          key === 'directCostDescription' ||
+          value === undefined,
+      );
+
+    if (isDirectCostOnlyEdit) {
+      if (user.role !== Role.ADMIN) {
+        throw new ForbiddenException(
+          'Solo un ADMIN puede modificar los costos internos de la orden',
+        );
+      }
+
+      const company = await this.prisma.company.findUniqueOrThrow({
+        where: { id: user.companyId },
+        select: { currency: true },
+      });
+
+      // Un solo evento de bitácora para el bloque completo (monto +
+      // descripción): el texto combinado captura cualquiera de los dos
+      // cambios, y "Otros costos directos" es el único campo pedido.
+      const formatDirectCost = (
+        amount: Prisma.Decimal,
+        description: string | null,
+      ): string =>
+        description
+          ? `${formatActivityCurrency(amount, company.currency)} — ${description}`
+          : formatActivityCurrency(amount, company.currency);
+
+      const previousAmount =
+        workOrder.directCostAmount ?? new Prisma.Decimal(0);
+      const previousDescription = workOrder.directCostDescription ?? null;
+
+      const updated = await this.prisma.$transaction(async (tx) => {
+        const result = await tx.workOrder.update({
+          where: { id },
+          data: {
+            directCostAmount: dto.directCostAmount,
+            directCostDescription: dto.directCostDescription?.trim(),
+          },
+          include: WORK_ORDER_INCLUDE,
+        });
+
+        await this.activityService.recordFieldChange(
+          {
+            companyId: user.companyId,
+            workOrderId: id,
+            userId: user.userId,
+            userName: activityAuthorName(user),
+            action: ActivityAction.BILLING_UPDATED,
+            field: 'Otros costos directos',
+            oldValue: formatDirectCost(previousAmount, previousDescription),
+            newValue: formatDirectCost(
+              result.directCostAmount,
+              result.directCostDescription,
+            ),
+            isFinancial: true,
+          },
+          tx,
+        );
+
+        return result;
+      });
+
+      return this.toView(updated, user.role);
+    }
+
+    if (
+      dto.directCostAmount !== undefined ||
+      dto.directCostDescription !== undefined
+    ) {
+      throw new ConflictException(
+        'directCostAmount/directCostDescription deben enviarse solos, sin combinar con otros campos',
       );
     }
 
@@ -751,7 +853,8 @@ export class WorkOrdersService {
     // de servicio junto con el cierre.
     const resultingServiceType = dto.serviceType ?? workOrder.serviceType;
     const isCompletingNow =
-      dto.status === OrderStatus.COMPLETED && workOrder.status !== OrderStatus.COMPLETED;
+      dto.status === OrderStatus.COMPLETED &&
+      workOrder.status !== OrderStatus.COMPLETED;
     const shouldUpdateMaintenance =
       isCompletingNow && resultingServiceType === ServiceType.PREVENTIVE;
 
@@ -1084,7 +1187,9 @@ export class WorkOrdersService {
               const label = equipment.location
                 ? `${equipment.brand} ${equipment.model} — ${equipment.location}`
                 : `${equipment.brand} ${equipment.model}`;
-              updatedLabels.push(`${label}: próxima ${formatDateOnly(nextMaintenanceAt)}`);
+              updatedLabels.push(
+                `${label}: próxima ${formatDateOnly(nextMaintenanceAt)}`,
+              );
             }
 
             await this.activityService.record(
@@ -1107,7 +1212,7 @@ export class WorkOrdersService {
       return result;
     });
 
-    return this.toView(updated);
+    return this.toView(updated, user.role);
   }
 
   /**
@@ -1281,7 +1386,7 @@ export class WorkOrdersService {
       return result;
     });
 
-    return this.toView(updated);
+    return this.toView(updated, user.role);
   }
 
   /** Validación cruzada multi-tenant de la relación WorkOrder → Client. */
@@ -1370,11 +1475,14 @@ export class WorkOrdersService {
    * devuelva esto directo porque la relación es explícita (tiene columnas
    * propias: companyId, createdAt), no un m-a-m implícito.
    */
-  private toView(order: WorkOrderWithRelations): WorkOrderView {
-    const { equipmentLinks, ...rest } = order;
+  /** RBAC financiero: directCostAmount/directCostDescription solo para ADMIN. */
+  private toView(order: WorkOrderWithRelations, role: Role): WorkOrderView {
+    const { equipmentLinks, directCostAmount, directCostDescription, ...rest } =
+      order;
     return {
       ...rest,
       equipments: equipmentLinks.map((link) => link.equipment),
+      ...(role === Role.ADMIN && { directCostAmount, directCostDescription }),
     };
   }
 }

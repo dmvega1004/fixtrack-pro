@@ -70,6 +70,15 @@ export interface WorkOrderPartsSummary {
   /** Costo total para la empresa — SOLO visible para ADMIN. */
   totalCost?: string;
   billing: WorkOrderBilling;
+  /**
+   * Costos internos (bloque "Costos internos", pestaña «Valores») — lo que
+   * el trabajo costó fuera del inventario. SOLO visible para ADMIN, igual
+   * que totalCost: nunca se factura al cliente ni aparece en ningún
+   * documento impreso, así que ni siquiera viaja en la respuesta para
+   * COORDINATOR/TECHNICIAN.
+   */
+  directCostAmount?: string;
+  directCostDescription?: string | null;
 }
 
 /**
@@ -267,13 +276,18 @@ export class WorkOrderPartsService {
       billing: this.buildBilling(order, totalSale, company.taxRate, paidAmount),
     };
 
-    // RBAC financiero: el costo total solo lo ve el ADMIN
+    // RBAC financiero: el costo total y los costos internos solo los ve el ADMIN
     if (user.role === Role.ADMIN) {
       const totalCost = lines.reduce(
         (acc, l) => acc.add(l.unitCost.mul(l.quantity)),
         new Prisma.Decimal(0),
       );
       summary.totalCost = totalCost.toFixed(2);
+      // order viene de WorkOrdersService.findOne(user, ...) con este mismo
+      // user ADMIN, así que directCostAmount/Description ya vienen sin
+      // redactar (ver WorkOrdersService.toView).
+      summary.directCostAmount = order.directCostAmount!.toFixed(2);
+      summary.directCostDescription = order.directCostDescription ?? null;
     }
 
     return summary;
@@ -287,7 +301,17 @@ export class WorkOrderPartsService {
    * tasa congelada solo para mostrar el desglose, no para derivar el total.
    */
   private buildBilling(
-    order: WorkOrder,
+    order: Pick<
+      WorkOrder,
+      | 'laborAmount'
+      | 'additionalAmount'
+      | 'additionalDescription'
+      | 'discountAmount'
+      | 'totalAmount'
+      | 'taxRateApplied'
+      | 'billedAt'
+      | 'paymentStatus'
+    >,
     partsTotal: Prisma.Decimal,
     companyTaxRate: Prisma.Decimal,
     paidAmount: Prisma.Decimal,
