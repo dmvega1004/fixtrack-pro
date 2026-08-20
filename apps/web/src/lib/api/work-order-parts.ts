@@ -49,6 +49,14 @@ export interface WorkOrderPartsSummary {
   /** Solo presente para ADMIN. */
   totalCost?: string;
   billing: WorkOrderBilling;
+  /**
+   * Costos internos (bloque "Costos internos", pestaña «Valores») — lo que
+   * el trabajo costó fuera del inventario. Solo presente para ADMIN, igual
+   * que totalCost: nunca se factura al cliente ni aparece en ningún
+   * documento impreso.
+   */
+  directCostAmount?: string;
+  directCostDescription?: string | null;
 }
 
 /** GET /work-orders/:orderId/parts */

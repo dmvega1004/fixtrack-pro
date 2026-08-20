@@ -5,6 +5,7 @@ import type { Payment } from "@/lib/api/payments";
 import { RemovePartButton } from "./remove-part-button";
 import { AddPartPanel } from "./add-part-panel";
 import { BillingSection } from "./billing-section";
+import { DirectCostSection } from "./direct-cost-section";
 import { PaymentsPanel } from "./payments-panel";
 
 interface PartsTabProps {
@@ -29,7 +30,8 @@ export function PartsTab({
   isClosed,
   payments,
 }: PartsTabProps) {
-  const { items, totalSale, totalCost, billing } = summary;
+  const { items, totalSale, totalCost, billing, directCostAmount, directCostDescription } =
+    summary;
   const balance = (Number(billing.total) - Number(billing.paidAmount)).toFixed(2);
   const margin =
     totalCost !== undefined
@@ -155,6 +157,15 @@ export function PartsTab({
         isAdmin={isAdmin}
         isTerminal={isTerminal}
       />
+
+      {isAdmin && directCostAmount !== undefined && (
+        <DirectCostSection
+          orderId={orderId}
+          directCostAmount={directCostAmount}
+          directCostDescription={directCostDescription ?? null}
+          currency={currency}
+        />
+      )}
 
       {isAdmin && isClosed && (
         <PaymentsPanel

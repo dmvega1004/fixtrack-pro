@@ -169,6 +169,33 @@ export async function saveBilledAtAction(
   );
 }
 
+export interface SaveDirectCostInput {
+  directCostAmount: number;
+  directCostDescription: string;
+}
+
+/**
+ * PATCH /work-orders/:id con SOLO directCostAmount/directCostDescription —
+ * "Costos internos" (pestaña «Valores», solo ADMIN, ver RBAC en el
+ * service). Igual que saveBilledAtAction: se envían solos para poder
+ * editarlos incluso en órdenes ya cerradas (DELIVERED/CANCELLED) — la
+ * factura del proveedor suele llegar días después de entregado el trabajo.
+ */
+export async function saveDirectCostAction(
+  orderId: string,
+  dto: SaveDirectCostInput,
+): Promise<ActionResult> {
+  return runMutation(orderId, () =>
+    serverFetch(`/work-orders/${orderId}`, {
+      method: "PATCH",
+      body: {
+        directCostAmount: dto.directCostAmount,
+        directCostDescription: dto.directCostDescription,
+      },
+    }),
+  );
+}
+
 export async function addPartAction(
   orderId: string,
   sparePartId: string,

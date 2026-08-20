@@ -52,6 +52,13 @@ export interface WorkOrder {
   /** Congelados al pasar la orden a COMPLETED; null mientras sigue abierta. */
   taxRateApplied: string | null;
   totalAmount: string | null;
+  /**
+   * Costo interno del trabajo, fuera de inventario (ver módulo de
+   * Rentabilidad). Redactado por el backend para todo rol distinto de
+   * ADMIN — nunca se cobra al cliente ni aparece en ningún documento.
+   */
+  directCostAmount?: string;
+  directCostDescription?: string | null;
   billedAt: string | null;
   paymentStatus: PaymentStatus;
   /** Consecutivo de la cuenta de cobro emitida sobre esta orden; null hasta que se genera. */
