@@ -286,6 +286,15 @@ model WorkOrder {
   /// unitPrice en WorkOrderPart.
   taxRateApplied        Decimal?             @db.Decimal(5, 2)
   totalAmount           Decimal?             @db.Decimal(12, 2)
+  /// Costo del trabajo que NO proviene del inventario: torno, materiales
+  /// comprados para la obra, subcontratos, consumibles. NUNCA se le cobra
+  /// al cliente ni entra en ningún total facturado — existe solo para
+  /// calcular el margen real (módulo de Rentabilidad). A diferencia del
+  /// resto del cierre económico, SÍ es editable después de cerrada la
+  /// orden, solo por ADMIN (igual que billedAt): la factura del proveedor
+  /// suele llegar días después de entregado el trabajo.
+  directCostAmount      Decimal              @default(0) @db.Decimal(12, 2)
+  directCostDescription String?
   billedAt              DateTime?
   paymentStatus         PaymentStatus        @default(PENDING)
   /// Consecutivo por tenant de la cuenta de cobro emitida sobre esta orden
