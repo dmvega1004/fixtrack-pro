@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    id: "/",
     name: "FixTrack Pro",
     short_name: "FixTrack",
     display: "standalone",
@@ -18,6 +19,12 @@ export default function manifest(): MetadataRoute.Manifest {
         src: "/brand/icon-512.png",
         sizes: "512x512",
         type: "image/png",
+      },
+      {
+        src: "/brand/icon-512.png",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "maskable",
       },
     ],
   };
