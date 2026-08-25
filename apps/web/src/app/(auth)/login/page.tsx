@@ -2,7 +2,6 @@
 
 import { useState, type FormEvent } from "react";
 import Image from "next/image";
-import { Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,12 +11,12 @@ import {
   CardDescription,
   CardHeader,
 } from "@/components/ui/card";
+import { PasswordInput } from "@/components/shared/password-input";
 import { useLogin } from "@/hooks/use-login";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const { submitLogin, isLoading } = useLogin();
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -56,29 +55,13 @@ export default function LoginPage() {
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="password">Contraseña</Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  autoComplete="current-password"
-                  required
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  className="pr-11"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((current) => !current)}
-                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                  className="absolute top-1/2 right-0 flex size-11 -translate-y-1/2 items-center justify-center text-muted-foreground hover:text-foreground"
-                >
-                  {showPassword ? (
-                    <EyeOff className="size-4" />
-                  ) : (
-                    <Eye className="size-4" />
-                  )}
-                </button>
-              </div>
+              <PasswordInput
+                id="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
             </div>
             <Button type="submit" className="mt-2 w-full" disabled={isLoading}>
               {isLoading ? "Ingresando..." : "Ingresar"}

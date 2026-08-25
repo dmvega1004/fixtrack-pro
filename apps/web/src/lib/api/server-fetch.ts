@@ -8,6 +8,15 @@ const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:3000";
 interface RequestOptions {
   method?: "GET" | "POST" | "PATCH" | "DELETE";
   body?: unknown;
+  /**
+   * Por defecto, un 401 del backend se interpreta como "sesión inválida"
+   * (token vencido/corrupto) y redirige a logout. Actívalo en llamadas
+   * donde un 401 tiene un significado de negocio propio que NO debe
+   * cerrar la sesión — ej. PATCH /auth/password responde 401 cuando
+   * currentPassword no coincide, y ese caso debe mostrarse en el campo
+   * del formulario, no desloguear a alguien que sigue autenticado.
+   */
+  allowUnauthorized?: boolean;
 }
 
 interface BackendErrorBody {
@@ -45,7 +54,7 @@ export async function serverFetch<T>(
     cache: "no-store",
   });
 
-  if (response.status === 401) {
+  if (response.status === 401 && !options.allowUnauthorized) {
     redirect("/api/auth/logout");
   }
 
