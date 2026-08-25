@@ -21,12 +21,23 @@ const EMPTY_FORM: FormState = {
   confirmPassword: "",
 };
 
+interface ChangePasswordFormProps {
+  /**
+   * Se dispara tras un cambio exitoso, además del toast y la limpieza de
+   * campos. La pantalla de cambio obligatorio (/cambiar-contrasena) la usa
+   * para redirigir al dashboard; /perfil no la pasa y se queda ahí.
+   */
+  onSuccess?: () => void;
+}
+
 /**
  * Sección "Seguridad" de /perfil: los tres roles pueden cambiar su propia
  * contraseña acá — antes el único camino era que un ADMIN editara al
  * usuario desde Personal (y para coordinador/técnico ni siquiera eso).
+ * También es el formulario de la pantalla de cambio obligatorio
+ * (/cambiar-contrasena) — mismo componente, no una copia.
  */
-export function ChangePasswordForm() {
+export function ChangePasswordForm({ onSuccess }: ChangePasswordFormProps) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [currentPasswordError, setCurrentPasswordError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -73,6 +84,7 @@ export function ChangePasswordForm() {
 
     setForm(EMPTY_FORM);
     toast.success("Contraseña actualizada");
+    onSuccess?.();
   }
 
   return (
