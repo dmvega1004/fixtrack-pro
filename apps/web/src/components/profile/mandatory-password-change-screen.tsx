@@ -20,8 +20,14 @@ export function MandatoryPasswordChangeScreen() {
   const router = useRouter();
 
   function handleSuccess() {
-    router.push("/");
-    router.refresh();
+    // replace (no push) — no tiene sentido dejar /cambiar-contrasena en el
+    // historial: "atrás" desde el dashboard volvería a ejecutar el guard
+    // de esa página, que ya redirige para acá sola. SIN router.refresh():
+    // llamarlo justo después de push/replace compite con la navegación en
+    // curso y puede dejar el router colgado en la ruta vieja — la
+    // navegación a "/" ya trae los datos frescos por su cuenta (el layout
+    // del dashboard vuelve a llamar a GET /auth/me, sin caché).
+    router.replace("/");
   }
 
   return (
