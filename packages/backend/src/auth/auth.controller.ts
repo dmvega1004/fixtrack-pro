@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -15,6 +16,7 @@ import {
 } from './auth.service';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ProvisioningKeyGuard } from './guards/provisioning-key.guard';
@@ -64,5 +66,27 @@ export class AuthController {
   @Get('me')
   getProfile(@CurrentUser() user: AuthenticatedUser): AuthenticatedUser {
     return user;
+  }
+
+  /**
+   * PATCH /auth/password — el usuario autenticado cambia SU PROPIA
+   * contraseña (los tres roles: ADMIN, COORDINATOR, TECHNICIAN — sin
+   * @Roles() la ruta queda abierta a cualquier rol autenticado, igual que
+   * GET /auth/me). ChangePasswordDto no acepta ningún identificador de
+   * usuario: `user` sale siempre del token, nunca del body.
+   *
+   * Rate-limitado igual de estricto que login (5 intentos por minuto por
+   * IP): sin esto, este endpoint sería una forma cómoda de adivinar la
+   * contraseña actual de una sesión robada.
+   */
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Patch('password')
+  async changePassword(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: ChangePasswordDto,
+  ): Promise<void> {
+    await this.authService.changePassword(user, dto);
   }
 }

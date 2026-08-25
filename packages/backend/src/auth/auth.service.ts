@@ -7,9 +7,13 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { Role } from 'database';
 import { PrismaService } from '../prisma.service';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
-import { JwtPayload } from './interfaces/jwt-payload.interface';
+import {
+  AuthenticatedUser,
+  JwtPayload,
+} from './interfaces/jwt-payload.interface';
 
 /** Costo del hash: 12 rondas ≈ 250ms por hash, resistente a fuerza bruta. */
 const BCRYPT_SALT_ROUNDS = 12;
@@ -120,6 +124,62 @@ export class AuthService {
       email: user.email,
       role: user.role,
       companyId: user.companyId,
+    });
+  }
+
+  /**
+   * PATCH /auth/password — el usuario autenticado cambia SU PROPIA
+   * contraseña. `user` viene SIEMPRE del token de sesión (nunca de un id
+   * en el body/ruta — ver ChangePasswordDto y el controller): así no hay
+   * forma de que esta llamada afecte la cuenta de otra persona.
+   *
+   * Exige la contraseña actual: es la prueba de que quien está al
+   * teclado es el dueño de la cuenta, no un trámite — sin esto, una
+   * sesión abierta en un computador compartido le bastaría a cualquiera
+   * para dejar fuera al dueño real.
+   *
+   * NOTA — sesiones ya emitidas: este cambio NO invalida los JWT que ya
+   * estén en circulación (otro dispositivo, otra pestaña). El sistema no
+   * lleva lista de tokens revocados ni un claim de versión de contraseña
+   * verificado en JwtStrategy.validate, así que una sesión abierta en
+   * otro lado sigue siendo válida hasta que expire sola (JWT_EXPIRES_IN).
+   * Es una decisión consciente para el alcance de este cambio, no un
+   * olvido: revocación activa de sesiones es infraestructura aparte
+   * (blacklist de tokens, o un contador de versión por usuario) que no
+   * corresponde acá.
+   */
+  async changePassword(
+    user: AuthenticatedUser,
+    dto: ChangePasswordDto,
+  ): Promise<void> {
+    const current = await this.prisma.user.findUniqueOrThrow({
+      where: { id: user.userId },
+      select: { password: true },
+    });
+
+    const isCurrentPasswordValid = await bcrypt.compare(
+      dto.currentPassword,
+      current.password,
+    );
+    if (!isCurrentPasswordValid) {
+      throw new UnauthorizedException('La contraseña actual no es correcta');
+    }
+
+    // dto.currentPassword YA quedó probado idéntico a la contraseña real
+    // (bcrypt.compare arriba) — comparar contra dto.newPassword es
+    // suficiente para detectar "la nueva es igual a la actual", sin
+    // necesidad de un segundo bcrypt.compare contra el hash.
+    if (dto.newPassword === dto.currentPassword) {
+      throw new ConflictException(
+        'La contraseña nueva debe ser distinta de la actual',
+      );
+    }
+
+    const passwordHash = await bcrypt.hash(dto.newPassword, BCRYPT_SALT_ROUNDS);
+
+    await this.prisma.user.update({
+      where: { id: user.userId },
+      data: { password: passwordHash },
     });
   }
 

@@ -5,8 +5,8 @@ import {
   IsNotEmpty,
   IsString,
   MaxLength,
-  MinLength,
 } from 'class-validator';
+import { IsAccountPassword } from '../../common/decorators/is-account-password.decorator';
 
 /**
  * Invitación de empleados (Módulo 12): solo el ADMIN crea usuarios
@@ -21,9 +21,7 @@ export class CreateUserDto {
   @IsEmail({}, { message: 'El correo electrónico no es válido' })
   email: string;
 
-  @IsString()
-  @MinLength(8, { message: 'La contraseña debe tener al menos 8 caracteres' })
-  @MaxLength(72)
+  @IsAccountPassword()
   password: string;
 
   @IsEnum(Role, { message: 'role debe ser ADMIN, COORDINATOR o TECHNICIAN' })
