@@ -101,16 +101,19 @@ export function AppShell({ session, children }: AppShellProps) {
           })}
         </nav>
 
-        <div className="flex items-center gap-3 border-t border-border px-4 py-4">
-          <div className="flex size-9 flex-shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
-            {getInitials(session.name)}
+        <div className="flex flex-col gap-1 border-t border-border px-4 py-4">
+          <div className="flex items-center gap-3 pb-3">
+            <div className="flex size-9 flex-shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
+              {getInitials(session.name)}
+            </div>
+            <div className="flex flex-1 flex-col overflow-hidden">
+              <span className="truncate text-sm font-medium">{session.name}</span>
+              <span className="text-xs text-muted-foreground">
+                {ROLE_LABELS[session.role]}
+              </span>
+            </div>
           </div>
-          <div className="flex flex-1 flex-col overflow-hidden">
-            <span className="truncate text-sm font-medium">{session.name}</span>
-            <span className="text-xs text-muted-foreground">
-              {ROLE_LABELS[session.role]}
-            </span>
-          </div>
+          <ProfileNavLink active={isActive("/perfil")} />
           <LogoutButton />
         </div>
       </aside>
@@ -198,24 +201,43 @@ export function AppShell({ session, children }: AppShellProps) {
           </div>
 
           <div className="flex flex-col gap-1 px-4 pb-4">
-            <Link
-              href="/perfil"
+            <ProfileNavLink
+              active={isActive("/perfil")}
               onClick={() => setMenuOpen(false)}
-              className={cn(
-                "flex min-h-12 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
-                isActive("/perfil")
-                  ? "bg-primary/10 text-primary"
-                  : "text-foreground hover:bg-muted",
-              )}
-            >
-              <User className="size-5" />
-              Perfil
-            </Link>
+            />
             <LogoutButton />
           </div>
         </SheetContent>
       </Sheet>
     </div>
+  );
+}
+
+/**
+ * Enlace a /perfil — compartido entre la barra lateral de escritorio y el
+ * menú desplegable de móvil, para que ambos queden siempre en sincro (un
+ * solo lugar donde ícono, estilo y estado activo pueden desincronizarse).
+ * `onClick` es opcional: solo el menú móvil lo usa, para cerrar el Sheet.
+ */
+function ProfileNavLink({
+  active,
+  onClick,
+}: {
+  active: boolean;
+  onClick?: () => void;
+}) {
+  return (
+    <Link
+      href="/perfil"
+      onClick={onClick}
+      className={cn(
+        "flex min-h-12 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
+        active ? "bg-primary/10 text-primary" : "text-foreground hover:bg-muted",
+      )}
+    >
+      <User className="size-5" />
+      Perfil
+    </Link>
   );
 }
 
