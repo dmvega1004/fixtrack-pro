@@ -1434,21 +1434,17 @@ export class WorkOrdersService {
    *   onDelete: Cascade en schema.prisma).
    * - Las fotos en Cloudinary se borran DESPUÉS de confirmar la transacción,
    *   best-effort: un fallo ahí no debe dejar la orden a medio borrar.
+   *
+   * Una cuenta de cobro emitida YA NO bloquea el borrado (el frontend
+   * advierte del hueco que deja en el consecutivo antes de confirmar) —
+   * pero los PAGOS sí siguen bloqueando: son movimientos de dinero reales,
+   * y borrarlos en cascada sin que nadie lo note descuadraría la cartera
+   * de forma invisible. El mensaje ya indica el camino (borrar los pagos
+   * primero, o marcar Cancelada).
    */
   async remove(user: AuthenticatedUser, id: string): Promise<WorkOrderView> {
     // El guard @Roles(ADMIN) ya filtró el rol; verificamos tenant + existencia
     const order = await this.findOne(user, id);
-
-    // Una orden con cuenta de cobro o con pagos es evidencia contable:
-    // eliminar debe servir para corregir un error de digitación, no para
-    // borrar historia. Para eso existe el estado Cancelada, que conserva
-    // el registro. Ambos candados van antes de la transacción, así no hay
-    // nada que revertir si alguno dispara.
-    if (order.collectionNumber !== null) {
-      throw new ConflictException(
-        `No se puede eliminar: esta orden tiene la cuenta de cobro ${formatActivityCollectionNumber(order.collectionNumber)} emitida. Borrarla dejaría un hueco en el consecutivo. Si el servicio no se ejecutó, márcala como Cancelada.`,
-      );
-    }
 
     const paidAgg = await this.prisma.payment.aggregate({
       where: { workOrderId: id, companyId: user.companyId }, // candado

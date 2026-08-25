@@ -223,12 +223,13 @@ export default async function CotizacionDetallePage({ params }: CotizacionDetall
         </Card>
       </div>
 
-      {isAdmin && quote.status === "DRAFT" && (
+      {isAdmin && (
         <div className="mt-2 flex flex-col gap-2 border-t border-border pt-4">
           <h2 className="text-sm font-medium">Zona de riesgo</h2>
           <DeleteQuoteButton
             quoteId={quote.id}
             quoteLabel={formatQuoteNumber(quote.quoteNumber)}
+            quoteNumber={quote.quoteNumber}
           />
         </div>
       )}

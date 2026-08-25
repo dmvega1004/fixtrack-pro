@@ -522,12 +522,15 @@ export class QuotesService {
     return this.toView(duplicated, company.taxRate);
   }
 
-  /** DELETE /quotes/:id — solo DRAFT (una cotización enviada es un documento ya entregado). */
+  /**
+   * DELETE /quotes/:id — SOLO ADMIN (RBAC en el controller), en CUALQUIER
+   * estado. A diferencia de una orden con cuenta de cobro, una cotización
+   * (incluso SENT/ACCEPTED/REJECTED) no es evidencia contable — el
+   * frontend advierte del hueco que deja en el consecutivo si ya tiene
+   * quoteNumber asignado, pero no bloquea.
+   */
   async remove(companyId: string, id: string): Promise<QuoteView> {
     const current = await this.requireQuote(companyId, id);
-    if (current.status !== QuoteStatus.DRAFT) {
-      throw new ConflictException('Solo se puede eliminar una cotización en borrador');
-    }
 
     const company = await this.prisma.company.findUniqueOrThrow({
       where: { id: companyId },

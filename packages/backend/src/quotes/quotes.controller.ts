@@ -135,7 +135,7 @@ export class QuotesController {
     return this.quotesService.duplicate(user.companyId, user.userId, id);
   }
 
-  /** DELETE /quotes/:id — solo DRAFT, y solo ADMIN (el resto del módulo es ADMIN/COORDINATOR). */
+  /** DELETE /quotes/:id — cualquier estado, y solo ADMIN (el resto del módulo es ADMIN/COORDINATOR). */
   @Roles(Role.ADMIN)
   @Delete(':id')
   remove(

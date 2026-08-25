@@ -67,7 +67,11 @@ export function DetailsTab({
       {isAdmin && (
         <div className="mt-6 flex flex-col gap-2 border-t border-border pt-4">
           <h2 className="text-sm font-medium">Zona de riesgo</h2>
-          <DeleteOrderButton orderId={order.id} orderNumber={order.orderNumber} />
+          <DeleteOrderButton
+            orderId={order.id}
+            orderNumber={order.orderNumber}
+            collectionNumber={order.collectionNumber}
+          />
         </div>
       )}
     </div>

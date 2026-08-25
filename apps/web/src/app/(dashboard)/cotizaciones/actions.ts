@@ -138,7 +138,7 @@ export async function postponeFollowUpAction(id: string, days: number): Promise<
   }
 }
 
-/** DELETE /quotes/:id — solo DRAFT (409 del backend si no lo está). */
+/** DELETE /quotes/:id — cualquier estado, SOLO ADMIN (RBAC en el backend). */
 export async function deleteQuoteAction(id: string): Promise<QuoteActionResult> {
   try {
     await deleteQuote(id);
