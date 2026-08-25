@@ -37,14 +37,22 @@ export function calculateBilling(components: BillingComponents): BillingResult {
 /**
  * Deriva WorkOrder.paymentStatus a partir del total congelado y lo abonado
  * hasta ahora. Se recalcula dentro de la misma transacción cada vez que se
- * registra o elimina un pago (PaymentsService) — nunca se guarda un delta,
- * siempre se deriva de la suma real de Payment para esa orden.
+ * registra o elimina un pago (PaymentsService), y también al editar la
+ * valorización de una orden cerrada (WorkOrdersService.update) — nunca se
+ * guarda un delta, siempre se deriva de la suma real de Payment para esa
+ * orden.
+ *
+ * PAID se evalúa PRIMERO (no PENDING): con total=0 y pagado=0,
+ * `paidAmount.gte(total)` es cierto (0 >= 0), así que una orden dejada en
+ * cero (ej. se condona el cobro) queda PAID y desaparece sola de cobros
+ * pendientes — si PENDING fuera el primer chequeo, "pagado <= 0" ganaría
+ * y una orden en $0 se quedaría colgada como pendiente para siempre.
  */
 export function derivePaymentStatus(
   total: Prisma.Decimal,
   paidAmount: Prisma.Decimal,
 ): PaymentStatus {
-  if (paidAmount.lte(0)) return PaymentStatus.PENDING;
   if (paidAmount.gte(total)) return PaymentStatus.PAID;
+  if (paidAmount.lte(0)) return PaymentStatus.PENDING;
   return PaymentStatus.PARTIAL;
 }

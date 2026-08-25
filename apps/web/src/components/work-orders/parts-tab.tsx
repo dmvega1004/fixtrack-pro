@@ -18,6 +18,8 @@ interface PartsTabProps {
   /** true si status es COMPLETED o DELIVERED — condición para admitir pagos. */
   isClosed: boolean;
   payments: Payment[];
+  /** Consecutivo de la cuenta de cobro emitida sobre esta orden; null hasta que se genera. */
+  collectionNumber: number | null;
 }
 
 export function PartsTab({
@@ -29,6 +31,7 @@ export function PartsTab({
   isAdmin,
   isClosed,
   payments,
+  collectionNumber,
 }: PartsTabProps) {
   const { items, totalSale, totalCost, billing, directCostAmount, directCostDescription } =
     summary;
@@ -156,6 +159,7 @@ export function PartsTab({
         currency={currency}
         isAdmin={isAdmin}
         isTerminal={isTerminal}
+        collectionNumber={collectionNumber}
       />
 
       {isAdmin && directCostAmount !== undefined && (

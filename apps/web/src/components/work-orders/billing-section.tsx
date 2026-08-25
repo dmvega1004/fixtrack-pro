@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatCurrency } from "@/lib/format/currency";
 import { formatDate } from "@/lib/format/dates";
+import { formatCollectionNumber } from "@/lib/format/collection-number";
 import type { WorkOrderBilling } from "@/lib/api/work-order-parts";
 import { saveBillingAction } from "@/app/(dashboard)/ordenes/[id]/actions";
 import { BilledAtEditor } from "./billed-at-editor";
@@ -20,6 +21,8 @@ interface BillingSectionProps {
   currency: string;
   isAdmin: boolean;
   isTerminal: boolean;
+  /** Consecutivo de la cuenta de cobro emitida sobre esta orden; null hasta que se genera. */
+  collectionNumber: number | null;
 }
 
 interface BillingFormState {
@@ -49,9 +52,12 @@ function Row({ label, value }: { label: string; value: string }) {
 
 /**
  * Cierre económico de la orden (pestaña «Valores»). Editable solo por
- * ADMIN, y solo mientras la orden sigue abierta y no congelada — una vez
- * congelada (billing.isFrozen) se muestra siempre en modo lectura con la
- * nota de cierre, sin importar el rol.
+ * ADMIN: mientras la orden sigue abierta y sin congelar (flujo normal), o
+ * ya congelada (billing.isFrozen) — un ADMIN puede corregir una orden
+ * cerrada (ej. condonar una visita de diagnóstico). Solo queda sin editar
+ * si terminó (DELIVERED/CANCELLED) SIN haber llegado a congelarse, caso en
+ * el que no hay nada que corregir. Coordinador y técnico nunca editan,
+ * pase lo que pase con el estado — el backend replica el mismo candado.
  */
 export function BillingSection({
   orderId,
@@ -60,12 +66,13 @@ export function BillingSection({
   currency,
   isAdmin,
   isTerminal,
+  collectionNumber,
 }: BillingSectionProps) {
   const router = useRouter();
   const [form, setForm] = useState<BillingFormState>(() => toFormState(billing));
   const [isSaving, setIsSaving] = useState(false);
 
-  const canEdit = isAdmin && !isTerminal && !billing.isFrozen;
+  const canEdit = isAdmin && (billing.isFrozen || !isTerminal);
 
   function updateField(field: keyof BillingFormState) {
     return (event: ChangeEvent<HTMLInputElement>) => {
@@ -133,6 +140,14 @@ export function BillingSection({
 
       {billing.isFrozen && billing.billedAt && isAdmin && (
         <BilledAtEditor orderId={orderId} billedAt={billing.billedAt} />
+      )}
+
+      {canEdit && collectionNumber !== null && (
+        <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          Esta orden tiene la cuenta de cobro {formatCollectionNumber(collectionNumber)}{" "}
+          emitida. Si cambias los valores, el documento que tiene el cliente
+          dejará de coincidir con el sistema.
+        </p>
       )}
 
       {canEdit ? (

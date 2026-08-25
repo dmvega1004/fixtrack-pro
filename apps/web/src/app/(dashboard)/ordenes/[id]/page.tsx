@@ -147,6 +147,7 @@ export default async function OrdenDetallePage({
             isAdmin={isAdmin}
             isClosed={isClosed}
             payments={payments}
+            collectionNumber={order.collectionNumber}
           />
         }
         fotos={

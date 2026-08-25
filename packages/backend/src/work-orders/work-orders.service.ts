@@ -34,7 +34,7 @@ import {
 import { EquipmentsService } from '../equipments/equipments.service';
 import { PrismaService } from '../prisma.service';
 import { QuotesService } from '../quotes/quotes.service';
-import { calculateBilling } from './billing.util';
+import { calculateBilling, derivePaymentStatus } from './billing.util';
 import { CreateWorkOrderDto } from './dto/create-work-order.dto';
 import { UpdateWorkOrderDto } from './dto/update-work-order.dto';
 
@@ -695,6 +695,216 @@ export class WorkOrdersService {
       throw new ConflictException(
         'directCostAmount/directCostDescription deben enviarse solos, sin combinar con otros campos',
       );
+    }
+
+    // Valorización de una orden YA CERRADA (totalAmount congelado): un ADMIN
+    // puede corregir mano de obra/cargos adicionales/descuento incluso
+    // después del cierre (ej. condonar la visita de diagnóstico de una
+    // orden ya entregada) — de otro modo queda bloqueado por el candado de
+    // estado terminal más abajo. Mismo patrón "solo, sin combinar" que
+    // billedAt/directCost arriba: así esta excepción no se reconcilia con
+    // el resto del método (RBAC de técnico/coordinador, congelamiento al
+    // completar, etc.). Si la orden TODAVÍA no está cerrada (totalAmount
+    // null), estos mismos campos siguen su camino normal más abajo.
+    const isBillingOnlyEdit =
+      (dto.laborAmount !== undefined ||
+        dto.additionalAmount !== undefined ||
+        dto.additionalDescription !== undefined ||
+        dto.discountAmount !== undefined) &&
+      Object.entries(dto).every(
+        ([key, value]) =>
+          key === 'laborAmount' ||
+          key === 'additionalAmount' ||
+          key === 'additionalDescription' ||
+          key === 'discountAmount' ||
+          value === undefined,
+      );
+
+    if (isBillingOnlyEdit && workOrder.totalAmount !== null) {
+      if (user.role !== Role.ADMIN) {
+        throw new ForbiddenException(
+          'Solo un ADMIN puede modificar la valorización de una orden cerrada',
+        );
+      }
+
+      const company = await this.prisma.company.findUniqueOrThrow({
+        where: { id: user.companyId },
+        select: { currency: true },
+      });
+
+      const parts = await this.prisma.workOrderPart.findMany({
+        where: { workOrderId: id, companyId: user.companyId },
+        select: { unitPrice: true, quantity: true },
+      });
+      const partsTotal = parts.reduce(
+        (acc, p) => acc.add(p.unitPrice.mul(p.quantity)),
+        new Prisma.Decimal(0),
+      );
+
+      const newLaborAmount =
+        dto.laborAmount !== undefined
+          ? new Prisma.Decimal(dto.laborAmount)
+          : workOrder.laborAmount;
+      const newAdditionalAmount =
+        dto.additionalAmount !== undefined
+          ? new Prisma.Decimal(dto.additionalAmount)
+          : workOrder.additionalAmount;
+      const newDiscountAmount =
+        dto.discountAmount !== undefined
+          ? new Prisma.Decimal(dto.discountAmount)
+          : workOrder.discountAmount;
+
+      // IVA CONGELADO de esta orden (taxRateApplied), NUNCA el vigente de
+      // la empresa: editar un cierre económico viejo no puede heredar el
+      // IVA de hoy solo porque la tarifa de la empresa cambió después.
+      const { total: newTotal } = calculateBilling({
+        laborAmount: newLaborAmount,
+        partsTotal,
+        additionalAmount: newAdditionalAmount,
+        discountAmount: newDiscountAmount,
+        taxRate: workOrder.taxRateApplied!,
+      });
+
+      const paidAgg = await this.prisma.payment.aggregate({
+        where: { workOrderId: id, companyId: user.companyId }, // candado
+        _sum: { amount: true },
+      });
+      const paidAmount = paidAgg._sum.amount ?? new Prisma.Decimal(0);
+
+      // Un saldo negativo no significa nada y descuadra la cartera: si el
+      // nuevo total queda por debajo de lo ya abonado, hay que corregir los
+      // pagos primero (eliminarlos o ajustarlos), no forzar el total.
+      if (newTotal.lessThan(paidAmount)) {
+        throw new ConflictException(
+          `El nuevo total (${formatActivityCurrency(newTotal, company.currency)}) no puede quedar por debajo de lo ya abonado (${formatActivityCurrency(paidAmount, company.currency)}). Corrige primero los pagos registrados.`,
+        );
+      }
+
+      const newPaymentStatus = derivePaymentStatus(newTotal, paidAmount);
+      const actorName = activityAuthorName(user);
+
+      const updated = await this.prisma.$transaction(async (tx) => {
+        const result = await tx.workOrder.update({
+          where: { id },
+          data: {
+            laborAmount: dto.laborAmount,
+            additionalAmount: dto.additionalAmount,
+            additionalDescription: dto.additionalDescription?.trim(),
+            discountAmount: dto.discountAmount,
+            totalAmount: newTotal,
+            paymentStatus: newPaymentStatus,
+          },
+          include: WORK_ORDER_INCLUDE,
+        });
+
+        // Un evento POR CAMPO, igual que la valorización de una orden
+        // abierta más abajo — recordFieldChange no escribe si no cambió.
+        await this.activityService.recordFieldChange(
+          {
+            companyId: user.companyId,
+            workOrderId: id,
+            userId: user.userId,
+            userName: actorName,
+            action: ActivityAction.BILLING_UPDATED,
+            field: 'Mano de obra (orden cerrada)',
+            oldValue: formatActivityCurrency(
+              workOrder.laborAmount,
+              company.currency,
+            ),
+            newValue: formatActivityCurrency(
+              result.laborAmount,
+              company.currency,
+            ),
+            isFinancial: true,
+          },
+          tx,
+        );
+
+        await this.activityService.recordFieldChange(
+          {
+            companyId: user.companyId,
+            workOrderId: id,
+            userId: user.userId,
+            userName: actorName,
+            action: ActivityAction.BILLING_UPDATED,
+            field: 'Cargos adicionales (orden cerrada)',
+            oldValue: formatActivityCurrency(
+              workOrder.additionalAmount,
+              company.currency,
+            ),
+            newValue: formatActivityCurrency(
+              result.additionalAmount,
+              company.currency,
+            ),
+            isFinancial: true,
+          },
+          tx,
+        );
+
+        await this.activityService.recordFieldChange(
+          {
+            companyId: user.companyId,
+            workOrderId: id,
+            userId: user.userId,
+            userName: actorName,
+            action: ActivityAction.BILLING_UPDATED,
+            field: 'Descripción de cargos adicionales (orden cerrada)',
+            oldValue: workOrder.additionalDescription,
+            newValue: result.additionalDescription,
+            isFinancial: true,
+          },
+          tx,
+        );
+
+        await this.activityService.recordFieldChange(
+          {
+            companyId: user.companyId,
+            workOrderId: id,
+            userId: user.userId,
+            userName: actorName,
+            action: ActivityAction.BILLING_UPDATED,
+            field: 'Descuento (orden cerrada)',
+            oldValue: formatActivityCurrency(
+              workOrder.discountAmount,
+              company.currency,
+            ),
+            newValue: formatActivityCurrency(
+              result.discountAmount,
+              company.currency,
+            ),
+            isFinancial: true,
+          },
+          tx,
+        );
+
+        // Total: consecuencia de los campos de arriba, no un campo que el
+        // usuario haya tocado directamente — pero es el número que de
+        // verdad le importa a Cobros, así que queda su propio evento.
+        await this.activityService.recordFieldChange(
+          {
+            companyId: user.companyId,
+            workOrderId: id,
+            userId: user.userId,
+            userName: actorName,
+            action: ActivityAction.BILLING_UPDATED,
+            field: 'Total a cobrar (orden cerrada)',
+            oldValue: formatActivityCurrency(
+              workOrder.totalAmount!,
+              company.currency,
+            ),
+            newValue: formatActivityCurrency(
+              result.totalAmount!,
+              company.currency,
+            ),
+            isFinancial: true,
+          },
+          tx,
+        );
+
+        return result;
+      });
+
+      return this.toView(updated, user.role);
     }
 
     // Una orden entregada o cancelada queda sellada para todos

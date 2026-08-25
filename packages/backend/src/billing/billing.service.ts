@@ -290,34 +290,40 @@ export class BillingService {
 
     const now = Date.now();
 
-    return orders.map((order) => {
-      const paid = order.payments.reduce(
-        (acc, payment) => acc.add(payment.amount),
-        new Prisma.Decimal(0),
-      );
-      const balance = order.totalAmount!.sub(paid);
-      const daysSinceBilled = Math.floor(
-        (now - order.billedAt!.getTime()) / DAY_MS,
-      );
-      const isOverdue = daysSinceBilled > order.client.paymentTermDays;
+    // El .filter() final es una red adicional: con paymentStatus ya
+    // filtrado arriba (PENDING/PARTIAL) esto no debería descartar nada,
+    // pero una orden con saldo en $0 (o negativo, por algún caso borde) no
+    // tiene nada que cobrar y no debe quedar colgada en la cartera.
+    return orders
+      .map((order) => {
+        const paid = order.payments.reduce(
+          (acc, payment) => acc.add(payment.amount),
+          new Prisma.Decimal(0),
+        );
+        const balance = order.totalAmount!.sub(paid);
+        const daysSinceBilled = Math.floor(
+          (now - order.billedAt!.getTime()) / DAY_MS,
+        );
+        const isOverdue = daysSinceBilled > order.client.paymentTermDays;
 
-      return {
-        orderId: order.id,
-        orderNumber: order.orderNumber,
-        collectionNumber: order.collectionNumber,
-        clientId: order.client.id,
-        clientName: order.client.name,
-        description: order.description,
-        total: order.totalAmount!.toFixed(2),
-        paid: paid.toFixed(2),
-        balance: balance.toFixed(2),
-        billedAt: order.billedAt!.toISOString(),
-        daysSinceBilled,
-        paymentTermDays: order.client.paymentTermDays,
-        isOverdue,
-        paymentStatus: order.paymentStatus,
-      };
-    });
+        return {
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          collectionNumber: order.collectionNumber,
+          clientId: order.client.id,
+          clientName: order.client.name,
+          description: order.description,
+          total: order.totalAmount!.toFixed(2),
+          paid: paid.toFixed(2),
+          balance: balance.toFixed(2),
+          billedAt: order.billedAt!.toISOString(),
+          daysSinceBilled,
+          paymentTermDays: order.client.paymentTermDays,
+          isOverdue,
+          paymentStatus: order.paymentStatus,
+        };
+      })
+      .filter((receivable) => Number(receivable.balance) > 0);
   }
 
   /** GET /billing/by-client — saldo agregado por cliente, de mayor a menor. */
