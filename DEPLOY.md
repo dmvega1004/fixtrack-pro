@@ -39,10 +39,70 @@ Copia los nombres de `packages/backend/.env.example` y complétalos con valores 
 | `JWT_EXPIRES_IN` | Opcional, default `8h` |
 | `FRONTEND_URL` | **Provisional al desplegar backend** — ver paso 3 |
 | `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | Cuenta de Cloudinary |
+| `PROVISIONING_KEY` | Habilita `POST /auth/register` — ver "Alta de una empresa nueva" más abajo |
 
 `PORT` **no** se configura manualmente: Railway la inyecta automáticamente y `main.ts` ya la lee de `process.env.PORT`.
 
 Railway provee HTTPS automático en el dominio `*.up.railway.app` (o el dominio custom que configures) — no requiere configuración adicional.
+
+---
+
+## Alta de una empresa nueva
+
+`POST /auth/register` crea una `Company` (tenant) junto con su primer
+usuario ADMIN. No hay pantalla de registro en el frontend — es un
+procedimiento manual del operador de la plataforma, protegido por una
+clave de aprovisionamiento en vez de quedar abierto al público.
+
+### Configurar `PROVISIONING_KEY`
+
+Se configura como cualquier otra variable de entorno del backend, en
+Railway → Settings → Variables (ver tabla arriba). Genera el valor con:
+
+```
+openssl rand -base64 48
+```
+
+Sin esta variable configurada, el endpoint responde 403 siempre, sin
+importar qué se envíe — no existe un modo "sin protección" para este
+endpoint (ver `ProvisioningKeyGuard`).
+
+⚠️ **Trata `PROVISIONING_KEY` como una contraseña**: no se comparte por
+chat ni correo, no se pega en ningún mensaje, y no entra a Git bajo
+ningún concepto (ni en un commit de ejemplo, ni en un `.env` versionado).
+Compártela solo por un canal seguro (gestor de contraseñas del equipo) y
+rótala si sospechas que se filtró.
+
+### Dar de alta una empresa
+
+```
+curl -X POST https://<URL_DEL_BACKEND>/auth/register \
+  -H "Content-Type: application/json" \
+  -H "x-provisioning-key: <PROVISIONING_KEY>" \
+  -d '{
+    "companyName": "<NOMBRE_DE_LA_EMPRESA>",
+    "name": "<NOMBRE_DEL_ADMINISTRADOR>",
+    "email": "<CORREO_DEL_ADMINISTRADOR>",
+    "password": "<CONTRASEÑA_TEMPORAL>"
+  }'
+```
+
+La respuesta trae solo los datos del alta (id y nombre de la empresa,
+nombre y correo del administrador) — **nunca** un token de sesión: quien
+ejecuta este comando es el operador de la plataforma, no el
+administrador de la empresa recién creada, y no tiene por qué quedar con
+una sesión abierta dentro de los datos del cliente. El administrador
+inicia sesión normalmente después, con el correo y la contraseña que le
+compartas por un canal seguro.
+
+Límite: 3 intentos por hora por IP (más estricto que el de login).
+Pasado ese límite, el endpoint responde 429 hasta que se cumpla la hora.
+
+Este comando es solo el primer paso técnico (crear el tenant y su
+Admin). El procedimiento completo de activación de un cliente nuevo —
+configuración de "Mi empresa", alta de personal, carga de inventario y
+acompañamiento — está en la **Parte III del documento de infraestructura**
+(gestión interna del equipo, fuera de este repositorio).
 
 ---
 
@@ -101,4 +161,4 @@ completo o por tabla) en `packages/database/README.md`.
 
 - **Cookie de sesión**: la cookie `fixtrack_session` la emite el propio Next.js (Route Handler `apps/web/src/app/api/auth/login/route.ts`), es `httpOnly`, `sameSite: "lax"` y `secure` en producción. Nunca viaja al dominio del backend — el servidor de Next.js la lee y reenvía el JWT como header `Authorization: Bearer` (`apps/web/src/lib/api/server-fetch.ts`). Por eso **no** se necesita `sameSite: "none"` aunque backend y frontend vivan en dominios distintos: la cookie es de un solo dominio (el de Vercel).
 - **Imágenes de Cloudinary**: se muestran con `<img>` plano (fotos de OT, logo del tenant), no con `next/image`. El único uso de `next/image` es un asset local estático (`/brand/logo-sm.png`). Por eso `next.config.ts` no necesita `remotePatterns` hoy — si en el futuro se migra alguna imagen de Cloudinary a `next/image`, habrá que agregar el patrón remoto ahí.
-- **Rate limiting**: `POST /auth/login` está limitado a 5 intentos por minuto por IP (`@nestjs/throttler`, aplicado solo a esa ruta, no globalmente).
+- **Rate limiting**: `POST /auth/login` está limitado a 5 intentos por minuto por IP; `POST /auth/register` a 3 intentos por hora por IP (`@nestjs/throttler`, aplicado solo a esas rutas, no globalmente).
