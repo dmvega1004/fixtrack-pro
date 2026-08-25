@@ -8,7 +8,11 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
-import { AuthResponse, AuthService } from './auth.service';
+import {
+  AuthResponse,
+  AuthService,
+  RegisterCompanyResponse,
+} from './auth.service';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
 import { LoginDto } from './dto/login.dto';
@@ -38,7 +42,7 @@ export class AuthController {
   @UseGuards(ThrottlerGuard, ProvisioningKeyGuard)
   @Throttle({ default: { limit: 3, ttl: 3_600_000 } })
   @Post('register')
-  register(@Body() dto: RegisterDto): Promise<AuthResponse> {
+  register(@Body() dto: RegisterDto): Promise<RegisterCompanyResponse> {
     return this.authService.register(dto);
   }
 
