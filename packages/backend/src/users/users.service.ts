@@ -55,6 +55,9 @@ export class UsersService {
           password: passwordHash,
           role: dto.role,
           companyId: user.companyId, // candado: el empleado nace en MI empresa
+          // La contraseña temporal la definió el ADMIN que invita, no el
+          // empleado — debe cambiarla antes de poder usar el sistema.
+          mustChangePassword: true,
         },
         select: PUBLIC_USER_SELECT,
       });
@@ -119,12 +122,22 @@ export class UsersService {
       ? await bcrypt.hash(dto.password, BCRYPT_SALT_ROUNDS)
       : undefined;
 
+    // Restablecimiento por un tercero: el ADMIN (id !== user.userId) le
+    // define una contraseña nueva a otro usuario, así que ese usuario
+    // debe cambiarla antes de poder seguir usando el sistema — mismo
+    // razonamiento que crear el usuario. NUNCA se limpia acá (solo
+    // AuthService.changePassword la limpia): este es justamente el caso
+    // que debe volver a activarla, aunque ya estuviera en true.
+    const mustChangePassword =
+      dto.password && id !== user.userId ? true : undefined;
+
     return this.prisma.user.update({
       where: { id },
       data: {
         name: dto.name?.trim(),
         role: dto.role,
         password: passwordHash,
+        mustChangePassword,
       },
       select: PUBLIC_USER_SELECT,
     });

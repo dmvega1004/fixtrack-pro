@@ -16,6 +16,7 @@ import {
 } from './auth.service';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
+import { SkipPasswordCheck } from './decorators/skip-password-check.decorator';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -62,7 +63,14 @@ export class AuthController {
     return this.authService.login(dto);
   }
 
-  /** GET /auth/me — ruta protegida de prueba: devuelve el usuario del token */
+  /**
+   * GET /auth/me — devuelve el usuario del token, incluido
+   * mustChangePassword: el frontend lo usa para saber si debe redirigir
+   * a la pantalla de cambio obligatorio. @SkipPasswordCheck() porque esa
+   * misma pantalla necesita poder llamarlo — si MustChangePasswordGuard
+   * lo bloqueara, no habría forma de saber por qué está bloqueado.
+   */
+  @SkipPasswordCheck()
   @Get('me')
   getProfile(@CurrentUser() user: AuthenticatedUser): AuthenticatedUser {
     return user;
@@ -75,10 +83,16 @@ export class AuthController {
    * GET /auth/me). ChangePasswordDto no acepta ningún identificador de
    * usuario: `user` sale siempre del token, nunca del body.
    *
+   * @SkipPasswordCheck(): es la ÚNICA salida que tiene un usuario con
+   * mustChangePassword=true. Si este endpoint quedara bloqueado por
+   * MustChangePasswordGuard, el usuario quedaría encerrado sin ninguna
+   * forma de salir — solo arreglable desde la base de datos.
+   *
    * Rate-limitado igual de estricto que login (5 intentos por minuto por
    * IP): sin esto, este endpoint sería una forma cómoda de adivinar la
    * contraseña actual de una sesión robada.
    */
+  @SkipPasswordCheck()
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @HttpCode(HttpStatus.NO_CONTENT)

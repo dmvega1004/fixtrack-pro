@@ -22,6 +22,11 @@ export interface JwtPayload {
  * Incluye el companyId: el candado Multi-Tenant que TODA consulta debe usar.
  * `name` se lee fresco de la BD en cada request (ver JwtStrategy.validate) —
  * a diferencia del `name` del JwtPayload, nunca queda desactualizado.
+ *
+ * `mustChangePassword` también se lee fresco en cada request (no viaja en
+ * el JwtPayload firmado): MustChangePasswordGuard lo usa para bloquear al
+ * usuario, y ese estado puede cambiar sin que se emita un token nuevo (ej.
+ * un ADMIN le restablece la contraseña mientras la sesión sigue viva).
  */
 export interface AuthenticatedUser {
   userId: string;
@@ -29,4 +34,5 @@ export interface AuthenticatedUser {
   name: string;
   role: Role;
   companyId: string;
+  mustChangePassword: boolean;
 }

@@ -89,6 +89,10 @@ export class AuthService {
           password: passwordHash,
           role: Role.ADMIN,
           companyId: company.id,
+          // La contraseña la definió el operador de la plataforma, no el
+          // Admin de la empresa — debe cambiarla antes de poder usar el
+          // sistema (ver MustChangePasswordGuard).
+          mustChangePassword: true,
         },
         select: { name: true, email: true },
       });
@@ -177,9 +181,14 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(dto.newPassword, BCRYPT_SALT_ROUNDS);
 
+    // Único lugar donde mustChangePassword se limpia: el usuario acaba de
+    // probar que conoce la contraseña asignada por un tercero Y definió
+    // una propia. Si un ADMIN es quien cambia la contraseña de otro
+    // (UsersService.update), la marca se ACTIVA en vez de limpiarse — ver
+    // ese servicio.
     await this.prisma.user.update({
       where: { id: user.userId },
-      data: { password: passwordHash },
+      data: { password: passwordHash, mustChangePassword: false },
     });
   }
 

@@ -6,6 +6,7 @@ import { AppService } from './app.service';
 import { AttachmentsModule } from './attachments/attachments.module';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
+import { MustChangePasswordGuard } from './auth/guards/must-change-password.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { BillingModule } from './billing/billing.module';
 import { ClientsModule } from './clients/clients.module';
@@ -44,9 +45,12 @@ import { WorkOrdersModule } from './work-orders/work-orders.module';
   controllers: [AppController],
   providers: [
     AppService,
-    // Guards GLOBALES: el orden importa — primero autentica (JWT),
-    // luego autoriza (RBAC). Todo endpoint queda protegido por defecto.
+    // Guards GLOBALES: el orden importa — primero autentica (JWT), luego
+    // bloquea a quien deba cambiar su contraseña (antes de cualquier
+    // chequeo de rol: ese estado es más fundamental que el RBAC), luego
+    // autoriza (RBAC). Todo endpoint queda protegido por defecto.
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: MustChangePasswordGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
   ],
 })
