@@ -160,29 +160,33 @@ model Company {
 }
 
 model User {
-  id            String        @id @default(uuid())
-  email         String        @unique
-  password      String
-  name          String
-  role          Role          @default(TECHNICIAN)
-  companyId     String
-  company       Company       @relation(fields: [companyId], references: [id])
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  workOrders    WorkOrder[]
+  id                 String        @id @default(uuid())
+  email              String        @unique
+  password           String
+  name               String
+  role               Role          @default(TECHNICIAN)
+  /// true = la contraseña actual fue asignada por un tercero (alta de
+  /// empresa o restablecimiento por un administrador) y el usuario debe
+  /// cambiarla antes de poder usar el sistema.
+  mustChangePassword Boolean       @default(false)
+  companyId          String
+  company            Company       @relation(fields: [companyId], references: [id])
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  workOrders         WorkOrder[]
   /// Fotos que este usuario subió a órdenes; sobrevive a su eliminación
   /// (uploadedById queda en null, la foto y su orden no se tocan).
-  attachments   Attachment[]
+  attachments        Attachment[]
   /// Pagos que este usuario registró; sobrevive a su eliminación
   /// (registeredById queda en null, el pago no se toca).
-  payments      Payment[]
+  payments           Payment[]
   /// Eventos de bitácora de los que este usuario fue autor; sobrevive a su
   /// eliminación (userId queda en null, ActivityLog.userName conserva el
   /// nombre como snapshot).
-  activityLogs  ActivityLog[]
+  activityLogs       ActivityLog[]
   /// Cotizaciones que este usuario creó; sobrevive a su eliminación
   /// (createdById queda en null, la cotización no se toca).
-  quotesCreated Quote[]
+  quotesCreated      Quote[]
 
   @@index([companyId])
 }
