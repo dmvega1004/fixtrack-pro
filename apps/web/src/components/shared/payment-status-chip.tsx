@@ -1,9 +1,14 @@
 import { cn } from "@/lib/utils";
 import type { PaymentStatus } from "@/lib/api/work-orders";
 
+/**
+ * Con el prefijo "Pago" adelante (salvo el último, que ya es inequívoco):
+ * este chip suele mostrarse junto al StatusChip del trabajo, y ambos pueden
+ * decir "Pendiente" — sin el prefijo no hay forma de saber cuál es cuál.
+ */
 export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
-  PENDING: "Pendiente",
-  PARTIAL: "Parcial",
+  PENDING: "Pago pendiente",
+  PARTIAL: "Pago abonado",
   PAID: "Pagado",
 };
 

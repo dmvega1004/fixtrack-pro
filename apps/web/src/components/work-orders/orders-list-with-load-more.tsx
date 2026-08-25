@@ -12,7 +12,7 @@ interface OrdersListWithLoadMoreProps {
   initialOrders: WorkOrder[];
   /** Total real (GET /work-orders/count), independiente de cuántas se hayan cargado. */
   total: number;
-  filters: Pick<WorkOrderFilters, "status" | "priority" | "search">;
+  filters: Pick<WorkOrderFilters, "status" | "priority" | "search" | "equipmentId">;
 }
 
 /** Listado de /ordenes con "Cargar más" (paginación take/skip del backend). */

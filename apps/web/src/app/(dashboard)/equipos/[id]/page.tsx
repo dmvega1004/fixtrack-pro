@@ -12,8 +12,7 @@ import { EquipmentStatusBadge } from "@/components/equipment/equipment-status-ba
 import { MaintenancePlanSection } from "@/components/equipment/maintenance-plan-section";
 import { QrCodeImage } from "@/components/equipment/qr-code-image";
 import { DeleteEquipmentButton } from "@/components/equipment/delete-equipment-button";
-import { StatusChip } from "@/components/shared/status-chip";
-import { formatOrderNumber } from "@/lib/format/order-number";
+import { OrderHistorySection } from "@/components/shared/order-history-section";
 import { formatDate } from "@/lib/format/dates";
 
 interface EquipoDetallePageProps {
@@ -154,35 +153,14 @@ export default async function EquipoDetallePage({
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Historial de órdenes</CardTitle>
-        </CardHeader>
         <CardContent>
-          {history.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Este equipo no tiene órdenes de trabajo registradas.
-            </p>
-          ) : (
-            <div className="flex flex-col divide-y divide-border">
-              {history.map((order) => (
-                <Link
-                  key={order.id}
-                  href={`/ordenes/${order.id}`}
-                  className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0 hover:bg-muted/50"
-                >
-                  <span className="font-medium">
-                    {formatOrderNumber(order.orderNumber)}
-                  </span>
-                  <span className="flex items-center gap-3">
-                    <StatusChip status={order.status} />
-                    <span className="text-xs text-muted-foreground">
-                      {formatDate(order.createdAt)}
-                    </span>
-                  </span>
-                </Link>
-              ))}
-            </div>
-          )}
+          <OrderHistorySection
+            orders={history}
+            isAdmin={isAdmin}
+            emptyMessage="Este equipo no tiene órdenes de trabajo registradas."
+            viewAllHref={`/ordenes?equipmentId=${equipment.id}`}
+            viewAllLabel={`Ver las ${history.length} órdenes de este equipo`}
+          />
         </CardContent>
       </Card>
 

@@ -31,6 +31,7 @@ interface OrdenesPageProps {
     priority?: string;
     unassigned?: string;
     q?: string;
+    equipmentId?: string;
   }>;
 }
 
@@ -42,12 +43,17 @@ export default async function OrdenesPage({ searchParams }: OrdenesPageProps) {
   // Sin soporte en el backend para filtrar por "sin asignar": se aplica acá
   // igual que priority, después del fetch. Enlazado desde el KPI de la home.
   const unassignedOnly = params.unassigned === "true";
+  // Enlazado desde "Ver todas las órdenes de este equipo" (ficha de equipo,
+  // vista móvil del historial) — filtro exacto por id, no por el buscador
+  // de texto (que no cubre marca/modelo/serial).
+  const equipmentId = params.equipmentId?.trim() || undefined;
 
-  // Enlace de "Limpiar búsqueda": conserva status/priority/unassigned, quita `q`.
+  // Enlace de "Limpiar búsqueda": conserva status/priority/unassigned/equipmentId, quita `q`.
   const clearSearchParams = new URLSearchParams();
   if (params.status) clearSearchParams.set("status", params.status);
   if (params.priority) clearSearchParams.set("priority", params.priority);
   if (params.unassigned) clearSearchParams.set("unassigned", params.unassigned);
+  if (equipmentId) clearSearchParams.set("equipmentId", equipmentId);
   const clearSearchQuery = clearSearchParams.toString();
   const clearSearchHref = clearSearchQuery
     ? `/ordenes?${clearSearchQuery}`
@@ -61,14 +67,14 @@ export default async function OrdenesPage({ searchParams }: OrdenesPageProps) {
   let workOrders;
   let total: number;
   if (unassignedOnly) {
-    workOrders = (await getWorkOrders({ status, priority, search })).filter(
-      (order) => order.user === null,
-    );
+    workOrders = (
+      await getWorkOrders({ status, priority, search, equipmentId })
+    ).filter((order) => order.user === null);
     total = workOrders.length;
   } else {
     [workOrders, total] = await Promise.all([
-      getWorkOrders({ status, priority, search, take: ORDERS_PAGE_SIZE, skip: 0 }),
-      getWorkOrdersCount({ status, priority, search }),
+      getWorkOrders({ status, priority, search, equipmentId, take: ORDERS_PAGE_SIZE, skip: 0 }),
+      getWorkOrdersCount({ status, priority, search, equipmentId }),
     ]);
   }
 
@@ -99,6 +105,15 @@ export default async function OrdenesPage({ searchParams }: OrdenesPageProps) {
         </p>
       )}
 
+      {equipmentId && (
+        <p className="text-sm text-muted-foreground">
+          Mostrando solo órdenes de este equipo ·{" "}
+          <Link href="/ordenes" className="font-medium text-primary">
+            Quitar filtro
+          </Link>
+        </p>
+      )}
+
       <OrdersSearchInput key={search ?? ""} initialValue={search ?? ""} />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -123,10 +138,10 @@ export default async function OrdenesPage({ searchParams }: OrdenesPageProps) {
           // Nueva combinación de filtros (incluida la búsqueda): remonta el
           // componente para que su paginación acumulada arranque de cero,
           // en vez de arrastrar `orders` de la búsqueda/filtro anterior.
-          key={`${status ?? ""}|${priority ?? ""}|${search ?? ""}`}
+          key={`${status ?? ""}|${priority ?? ""}|${search ?? ""}|${equipmentId ?? ""}`}
           initialOrders={workOrders}
           total={total}
-          filters={{ status, priority, search }}
+          filters={{ status, priority, search, equipmentId }}
         />
       )}
     </div>

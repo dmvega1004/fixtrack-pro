@@ -5,7 +5,7 @@ import { ORDERS_PAGE_SIZE } from "@/lib/work-orders-pagination";
 
 /** Server Action: siguiente página de /ordenes con los mismos filtros activos. */
 export async function loadMoreWorkOrders(
-  filters: Pick<WorkOrderFilters, "status" | "priority" | "search">,
+  filters: Pick<WorkOrderFilters, "status" | "priority" | "search" | "equipmentId">,
   skip: number,
 ): Promise<WorkOrder[]> {
   return getWorkOrders({ ...filters, take: ORDERS_PAGE_SIZE, skip });
