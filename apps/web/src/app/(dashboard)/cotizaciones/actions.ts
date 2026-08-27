@@ -47,6 +47,7 @@ export async function createQuoteAction(input: CreateQuoteFormInput): Promise<Qu
     }
 
     const { client: _client, ...rest } = input;
+    void _client;
     const quote = await createQuote({ ...rest, clientId });
 
     revalidatePath("/cotizaciones");

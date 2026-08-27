@@ -70,7 +70,7 @@ async function fetchOnce(
 
   try {
     return await fetch(url, { ...init, signal: controller.signal });
-  } catch (error) {
+  } catch {
     if (controller.signal.aborted) {
       throw new TimeoutError();
     }
