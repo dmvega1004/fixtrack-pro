@@ -1,8 +1,5 @@
 import { getSession } from "@/lib/session";
-
-function Bone({ className = "" }: { className?: string }) {
-  return <div className={`animate-pulse rounded-lg bg-muted ${className}`} />;
-}
+import { Skeleton as Bone } from "@/components/ui/skeleton";
 
 function AdminSkeleton() {
   return (
