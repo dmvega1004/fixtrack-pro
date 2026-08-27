@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { HttpError } from "@/lib/api/http";
+import { toFriendlyActionMessage } from "@/lib/api/http";
 import {
   createSparePart,
   updateSparePart,
@@ -24,8 +24,9 @@ export async function createSparePartAction(
     revalidatePath("/inventario");
     return { ok: true, id: part.id };
   } catch (error) {
-    if (error instanceof HttpError) {
-      return { ok: false, message: error.message };
+    const message = toFriendlyActionMessage(error);
+    if (message) {
+      return { ok: false, message };
     }
     throw error;
   }
@@ -41,8 +42,9 @@ export async function updateSparePartAction(
     revalidatePath(`/inventario/${id}/editar`);
     return { ok: true, id };
   } catch (error) {
-    if (error instanceof HttpError) {
-      return { ok: false, message: error.message };
+    const message = toFriendlyActionMessage(error);
+    if (message) {
+      return { ok: false, message };
     }
     throw error;
   }
@@ -56,8 +58,9 @@ export async function deleteSparePartAction(
     revalidatePath("/inventario");
     return { ok: true };
   } catch (error) {
-    if (error instanceof HttpError) {
-      return { ok: false, message: error.message };
+    const message = toFriendlyActionMessage(error);
+    if (message) {
+      return { ok: false, message };
     }
     throw error;
   }

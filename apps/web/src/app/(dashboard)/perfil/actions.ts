@@ -1,7 +1,7 @@
 "use server";
 
 import { serverFetch } from "@/lib/api/server-fetch";
-import { HttpError } from "@/lib/api/http";
+import { HttpError, toFriendlyActionMessage } from "@/lib/api/http";
 
 export interface ChangePasswordInput {
   currentPassword: string;
@@ -43,6 +43,10 @@ export async function changePasswordAction(
         message: error.message,
         isCurrentPasswordError: error.status === 401,
       };
+    }
+    const message = toFriendlyActionMessage(error);
+    if (message) {
+      return { ok: false, message };
     }
     throw error;
   }

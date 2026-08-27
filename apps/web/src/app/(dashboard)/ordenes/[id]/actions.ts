@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { serverFetch } from "@/lib/api/server-fetch";
-import { HttpError } from "@/lib/api/http";
+import { toFriendlyActionMessage } from "@/lib/api/http";
 import type { OrderStatus } from "@/components/shared/status-chip";
 import type { Priority } from "@/components/shared/priority-badge";
 import type { ServiceType } from "@/components/shared/service-type-badge";
@@ -26,8 +26,9 @@ async function runMutation(
   try {
     await fn();
   } catch (error) {
-    if (error instanceof HttpError) {
-      return { ok: false, message: error.message };
+    const message = toFriendlyActionMessage(error);
+    if (message) {
+      return { ok: false, message };
     }
     throw error;
   }
@@ -282,8 +283,9 @@ export async function generateCollectionDocumentAction(
     revalidatePath(`/ordenes/${orderId}`);
     return { ok: true, collectionNumber: order.collectionNumber ?? undefined };
   } catch (error) {
-    if (error instanceof HttpError) {
-      return { ok: false, message: error.message };
+    const message = toFriendlyActionMessage(error);
+    if (message) {
+      return { ok: false, message };
     }
     throw error;
   }
@@ -298,8 +300,9 @@ export async function deleteWorkOrderAction(orderId: string): Promise<ActionResu
   try {
     await serverFetch(`/work-orders/${orderId}`, { method: "DELETE" });
   } catch (error) {
-    if (error instanceof HttpError) {
-      return { ok: false, message: error.message };
+    const message = toFriendlyActionMessage(error);
+    if (message) {
+      return { ok: false, message };
     }
     throw error;
   }

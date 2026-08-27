@@ -1,6 +1,6 @@
 "use server";
 
-import { HttpError } from "@/lib/api/http";
+import { HttpError, toFriendlyActionMessage } from "@/lib/api/http";
 import { getEquipmentByQrCode } from "@/lib/api/equipments";
 
 export interface ResolveQrCodeResult {
@@ -29,8 +29,9 @@ export async function resolveQrCodeAction(
         message: "Este código no corresponde a ningún equipo de tu empresa",
       };
     }
-    if (error instanceof HttpError) {
-      return { ok: false, message: error.message };
+    const message = toFriendlyActionMessage(error);
+    if (message) {
+      return { ok: false, message };
     }
     throw error;
   }

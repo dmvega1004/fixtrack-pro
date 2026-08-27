@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { HttpError } from "@/lib/api/http";
+import { toFriendlyActionMessage } from "@/lib/api/http";
 import {
   createUser,
   updateUser,
@@ -24,8 +24,9 @@ export async function createEmployeeAction(
     revalidatePath("/personal");
     return { ok: true, id: employee.id };
   } catch (error) {
-    if (error instanceof HttpError) {
-      return { ok: false, message: error.message };
+    const message = toFriendlyActionMessage(error);
+    if (message) {
+      return { ok: false, message };
     }
     throw error;
   }
@@ -42,8 +43,9 @@ export async function updateEmployeeAction(
     revalidatePath(`/personal/${id}`);
     return { ok: true, id };
   } catch (error) {
-    if (error instanceof HttpError) {
-      return { ok: false, message: error.message };
+    const message = toFriendlyActionMessage(error);
+    if (message) {
+      return { ok: false, message };
     }
     throw error;
   }
@@ -59,8 +61,9 @@ export async function resetEmployeePasswordAction(
     revalidatePath(`/personal/${id}`);
     return { ok: true, id };
   } catch (error) {
-    if (error instanceof HttpError) {
-      return { ok: false, message: error.message };
+    const message = toFriendlyActionMessage(error);
+    if (message) {
+      return { ok: false, message };
     }
     throw error;
   }
@@ -73,8 +76,9 @@ export async function deleteEmployeeAction(id: string): Promise<EmployeeActionRe
     revalidatePath("/personal");
     return { ok: true };
   } catch (error) {
-    if (error instanceof HttpError) {
-      return { ok: false, message: error.message };
+    const message = toFriendlyActionMessage(error);
+    if (message) {
+      return { ok: false, message };
     }
     throw error;
   }

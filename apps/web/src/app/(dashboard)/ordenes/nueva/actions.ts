@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { serverFetch } from "@/lib/api/server-fetch";
-import { HttpError } from "@/lib/api/http";
+import { toFriendlyActionMessage } from "@/lib/api/http";
 import type { Client, DocumentType } from "@/lib/api/clients";
 import type { Equipment } from "@/lib/api/equipments";
 import type { Priority } from "@/components/shared/priority-badge";
@@ -114,8 +114,9 @@ export async function createWorkOrderChainedAction(
     revalidatePath("/ordenes");
     return { ok: true, orderId: order.id, orderNumber: order.orderNumber };
   } catch (error) {
-    if (error instanceof HttpError) {
-      return { ok: false, message: error.message };
+    const message = toFriendlyActionMessage(error);
+    if (message) {
+      return { ok: false, message };
     }
     throw error;
   }

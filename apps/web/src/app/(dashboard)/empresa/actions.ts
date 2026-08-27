@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { serverFetch } from "@/lib/api/server-fetch";
-import { HttpError } from "@/lib/api/http";
+import { toFriendlyActionMessage } from "@/lib/api/http";
 import type { UpdateCompanyInput } from "@/lib/api/company";
 
 export interface ActionResult {
@@ -23,8 +23,9 @@ export async function saveCompanyAction(
     revalidatePath("/empresa");
     return { ok: true, warning: result.collectionNumberWarning };
   } catch (error) {
-    if (error instanceof HttpError) {
-      return { ok: false, message: error.message };
+    const message = toFriendlyActionMessage(error);
+    if (message) {
+      return { ok: false, message };
     }
     throw error;
   }

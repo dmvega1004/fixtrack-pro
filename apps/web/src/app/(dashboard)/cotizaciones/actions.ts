@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { HttpError } from "@/lib/api/http";
+import { toFriendlyActionMessage } from "@/lib/api/http";
 import { createClient, type CreateClientInput, type Client } from "@/lib/api/clients";
 import {
   createQuote,
@@ -52,8 +52,9 @@ export async function createQuoteAction(input: CreateQuoteFormInput): Promise<Qu
     revalidatePath("/cotizaciones");
     return { ok: true, id: quote.id };
   } catch (error) {
-    if (error instanceof HttpError) {
-      return { ok: false, message: error.message };
+    const message = toFriendlyActionMessage(error);
+    if (message) {
+      return { ok: false, message };
     }
     throw error;
   }
@@ -70,8 +71,9 @@ export async function updateQuoteAction(
     revalidatePath(`/cotizaciones/${id}/editar`);
     return { ok: true, id };
   } catch (error) {
-    if (error instanceof HttpError) {
-      return { ok: false, message: error.message };
+    const message = toFriendlyActionMessage(error);
+    if (message) {
+      return { ok: false, message };
     }
     throw error;
   }
@@ -85,8 +87,9 @@ export async function sendQuoteAction(id: string): Promise<QuoteActionResult> {
     revalidatePath(`/cotizaciones/${id}`);
     return { ok: true, id };
   } catch (error) {
-    if (error instanceof HttpError) {
-      return { ok: false, message: error.message };
+    const message = toFriendlyActionMessage(error);
+    if (message) {
+      return { ok: false, message };
     }
     throw error;
   }
@@ -102,8 +105,9 @@ export async function decideQuoteAction(
     revalidatePath(`/cotizaciones/${id}`);
     return { ok: true, id };
   } catch (error) {
-    if (error instanceof HttpError) {
-      return { ok: false, message: error.message };
+    const message = toFriendlyActionMessage(error);
+    if (message) {
+      return { ok: false, message };
     }
     throw error;
   }
@@ -116,8 +120,9 @@ export async function duplicateQuoteAction(id: string): Promise<QuoteActionResul
     revalidatePath("/cotizaciones");
     return { ok: true, id: duplicated.id };
   } catch (error) {
-    if (error instanceof HttpError) {
-      return { ok: false, message: error.message };
+    const message = toFriendlyActionMessage(error);
+    if (message) {
+      return { ok: false, message };
     }
     throw error;
   }
@@ -131,8 +136,9 @@ export async function postponeFollowUpAction(id: string, days: number): Promise<
     revalidatePath(`/cotizaciones/${id}`);
     return { ok: true, id };
   } catch (error) {
-    if (error instanceof HttpError) {
-      return { ok: false, message: error.message };
+    const message = toFriendlyActionMessage(error);
+    if (message) {
+      return { ok: false, message };
     }
     throw error;
   }
@@ -145,8 +151,9 @@ export async function deleteQuoteAction(id: string): Promise<QuoteActionResult> 
     revalidatePath("/cotizaciones");
     return { ok: true };
   } catch (error) {
-    if (error instanceof HttpError) {
-      return { ok: false, message: error.message };
+    const message = toFriendlyActionMessage(error);
+    if (message) {
+      return { ok: false, message };
     }
     throw error;
   }

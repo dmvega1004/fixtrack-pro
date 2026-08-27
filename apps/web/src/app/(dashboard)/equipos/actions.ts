@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { HttpError } from "@/lib/api/http";
+import { toFriendlyActionMessage } from "@/lib/api/http";
 import {
   createEquipment,
   updateEquipment,
@@ -24,8 +24,9 @@ export async function createEquipmentAction(
     revalidatePath("/equipos");
     return { ok: true, id: equipment.id };
   } catch (error) {
-    if (error instanceof HttpError) {
-      return { ok: false, message: error.message };
+    const message = toFriendlyActionMessage(error);
+    if (message) {
+      return { ok: false, message };
     }
     throw error;
   }
@@ -42,8 +43,9 @@ export async function updateEquipmentAction(
     revalidatePath(`/equipos/${id}/editar`);
     return { ok: true, id };
   } catch (error) {
-    if (error instanceof HttpError) {
-      return { ok: false, message: error.message };
+    const message = toFriendlyActionMessage(error);
+    if (message) {
+      return { ok: false, message };
     }
     throw error;
   }
@@ -54,8 +56,9 @@ export async function deleteEquipmentAction(id: string): Promise<EquipmentAction
   try {
     await deleteEquipment(id);
   } catch (error) {
-    if (error instanceof HttpError) {
-      return { ok: false, message: error.message };
+    const message = toFriendlyActionMessage(error);
+    if (message) {
+      return { ok: false, message };
     }
     throw error;
   }
