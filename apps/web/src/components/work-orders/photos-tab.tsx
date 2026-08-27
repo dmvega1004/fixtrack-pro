@@ -15,6 +15,7 @@ import type { Attachment } from "@/lib/api/attachments";
 import { removePhotoAction } from "@/app/(dashboard)/ordenes/[id]/actions";
 import { compressImage } from "@/lib/image/compress-image";
 import { reportRequestFailure, reportRequestSuccess } from "@/lib/connectivity/store";
+import { cloudinaryUrl } from "@/lib/image/cloudinary-url";
 
 interface PhotosTabProps {
   orderId: string;
@@ -139,7 +140,7 @@ export function PhotosTab({
               <a href={photo.url} target="_blank" rel="noopener noreferrer">
                 {/* eslint-disable-next-line @next/next/no-img-element -- foto remota en Cloudinary, sin dominio fijo que declarar */}
                 <img
-                  src={photo.url}
+                  src={cloudinaryUrl(photo.url, "thumbnail")}
                   alt="Foto de la orden"
                   className="h-full w-full object-cover"
                 />

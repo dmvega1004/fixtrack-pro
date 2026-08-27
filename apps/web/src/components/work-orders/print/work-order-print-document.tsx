@@ -11,6 +11,7 @@ import { formatOrderNumber } from "@/lib/format/order-number";
 import { formatDate } from "@/lib/format/dates";
 import { formatCurrency } from "@/lib/format/currency";
 import { cn } from "@/lib/utils";
+import { cloudinaryUrl } from "@/lib/image/cloudinary-url";
 import { PrintLetterhead, PRINT_BRAND_BLUE as BRAND_BLUE } from "./print-letterhead";
 
 interface WorkOrderPrintDocumentProps {
@@ -359,7 +360,7 @@ export function WorkOrderPrintDocument({
               >
                 {/* eslint-disable-next-line @next/next/no-img-element -- foto remota en Cloudinary, sin dominio fijo que declarar */}
                 <img
-                  src={photo.url}
+                  src={cloudinaryUrl(photo.url, "print")}
                   alt="Foto de la orden"
                   className="h-full w-full object-cover"
                 />
