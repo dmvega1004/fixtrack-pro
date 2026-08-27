@@ -1,24 +1,13 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { getServerSnapshot, getSnapshot, subscribe } from "@/lib/connectivity/store";
 
-function subscribe(callback: () => void): () => void {
-  window.addEventListener("online", callback);
-  window.addEventListener("offline", callback);
-  return () => {
-    window.removeEventListener("online", callback);
-    window.removeEventListener("offline", callback);
-  };
-}
-
-function getSnapshot(): boolean {
-  return navigator.onLine;
-}
-
-function getServerSnapshot(): boolean {
-  return true;
-}
-
+/**
+ * true cuando NO hay conectividad observada — ver lib/connectivity/store
+ * para de dónde sale ese hecho (nunca solo navigator.onLine).
+ */
 export function useOnlineStatus(): boolean {
-  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const isOffline = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  return !isOffline;
 }

@@ -14,6 +14,7 @@ import {
 import type { Attachment } from "@/lib/api/attachments";
 import { removePhotoAction } from "@/app/(dashboard)/ordenes/[id]/actions";
 import { compressImage } from "@/lib/image/compress-image";
+import { reportRequestFailure, reportRequestSuccess } from "@/lib/connectivity/store";
 
 interface PhotosTabProps {
   orderId: string;
@@ -67,8 +68,10 @@ export function PhotosTab({
           method: "POST",
           body: formData,
         });
+        reportRequestSuccess();
       } catch (networkError) {
         console.error("Error de red al subir la foto:", networkError);
+        reportRequestFailure();
         toast.error(
           "No se pudo subir la foto: sin conexión a internet o el servidor no respondió. Intenta de nuevo.",
         );
