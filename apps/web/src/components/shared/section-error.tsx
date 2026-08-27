@@ -1,16 +1,21 @@
 "use client";
 
 import { useEffect } from "react";
-import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { describeError } from "@/lib/errors/describe-error";
 
-interface DashboardErrorProps {
+interface SectionErrorProps {
   error: Error & { digest?: string };
   reset: () => void;
 }
 
-export default function DashboardError({ error, reset }: DashboardErrorProps) {
+/**
+ * error.tsx reutilizable para un segmento de ruta del dashboard: reintentar
+ * solo vuelve a renderizar esa sección, no la pantalla completa. El mensaje
+ * distingue sin conexión / tiempo agotado / error del servidor — ver
+ * lib/errors/describe-error.
+ */
+export function SectionError({ error, reset }: SectionErrorProps) {
   useEffect(() => {
     console.error(error);
   }, [error]);
@@ -19,20 +24,10 @@ export default function DashboardError({ error, reset }: DashboardErrorProps) {
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center">
-      <Image
-        src="/brand/logo-sm.png"
-        alt="FixTrack Pro"
-        width={140}
-        height={32}
-        unoptimized
-        className="h-8 w-auto opacity-80"
-      />
       <div className="flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
         <Icon className="size-6" />
       </div>
-      <div className="flex flex-col gap-1">
-        <p className="text-sm font-medium">{message}</p>
-      </div>
+      <p className="text-sm font-medium">{message}</p>
       <Button onClick={() => reset()}>Reintentar</Button>
     </div>
   );
