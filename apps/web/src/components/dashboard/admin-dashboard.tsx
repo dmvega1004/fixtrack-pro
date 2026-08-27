@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import { cache, Suspense } from "react";
 import Link from "next/link";
 import { ClipboardList, UserRoundX, PackageX, PhoneCall, Wallet, Wrench } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
@@ -33,12 +33,16 @@ interface AdminDashboardProps {
 /**
  * Stock bajo (KPI) y alertas de inventario comparten la misma consulta
  * (GET /spare-parts?lowStock=true) pero viven en dos zonas distintas del
- * layout (fila de KPIs vs. grilla de paneles) — Next dedupea el fetch por
- * request, así que llamarla desde dos componentes async no duplica la
- * petición al backend, y cada uno puede aparecer en su Suspense propio.
+ * layout (fila de KPIs vs. grilla de paneles). El dedupe de fetch de Next
+ * se desactiva en cuanto la petición lleva su propio AbortSignal (nuestro
+ * timeout siempre lo hace — ver lib/api/http.ts), así que memoizamos la
+ * llamada nosotros mismos con React.cache: se ejecuta una sola vez por
+ * request sin importar cuántos componentes la invoquen.
  */
+const getLowStockParts = cache(() => getSpareParts({ lowStock: true }));
+
 async function InventoryKpi() {
-  const lowStockParts = await getSpareParts({ lowStock: true });
+  const lowStockParts = await getLowStockParts();
   return (
     <KpiCard
       href="/inventario?lowStock=true"
@@ -51,7 +55,7 @@ async function InventoryKpi() {
 }
 
 async function InventoryAlerts() {
-  const lowStockParts = await getSpareParts({ lowStock: true });
+  const lowStockParts = await getLowStockParts();
   const alerts = lowStockAlerts(lowStockParts, 5);
   return <InventoryAlertsPanel items={alerts} />;
 }
