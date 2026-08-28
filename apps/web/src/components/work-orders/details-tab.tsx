@@ -1,5 +1,6 @@
 import type { WorkOrder } from "@/lib/api/work-orders";
 import type { Technician } from "@/lib/api/users";
+import { DescriptionEditor } from "./description-editor";
 import { DiagnosisEditor } from "./diagnosis-editor";
 import { ObservationsEditor } from "./observations-editor";
 import { ReassignTechnician } from "./reassign-technician";
@@ -24,12 +25,11 @@ export function DetailsTab({
 }: DetailsTabProps) {
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-sm font-medium">Descripción completa</h2>
-        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-          {order.description}
-        </p>
-      </div>
+      <DescriptionEditor
+        orderId={order.id}
+        initialDescription={order.description}
+        isTerminal={isTerminal}
+      />
 
       <DiagnosisEditor
         orderId={order.id}

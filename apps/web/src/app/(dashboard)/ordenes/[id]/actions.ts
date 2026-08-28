@@ -49,6 +49,18 @@ export async function changeStatusAction(
   );
 }
 
+export async function saveDescriptionAction(
+  orderId: string,
+  description: string,
+): Promise<ActionResult> {
+  return runMutation(orderId, () =>
+    serverFetch(`/work-orders/${orderId}`, {
+      method: "PATCH",
+      body: { description },
+    }),
+  );
+}
+
 export async function saveDiagnosisAction(
   orderId: string,
   diagnosis: string,
