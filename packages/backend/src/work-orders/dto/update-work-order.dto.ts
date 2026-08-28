@@ -19,7 +19,8 @@ import { CreateWorkOrderDto } from './create-work-order.dto';
  * valoriza más adelante desde la pestaña «Valores».
  *
  * Nota RBAC (aplicado en el service):
- * - TECHNICIAN solo puede enviar `status`, `diagnosis` y `observations`.
+ * - TECHNICIAN solo puede enviar `status`, `description`, `diagnosis` y
+ *   `observations`.
  * - Los montos de valorización (laborAmount, additionalAmount,
  *   additionalDescription, discountAmount) son SOLO ADMIN — ni siquiera
  *   COORDINATOR puede tocarlos.

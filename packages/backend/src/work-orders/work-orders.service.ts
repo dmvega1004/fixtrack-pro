@@ -167,7 +167,8 @@ export interface WorkOrderDashboardStats {
  *   userId, role) y aplican el candado companyId en cada consulta.
  * - TECHNICIAN: su filtro de visibilidad (userId = él mismo) se inyecta
  *   DENTRO del `where` de Prisma — una orden ajena es un 404, ni siquiera
- *   puede saber que existe. Y solo puede editar status, diagnosis y observations.
+ *   puede saber que existe. Y solo puede editar status, description,
+ *   diagnosis y observations.
  */
 @Injectable()
 export class WorkOrdersService {
@@ -914,10 +915,12 @@ export class WorkOrdersService {
       );
     }
 
-    // RBAC fino: el técnico solo puede tocar status, diagnosis y observations
+    // RBAC fino: el técnico solo puede tocar status, description, diagnosis
+    // y observations — description tiene el mismo permiso que diagnosis y
+    // observations porque el alcance real de la orden muchas veces solo se
+    // conoce al llegar al sitio.
     if (user.role === Role.TECHNICIAN) {
       const forbiddenFields: string[] = [];
-      if (dto.description !== undefined) forbiddenFields.push('description');
       if (dto.priority !== undefined) forbiddenFields.push('priority');
       if (dto.serviceType !== undefined) forbiddenFields.push('serviceType');
       if (dto.clientId !== undefined) forbiddenFields.push('clientId');
@@ -935,7 +938,7 @@ export class WorkOrdersService {
 
       if (forbiddenFields.length > 0) {
         throw new ForbiddenException(
-          `Como técnico solo puedes modificar status, diagnosis y observations. ` +
+          `Como técnico solo puedes modificar status, description, diagnosis y observations. ` +
             `Campos no permitidos: ${forbiddenFields.join(', ')}`,
         );
       }
