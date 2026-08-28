@@ -10,12 +10,15 @@ import { CreateSparePartDto } from './dto/create-spare-part.dto';
 import { UpdateSparePartDto } from './dto/update-spare-part.dto';
 
 /**
- * Vista del repuesto con el costo opcionalmente omitido.
- * RBAC financiero: `cost` (lo que paga la empresa) es dato de ADMIN;
- * Coordinadores y Técnicos ven salePrice, stock y minStock.
+ * Vista del repuesto con cost/salePrice opcionalmente omitidos.
+ * RBAC financiero: `cost` (lo que paga la empresa) es dato de ADMIN.
+ * `salePrice` también se omite para TECHNICIAN — elige el repuesto por
+ * código, nombre, categoría y existencias, nunca por precio. Coordinador
+ * conserva salePrice: lo necesita para cotizar.
  */
-export type SparePartView = Omit<SparePart, 'cost'> & {
+export type SparePartView = Omit<SparePart, 'cost' | 'salePrice'> & {
   cost?: SparePart['cost'];
+  salePrice?: SparePart['salePrice'];
 };
 
 @Injectable()
@@ -152,12 +155,19 @@ export class SparePartsService {
     }
   }
 
-  /** RBAC financiero: omite `cost` para todo rol distinto de ADMIN. */
+  /**
+   * RBAC financiero: `cost` se omite para todo rol distinto de ADMIN;
+   * `salePrice` se omite además para TECHNICIAN.
+   */
   private redact(part: SparePart, role: Role): SparePartView {
     if (role === Role.ADMIN) {
       return part;
     }
     const { cost: _cost, ...rest } = part;
+    if (role === Role.TECHNICIAN) {
+      const { salePrice: _salePrice, ...withoutPrice } = rest;
+      return withoutPrice;
+    }
     return rest;
   }
 }

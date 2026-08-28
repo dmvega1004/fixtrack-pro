@@ -78,19 +78,42 @@ export interface WorkOrderEquipmentSummary {
   qrCode: string;
 }
 
+/** Campos monetarios/financieros de la orden, redactados por completo para TECHNICIAN (ver toView()). */
+type WorkOrderFinancialFields =
+  | 'laborAmount'
+  | 'additionalAmount'
+  | 'additionalDescription'
+  | 'discountAmount'
+  | 'taxRateApplied'
+  | 'totalAmount'
+  | 'paymentStatus'
+  | 'collectionNumber'
+  | 'collectionIssuedAt';
+
 /**
  * Vista pública de una orden: WorkOrder + client/user incluidos + equipments
  * ya aplanado. directCostAmount/directCostDescription (costos internos, ver
  * módulo de Rentabilidad) quedan OPCIONALES a propósito: toView() los omite
  * para todo rol distinto de ADMIN — mismo criterio RBAC financiero que
- * WorkOrderPart.unitCost.
+ * WorkOrderPart.unitCost. Los campos de WorkOrderFinancialFields quedan
+ * OPCIONALES por el mismo motivo: toView() los omite para TECHNICIAN (un
+ * técnico no tiene derecho a ver ningún valor monetario de la orden).
  */
 export type WorkOrderView = Omit<
   WorkOrder,
-  'directCostAmount' | 'directCostDescription'
+  'directCostAmount' | 'directCostDescription' | WorkOrderFinancialFields
 > & {
   directCostAmount?: WorkOrder['directCostAmount'];
   directCostDescription?: WorkOrder['directCostDescription'];
+  laborAmount?: WorkOrder['laborAmount'];
+  additionalAmount?: WorkOrder['additionalAmount'];
+  additionalDescription?: WorkOrder['additionalDescription'];
+  discountAmount?: WorkOrder['discountAmount'];
+  taxRateApplied?: WorkOrder['taxRateApplied'];
+  totalAmount?: WorkOrder['totalAmount'];
+  paymentStatus?: WorkOrder['paymentStatus'];
+  collectionNumber?: WorkOrder['collectionNumber'];
+  collectionIssuedAt?: WorkOrder['collectionIssuedAt'];
   client: { id: string; name: string };
   user: { id: string; name: string; email: string } | null;
   equipments: WorkOrderEquipmentSummary[];
@@ -510,6 +533,21 @@ export class WorkOrdersService {
   }
 
   async findOne(user: AuthenticatedUser, id: string): Promise<WorkOrderView> {
+    const workOrder = await this.findOneRaw(user, id);
+    return this.toView(workOrder, user.role);
+  }
+
+  /**
+   * Misma búsqueda + candado que findOne(), pero SIN pasar por toView(): la
+   * lógica interna de update() necesita los valores reales (ej. el
+   * laborAmount vigente para congelar el total al completar una orden),
+   * sin importar el rol de quien dispara el cambio. Solo la RESPUESTA al
+   * cliente se redacta — eso lo hace toView() en el punto de salida.
+   */
+  private async findOneRaw(
+    user: AuthenticatedUser,
+    id: string,
+  ): Promise<WorkOrderWithRelations> {
     const workOrder = await this.prisma.workOrder.findFirst({
       where: {
         id,
@@ -524,7 +562,7 @@ export class WorkOrdersService {
       throw new NotFoundException(`Orden de trabajo ${id} no encontrada`);
     }
 
-    return this.toView(workOrder, user.role);
+    return workOrder;
   }
 
   async update(
@@ -532,8 +570,11 @@ export class WorkOrdersService {
     id: string,
     dto: UpdateWorkOrderDto,
   ): Promise<WorkOrderView> {
-    // Pertenencia al tenant + visibilidad del técnico (404 si no aplica)
-    const workOrder = await this.findOne(user, id);
+    // Pertenencia al tenant + visibilidad del técnico (404 si no aplica).
+    // Fetch SIN redactar (ver findOneRaw): esta función necesita los
+    // valores reales para calcular congelamientos/eventos de bitácora,
+    // independientemente del rol de quien dispara el cambio.
+    const workOrder = await this.findOneRaw(user, id);
 
     // Excepción puntual: ADMIN puede corregir SOLO la fecha de facturación
     // de una orden YA facturada, incluso si quedó sellada (DELIVERED) — el
@@ -1085,9 +1126,10 @@ export class WorkOrdersService {
     // bitácora (ver más abajo). workOrder ya viene de findOne(), con
     // user/equipments incluidos.
     const actorName = activityAuthorName(user);
-    const oldEquipmentIds = new Set(workOrder.equipments.map((e) => e.id));
+    const oldEquipments = workOrder.equipmentLinks.map((link) => link.equipment);
+    const oldEquipmentIds = new Set(oldEquipments.map((e) => e.id));
     const oldEquipmentsById = new Map(
-      workOrder.equipments.map((equipment) => [equipment.id, equipment]),
+      oldEquipments.map((equipment) => [equipment.id, equipment]),
     );
 
     // El update y los eventos de bitácora viajan en la MISMA transacción:
@@ -1694,14 +1736,44 @@ export class WorkOrdersService {
    * devuelva esto directo porque la relación es explícita (tiene columnas
    * propias: companyId, createdAt), no un m-a-m implícito.
    */
-  /** RBAC financiero: directCostAmount/directCostDescription solo para ADMIN. */
+  /**
+   * RBAC financiero: directCostAmount/directCostDescription solo para ADMIN.
+   * Además, TECHNICIAN no recibe ningún valor monetario de la orden
+   * (laborAmount, additionalAmount, discountAmount, taxRateApplied,
+   * totalAmount, paymentStatus, collectionNumber, collectionIssuedAt) — se
+   * omiten del objeto, no se envían en 0 ni en null.
+   */
   private toView(order: WorkOrderWithRelations, role: Role): WorkOrderView {
-    const { equipmentLinks, directCostAmount, directCostDescription, ...rest } =
-      order;
+    const {
+      equipmentLinks,
+      directCostAmount,
+      directCostDescription,
+      laborAmount,
+      additionalAmount,
+      additionalDescription,
+      discountAmount,
+      taxRateApplied,
+      totalAmount,
+      paymentStatus,
+      collectionNumber,
+      collectionIssuedAt,
+      ...rest
+    } = order;
     return {
       ...rest,
       equipments: equipmentLinks.map((link) => link.equipment),
       ...(role === Role.ADMIN && { directCostAmount, directCostDescription }),
+      ...(role !== Role.TECHNICIAN && {
+        laborAmount,
+        additionalAmount,
+        additionalDescription,
+        discountAmount,
+        taxRateApplied,
+        totalAmount,
+        paymentStatus,
+        collectionNumber,
+        collectionIssuedAt,
+      }),
     };
   }
 }

@@ -31,15 +31,22 @@ const PART_SUMMARY = {
   },
 } as const;
 
-/** Línea de repuesto con unitCost opcionalmente omitido (RBAC financiero). */
-export type WorkOrderPartView = Omit<WorkOrderPart, 'unitCost'> & {
+/**
+ * Línea de repuesto con unitCost/unitPrice opcionalmente omitidos (RBAC
+ * financiero): unitCost solo para ADMIN; unitPrice también se omite para
+ * TECHNICIAN (ve qué repuesto y cuánta cantidad, nunca el precio).
+ */
+export type WorkOrderPartView = Omit<WorkOrderPart, 'unitCost' | 'unitPrice'> & {
   unitCost?: WorkOrderPart['unitCost'];
+  unitPrice?: WorkOrderPart['unitPrice'];
 };
 
 /**
  * Cierre económico de la orden (pestaña «Valores»). Los montos son precios
- * al cliente, no costos — visibles para los 3 roles (aparecen en el
- * documento que se entrega); solo ADMIN puede editarlos (PATCH /work-orders/:id).
+ * al cliente, no costos — visibles para ADMIN/COORDINATOR (aparecen en el
+ * documento que se entrega); solo ADMIN puede editarlos (PATCH
+ * /work-orders/:id). TECHNICIAN no recibe este bloque en absoluto (ver
+ * WorkOrderPartsService.listParts).
  */
 export interface WorkOrderBilling {
   laborAmount: string;
@@ -65,11 +72,17 @@ export interface WorkOrderBilling {
 
 export interface WorkOrderPartsSummary {
   items: WorkOrderPartView[];
-  /** Total de repuestos a cobrar al cliente (suma de quantity × unitPrice). */
-  totalSale: string;
+  /**
+   * Total de repuestos a cobrar al cliente (suma de quantity × unitPrice).
+   * Omitido para TECHNICIAN — mismo criterio RBAC financiero que
+   * WorkOrderPartView.unitPrice: es un valor monetario derivado de precios
+   * que el técnico no debe ver.
+   */
+  totalSale?: string;
   /** Costo total para la empresa — SOLO visible para ADMIN. */
   totalCost?: string;
-  billing: WorkOrderBilling;
+  /** Desglose económico de la orden — omitido para TECHNICIAN (ver totalSale). */
+  billing?: WorkOrderBilling;
   /**
    * Costos internos (bloque "Costos internos", pestaña «Valores») — lo que
    * el trabajo costó fuera del inventario. SOLO visible para ADMIN, igual
@@ -272,9 +285,31 @@ export class WorkOrderPartsService {
 
     const summary: WorkOrderPartsSummary = {
       items: lines.map((l) => this.redact(l, user.role)),
-      totalSale: totalSale.toFixed(2),
-      billing: this.buildBilling(order, totalSale, company.taxRate, paidAmount),
     };
+
+    // RBAC financiero: TECHNICIAN no recibe ningún valor monetario — ni el
+    // subtotal de repuestos ni el desglose económico de la orden.
+    if (user.role !== Role.TECHNICIAN) {
+      summary.totalSale = totalSale.toFixed(2);
+      // El role check de arriba garantiza que `order` (mismo user, ver
+      // WorkOrdersService.toView) trae estos campos sin redactar.
+      summary.billing = this.buildBilling(
+        order as Pick<
+          WorkOrder,
+          | 'laborAmount'
+          | 'additionalAmount'
+          | 'additionalDescription'
+          | 'discountAmount'
+          | 'totalAmount'
+          | 'taxRateApplied'
+          | 'billedAt'
+          | 'paymentStatus'
+        >,
+        totalSale,
+        company.taxRate,
+        paidAmount,
+      );
+    }
 
     // RBAC financiero: el costo total y los costos internos solo los ve el ADMIN
     if (user.role === Role.ADMIN) {
@@ -351,12 +386,20 @@ export class WorkOrderPartsService {
     }
   }
 
-  /** RBAC financiero: omite unitCost para todo rol distinto de ADMIN. */
+  /**
+   * RBAC financiero: unitCost solo para ADMIN; unitPrice se omite además
+   * para TECHNICIAN (sigue viendo qué repuesto y cuánta cantidad, nunca
+   * ningún valor monetario).
+   */
   private redact(line: WorkOrderPart, role: Role): WorkOrderPartView {
     if (role === Role.ADMIN) {
       return line;
     }
     const { unitCost: _unitCost, ...rest } = line;
+    if (role === Role.TECHNICIAN) {
+      const { unitPrice: _unitPrice, ...withoutPrice } = rest;
+      return withoutPrice;
+    }
     return rest;
   }
 }
