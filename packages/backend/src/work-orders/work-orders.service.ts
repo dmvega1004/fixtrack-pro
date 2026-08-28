@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -906,6 +907,15 @@ export class WorkOrdersService {
       });
 
       return this.toView(updated, user.role);
+    }
+
+    // La descripción identifica de qué se trata la orden en listados,
+    // buscador y documentos: a diferencia de diagnosis/observations, no
+    // puede quedar vacía. @IsNotEmpty del DTO ya rechaza "", pero no un
+    // valor de solo espacios — que el trim() de más abajo dejaría vacío
+    // igual, así que se valida acá, sobre el mismo valor ya recortado.
+    if (dto.description !== undefined && dto.description.trim() === '') {
+      throw new BadRequestException('La descripción no puede quedar vacía');
     }
 
     // Una orden entregada o cancelada queda sellada para todos
