@@ -1,3 +1,5 @@
+"use client";
+
 import { saveDiagnosisAction } from "@/app/(dashboard)/ordenes/[id]/actions";
 import { LongTextFieldEditor } from "./long-text-field-editor";
 
