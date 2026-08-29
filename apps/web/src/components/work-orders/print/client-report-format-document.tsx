@@ -1,7 +1,9 @@
 import type { WorkOrder } from "@/lib/api/work-orders";
 import type { Client, ReportFormatSource } from "@/lib/api/clients";
+import type { Attachment } from "@/lib/api/attachments";
 import { formatOrderNumber } from "@/lib/format/order-number";
 import { formatDate, formatTime } from "@/lib/format/dates";
+import { cloudinaryUrl } from "@/lib/image/cloudinary-url";
 
 /** Color de acento por defecto si el cliente no configuró uno (raro: el color picker siempre trae un valor). */
 const FALLBACK_ACCENT_COLOR = "#2563EB";
@@ -12,6 +14,7 @@ const EMPTY_SECTION_MIN_HEIGHT = "42mm";
 interface ClientReportFormatDocumentProps {
   order: WorkOrder;
   client: Client;
+  photos: Attachment[];
 }
 
 function sectionContent(order: WorkOrder, source: ReportFormatSource | null): string {
@@ -85,6 +88,49 @@ function ReportSection({
   );
 }
 
+/**
+ * Registro fotográfico: misma franja del color de acento que ReportSection
+ * (para que se vea como parte del formato del cliente, no como un injerto
+ * del informe propio) seguida de una cuadrícula de 3 columnas. Cada foto en
+ * tamaño "print" de Cloudinary — igual que WorkOrderPrintDocument, nunca el
+ * original — y con break-inside-avoid para no partirse entre hojas.
+ */
+function PhotosSection({
+  label,
+  photos,
+  accentColor,
+}: {
+  label: string;
+  photos: Attachment[];
+  accentColor: string;
+}) {
+  return (
+    <section className="flex flex-col">
+      <div
+        className="print-color-exact px-3 py-1.5 text-xs font-semibold tracking-wide text-white uppercase"
+        style={{ backgroundColor: accentColor }}
+      >
+        {label}
+      </div>
+      <div className="grid grid-cols-3 gap-3 border border-t-0 border-neutral-300 p-3">
+        {photos.map((photo) => (
+          <div
+            key={photo.id}
+            className="aspect-square overflow-hidden rounded-md border border-neutral-200 break-inside-avoid"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element -- foto remota en Cloudinary, sin dominio fijo que declarar */}
+            <img
+              src={cloudinaryUrl(photo.url, "print")}
+              alt="Foto de la orden"
+              className="h-full w-full object-cover"
+            />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function SignatureColumn({
   title,
   companyValue,
@@ -117,9 +163,15 @@ function SignatureColumn({
 export function ClientReportFormatDocument({
   order,
   client,
+  photos,
 }: ClientReportFormatDocumentProps) {
   const accentColor = client.reportFormatAccentColor || FALLBACK_ACCENT_COLOR;
   const title = client.reportFormatTitle ?? "";
+  // El bloque no se renderiza en absoluto (ni la franja) si el cliente
+  // desactivó las fotos o si la orden no tiene ninguna — el documento debe
+  // verse exactamente igual que hoy en esos casos.
+  const showPhotos = client.reportFormatIncludePhotos && photos.length > 0;
+  const photosLabel = client.reportFormatPhotosLabel?.trim() || "Registro fotográfico";
 
   // Fecha → fecha de facturación; si no existe (orden aún no cerrada), la de creación.
   const dateValue = formatDate(order.billedAt ?? order.createdAt);
@@ -207,6 +259,14 @@ export function ClientReportFormatDocument({
           />
         ))}
       </div>
+
+      {/* Registro fotográfico: después del contenido, antes de las firmas —
+          respalda lo descrito y precede a quien firma. Ausente por completo
+          (ni la franja) si el cliente desactivó las fotos o la orden no
+          tiene ninguna. */}
+      {showPhotos && (
+        <PhotosSection label={photosLabel} photos={photos} accentColor={accentColor} />
+      )}
 
       {/* 4. Bloque de firmas */}
       <div className="mt-4 grid grid-cols-1 gap-10 sm:grid-cols-2">

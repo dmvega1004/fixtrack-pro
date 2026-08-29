@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { getWorkOrder } from "@/lib/api/work-orders";
 import { getClient } from "@/lib/api/clients";
+import { getPhotos } from "@/lib/api/attachments";
 import { HttpError } from "@/lib/api/http";
 import {
   ClientReportFormatDocument,
@@ -62,7 +63,13 @@ export default async function FormatoClientePage({
     throw error;
   }
 
-  const client = await getClient(order.client.id);
+  // En paralelo, no en cadena: ninguno de los dos depende del otro (mismo
+  // patrón que /ordenes/[id]/imprimir) — encadenarlos triplicaría el tiempo
+  // de carga en una red lenta.
+  const [client, photos] = await Promise.all([
+    getClient(order.client.id),
+    getPhotos(id),
+  ]);
 
   // Candado adicional: si el formato no está activo para este cliente (ya
   // sea porque nunca se configuró o se desactivó después de que alguien
@@ -73,7 +80,7 @@ export default async function FormatoClientePage({
 
   return (
     <div className="min-h-svh bg-neutral-100 pb-24 print:bg-white print:pb-0">
-      <ClientReportFormatDocument order={order} client={client} />
+      <ClientReportFormatDocument order={order} client={client} photos={photos} />
       <PrintActions orderId={order.id} />
     </div>
   );
