@@ -201,8 +201,41 @@ model Client {
   documentType    String?
   documentNumber  String?
   address         String?
+  city            String?
   /// Días de crédito acordados con el cliente (ej. 30 = "pago a 30 días").
   paymentTermDays Int         @default(30)
+
+  /// Formato de informe propio del cliente (Módulo de Formatos): cuando este
+  /// cliente exige que las órdenes se entreguen en SU formato corporativo
+  /// (típico al trabajar como subcontratista de una empresa con sistema de
+  /// gestión de calidad). GENÉRICO a propósito — no se programa "el formato
+  /// de Fire Energy", se configuran estos campos por cliente. Ver
+  /// /ordenes/[id]/formato-cliente en el frontend.
+  reportFormatEnabled     Boolean @default(false)
+  /// Obligatorio si reportFormatEnabled=true (validado en el DTO). Ej. "ORDEN DE SERVICIO".
+  reportFormatTitle       String?
+  reportFormatCode        String?
+  reportFormatVersion     String?
+  /// Texto libre (ej. "28/09/2019"): es la fecha de la VERSIÓN del formato
+  /// impreso, no una fecha operativa — se muestra tal cual la escribe quien
+  /// configura, sin parsear ni validar como fecha real.
+  reportFormatDate        String?
+  reportFormatLogoUrl     String?
+  /// Color hexadecimal de las franjas de sección del documento.
+  reportFormatAccentColor String?
+  reportFormatFooter      String?
+  /// Empresa que figura como quien ENTREGA el informe en el bloque de firmas.
+  reportFormatIssuer      String?
+  /// Tres secciones configurables: etiqueta + de qué campo de la orden se
+  /// alimenta (DESCRIPTION | DIAGNOSIS | OBSERVATIONS | EMPTY — validado en
+  /// el DTO, no enum de BD por el mismo motivo que documentType).
+  reportFormatS1Label     String?
+  reportFormatS1Source    String?
+  reportFormatS2Label     String?
+  reportFormatS2Source    String?
+  reportFormatS3Label     String?
+  reportFormatS3Source    String?
+
   companyId       String
   company         Company     @relation(fields: [companyId], references: [id])
   createdAt       DateTime    @default(now())
@@ -306,6 +339,13 @@ model WorkOrder {
   /// documento — solo se puede generar una vez por orden.
   collectionNumber      Int?
   collectionIssuedAt    DateTime?
+  /// Cliente FINAL del servicio, cuando la empresa trabaja como
+  /// subcontratista (ej. TAELCO para Fire Energy): `client`/`clientId` es
+  /// quien CONTRATA (a quien se le factura), pero en el formato de informe
+  /// propio del cliente contratante la casilla "Cliente" se refiere al
+  /// destinatario real del servicio. Opcional — vacío, la línea sale en
+  /// blanco para llenarla a mano (ver /ordenes/[id]/formato-cliente).
+  endClientName         String?
   /// Cliente dueño de la orden — vínculo principal. Toda orden pertenece a
   /// un cliente; los equipos son opcionales y pueden ser varios (ver
   /// equipmentLinks) — cero equipos es un servicio locativo.
