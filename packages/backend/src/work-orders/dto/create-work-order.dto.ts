@@ -52,6 +52,28 @@ export class CreateWorkOrderDto {
   endClientName?: string;
 
   /**
+   * Ciudad donde se ejecutó ESTE servicio (ver WorkOrder.serviceCity en el
+   * schema) — puede diferir de la ciudad registrada en la ficha del
+   * cliente. Opcional: si se deja vacía, el formato de informe propio del
+   * cliente usa Client.city como respaldo.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  serviceCity?: string;
+
+  /**
+   * Recomendaciones al cliente, separadas de `observations` (notas de lo
+   * que se hizo). Alimenta la sección SUGGESTIONS del formato de informe
+   * propio del cliente y, si tiene contenido, un bloque propio en el
+   * informe de la empresa.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(5000)
+  suggestions?: string;
+
+  /**
    * Equipos a intervenir (opcional, varios): la empresa también presta
    * servicios locativos (sellado, limpieza, instalación) sin equipo
    * asociado — un array vacío u omitido es un servicio locativo. Una

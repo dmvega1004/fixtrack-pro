@@ -253,7 +253,9 @@ export class WorkOrdersService {
           description: dto.description.trim(),
           diagnosis: dto.diagnosis?.trim(),
           observations: dto.observations?.trim(),
+          suggestions: dto.suggestions?.trim(),
           endClientName: dto.endClientName?.trim(),
+          serviceCity: dto.serviceCity?.trim(),
           priority: dto.priority, // undefined → default MEDIUM
           serviceType: dto.serviceType, // undefined → default CORRECTIVE
           clientId: dto.clientId,
@@ -1145,7 +1147,9 @@ export class WorkOrdersService {
           description: dto.description?.trim(),
           diagnosis: dto.diagnosis?.trim(),
           observations: dto.observations?.trim(),
+          suggestions: dto.suggestions?.trim(),
           endClientName: dto.endClientName?.trim(),
+          serviceCity: dto.serviceCity?.trim(),
           status: dto.status,
           priority: dto.priority,
           serviceType: dto.serviceType,
