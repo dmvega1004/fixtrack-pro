@@ -48,6 +48,8 @@ const REPORT_FORMAT_FIELD_NAMES = [
   'reportFormatS2Source',
   'reportFormatS3Label',
   'reportFormatS3Source',
+  'reportFormatIncludePhotos',
+  'reportFormatPhotosLabel',
 ] as const satisfies readonly (keyof CreateClientDto)[];
 
 /**
@@ -246,6 +248,8 @@ export class ClientsService {
       reportFormatS2Source: dto.reportFormatS2Source,
       reportFormatS3Label: dto.reportFormatS3Label?.trim(),
       reportFormatS3Source: dto.reportFormatS3Source,
+      reportFormatIncludePhotos: dto.reportFormatIncludePhotos,
+      reportFormatPhotosLabel: dto.reportFormatPhotosLabel?.trim(),
     };
   }
 

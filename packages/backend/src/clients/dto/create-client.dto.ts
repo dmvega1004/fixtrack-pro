@@ -164,4 +164,15 @@ export class CreateClientDto {
       'reportFormatS3Source debe ser DESCRIPTION, DIAGNOSIS, OBSERVATIONS, SUGGESTIONS o EMPTY',
   })
   reportFormatS3Source?: string;
+
+  @IsOptional()
+  @IsBoolean({
+    message: 'reportFormatIncludePhotos debe ser verdadero o falso',
+  })
+  reportFormatIncludePhotos?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  reportFormatPhotosLabel?: string;
 }
