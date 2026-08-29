@@ -2,6 +2,17 @@ import { OrderStatus, PaymentMethod, Prisma, Priority } from 'database';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 
 /**
+ * El backend corre en UTC (Railway); el negocio opera en Colombia. Sin
+ * este timeZone explícito, una fecha se formatea con la hora del
+ * servidor — visible en la bitácora, ej. una orden facturada a las 8pm
+ * hora local ya cayó en el día siguiente en UTC. El día que la
+ * plataforma se venda fuera de Colombia esto debe volverse una
+ * configuración por empresa; hoy agregar eso sería complejidad sin
+ * beneficio (mismo criterio que apps/web/src/lib/format/dates.ts).
+ */
+const BOGOTA_TIME_ZONE = 'America/Bogota';
+
+/**
  * Etiquetas en español para formatear valores legibles en la bitácora.
  * Deben reflejar exactamente ORDER_STATUS_LABELS/PRIORITY_LABELS/
  * PAYMENT_METHOD_LABELS de apps/web/src/components/shared/status-chip.tsx,
@@ -67,6 +78,7 @@ export function formatActivityDate(date: Date): string {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
+    timeZone: BOGOTA_TIME_ZONE,
   }).format(date);
 }
 

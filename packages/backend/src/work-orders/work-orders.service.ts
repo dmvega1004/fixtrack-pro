@@ -256,6 +256,7 @@ export class WorkOrdersService {
           suggestions: dto.suggestions?.trim(),
           endClientName: dto.endClientName?.trim(),
           serviceCity: dto.serviceCity?.trim(),
+          serviceTime: dto.serviceTime?.trim(),
           priority: dto.priority, // undefined → default MEDIUM
           serviceType: dto.serviceType, // undefined → default CORRECTIVE
           clientId: dto.clientId,
@@ -804,7 +805,8 @@ export class WorkOrdersService {
       const newItemsTotal =
         dto.items !== undefined
           ? dto.items.reduce(
-              (acc, i) => acc.add(new Prisma.Decimal(i.unitPrice).mul(i.quantity)),
+              (acc, i) =>
+                acc.add(new Prisma.Decimal(i.unitPrice).mul(i.quantity)),
               new Prisma.Decimal(0),
             )
           : oldItemsTotal;
@@ -1154,7 +1156,8 @@ export class WorkOrdersService {
       const itemsTotal =
         dto.items !== undefined
           ? dto.items.reduce(
-              (acc, i) => acc.add(new Prisma.Decimal(i.unitPrice).mul(i.quantity)),
+              (acc, i) =>
+                acc.add(new Prisma.Decimal(i.unitPrice).mul(i.quantity)),
               new Prisma.Decimal(0),
             )
           : existingItems.reduce(
@@ -1230,6 +1233,7 @@ export class WorkOrdersService {
           suggestions: dto.suggestions?.trim(),
           endClientName: dto.endClientName?.trim(),
           serviceCity: dto.serviceCity?.trim(),
+          serviceTime: dto.serviceTime?.trim(),
           status: dto.status,
           priority: dto.priority,
           serviceType: dto.serviceType,

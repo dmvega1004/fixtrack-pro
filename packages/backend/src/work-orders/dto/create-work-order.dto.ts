@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   MaxLength,
 } from 'class-validator';
 
@@ -61,6 +62,19 @@ export class CreateWorkOrderDto {
   @IsString()
   @MaxLength(100)
   serviceCity?: string;
+
+  /**
+   * Hora del servicio, texto HH:mm (ver WorkOrder.serviceTime en el
+   * schema) — captura del usuario, no un instante calculado. Opcional:
+   * cadena vacía permitida (limpia el campo, ver WorkOrdersService.update),
+   * así el formato del cliente vuelve a usar la hora de cierre.
+   */
+  @IsOptional()
+  @IsString()
+  @Matches(/^$|^([01]\d|2[0-3]):[0-5]\d$/, {
+    message: 'serviceTime debe tener el formato HH:mm',
+  })
+  serviceTime?: string;
 
   /**
    * Recomendaciones al cliente, separadas de `observations` (notas de lo
