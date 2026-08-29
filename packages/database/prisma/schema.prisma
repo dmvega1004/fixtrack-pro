@@ -100,6 +100,18 @@ model Company {
   /// URL del logo del tenant (Cloudinary). Aún sin flujo de carga: llega
   /// en una iteración posterior.
   logoUrl               String?
+  /// URL de la imagen de la firma digital del tenant (Cloudinary, PNG).
+  /// Se dibuja sobre la línea de firma de quien EMITE el documento — nunca
+  /// en el espacio de firma del cliente.
+  signatureImageUrl     String?
+  /// Documentos en los que se estampa la firma automáticamente. Todos
+  /// controlables desde "Mi empresa" — collection va en true por defecto
+  /// porque es el caso que motivó la función (cuenta de cobro firmada sin
+  /// imprimir/escanear); los otros dos arrancan apagados, a criterio del
+  /// ADMIN.
+  signatureInCollection Boolean              @default(true)
+  signatureInWorkOrder  Boolean              @default(false)
+  signatureInQuote      Boolean              @default(false)
   /// Moneda del tenant para formatear precios (ver DTO: COP/USD/EUR/MXN/PEN).
   currency              String               @default("COP")
   /// Contador atómico por tenant para asignar WorkOrder.orderNumber consecutivo.
