@@ -14,6 +14,7 @@ import {
   PrintLetterhead,
   PRINT_BRAND_BLUE as BRAND_BLUE,
 } from "@/components/work-orders/print/print-letterhead";
+import { SignatureLine } from "@/components/shared/signature-line";
 
 const DEFAULT_FOOTNOTE =
   "Este documento constituye una solicitud de pago y no equivale a factura electrónica de venta.";
@@ -302,7 +303,11 @@ export function CollectionDocument({
 
           {company.signerName && (
             <div className="flex flex-col gap-8">
-              <div className="h-10 border-b border-neutral-400" />
+              <SignatureLine
+                signatureImageUrl={
+                  company.signatureInCollection ? company.signatureImageUrl : null
+                }
+              />
               <div className="flex flex-col text-sm text-neutral-800">
                 <span className="font-medium">{company.signerName}</span>
                 {company.signerRole && (

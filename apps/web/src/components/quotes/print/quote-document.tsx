@@ -13,6 +13,7 @@ import {
 import { formatCurrency } from "@/lib/format/currency";
 import { amountInWords } from "@/lib/format/number-to-words";
 import { cn } from "@/lib/utils";
+import { SignatureLine } from "@/components/shared/signature-line";
 
 const BRAND_BLUE = "#2563EB";
 
@@ -285,7 +286,11 @@ export function QuoteDocument({ quote, client, company }: QuoteDocumentProps) {
         <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
           {company.signerName && (
             <div className="flex flex-col gap-8">
-              <div className="h-10 border-b border-neutral-400" />
+              <SignatureLine
+                signatureImageUrl={
+                  company.signatureInQuote ? company.signatureImageUrl : null
+                }
+              />
               <div className="flex flex-col text-sm text-neutral-800">
                 <span className="text-xs text-neutral-500">Elaborado por</span>
                 <span className="font-medium">{company.signerName}</span>

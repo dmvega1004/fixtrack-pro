@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { Company } from 'database';
-import { cloudinaryRootFolder, CloudinaryService } from '../cloudinary/cloudinary.service';
+import {
+  cloudinaryRootFolder,
+  CloudinaryService,
+} from '../cloudinary/cloudinary.service';
 import { validateImageFile } from '../cloudinary/validate-image-file';
 import { PrismaService } from '../prisma.service';
 import { UpdateCompanyDto } from './dto/update-company.dto';

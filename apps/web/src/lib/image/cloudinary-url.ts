@@ -8,13 +8,16 @@ const UPLOAD_MARKER = "/upload/";
  *  - full: al abrir la foto en grande — mismas dimensiones que el original,
  *    solo negocia formato/calidad (webp/avif cuando el navegador lo soporta).
  *  - print: informe impreso — calidad suficiente para imprimir sin bajar el original.
+ *  - signature: firma estampada en un documento — ancho fijo (~50mm impresos),
+ *    q_auto:good conserva nitidez del trazo sin pedir el original completo.
  */
-export type CloudinaryPreset = "thumbnail" | "full" | "print";
+export type CloudinaryPreset = "thumbnail" | "full" | "print" | "signature";
 
 const TRANSFORMS: Record<CloudinaryPreset, string> = {
   thumbnail: "c_fill,w_320,h_320,q_auto,f_auto",
   print: "c_limit,w_1000,q_auto:good,f_auto",
   full: "q_auto,f_auto",
+  signature: "c_limit,w_600,q_auto:good,f_auto",
 };
 
 /**

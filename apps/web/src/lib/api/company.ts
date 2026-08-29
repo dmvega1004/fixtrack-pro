@@ -16,6 +16,12 @@ export interface Company {
   address: string | null;
   website: string | null;
   logoUrl: string | null;
+  /** URL de la imagen de la firma digital (Cloudinary, PNG). */
+  signatureImageUrl: string | null;
+  /** Documentos en los que se estampa la firma automáticamente. */
+  signatureInCollection: boolean;
+  signatureInWorkOrder: boolean;
+  signatureInQuote: boolean;
   currency: string;
   /** Porcentaje de IVA del tenant (ej. "19.00"). "0.00" si no es responsable de IVA. */
   taxRate: string;
@@ -62,6 +68,9 @@ export interface UpdateCompanyInput {
   signerName?: string;
   signerRole?: string;
   collectionDocFootnote?: string;
+  signatureInCollection?: boolean;
+  signatureInWorkOrder?: boolean;
+  signatureInQuote?: boolean;
   nextCollectionNumber?: number;
   nextQuoteNumber?: number;
   defaultPaymentTerms?: string;

@@ -43,6 +43,9 @@ interface CompanyFormState {
   defaultValidityDays: string;
   quoteFollowUpDays: string;
   quoteFootnote: string;
+  signatureInCollection: boolean;
+  signatureInWorkOrder: boolean;
+  signatureInQuote: boolean;
 }
 
 function toFormState(company: Company): CompanyFormState {
@@ -73,6 +76,9 @@ function toFormState(company: Company): CompanyFormState {
     defaultValidityDays: String(company.defaultValidityDays),
     quoteFollowUpDays: String(company.quoteFollowUpDays),
     quoteFootnote: company.quoteFootnote ?? "",
+    signatureInCollection: company.signatureInCollection,
+    signatureInWorkOrder: company.signatureInWorkOrder,
+    signatureInQuote: company.signatureInQuote,
   };
 }
 
@@ -87,6 +93,9 @@ export function CompanyForm({ company }: CompanyFormProps) {
   const [logoUrl, setLogoUrl] = useState(company.logoUrl);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const [signatureUrl, setSignatureUrl] = useState(company.signatureImageUrl);
+  const [isUploadingSignature, setIsUploadingSignature] = useState(false);
+  const signatureInputRef = useRef<HTMLInputElement>(null);
 
   async function handleLogoChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -117,6 +126,43 @@ export function CompanyForm({ company }: CompanyFormProps) {
       toast.error("No se pudo subir el logo");
     } finally {
       setIsUploadingLogo(false);
+    }
+  }
+
+  async function handleSignatureChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    if (file.type !== "image/png") {
+      toast.error("La firma debe ser una imagen PNG");
+      return;
+    }
+
+    setIsUploadingSignature(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/api/upload/signature", {
+        method: "POST",
+        body: formData,
+      });
+      const data: unknown = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const message = (data as UploadErrorBody | null)?.message;
+        toast.error(message ?? "No se pudo subir la firma");
+        return;
+      }
+
+      setSignatureUrl((data as Company).signatureImageUrl);
+      toast.success("Firma actualizada");
+      router.refresh();
+    } catch {
+      toast.error("No se pudo subir la firma");
+    } finally {
+      setIsUploadingSignature(false);
     }
   }
 
@@ -188,6 +234,9 @@ export function CompanyForm({ company }: CompanyFormProps) {
       signerName: form.signerName.trim() || undefined,
       signerRole: form.signerRole.trim() || undefined,
       collectionDocFootnote: form.collectionDocFootnote.trim() || undefined,
+      signatureInCollection: form.signatureInCollection,
+      signatureInWorkOrder: form.signatureInWorkOrder,
+      signatureInQuote: form.signatureInQuote,
       nextCollectionNumber,
       nextQuoteNumber,
       defaultPaymentTerms: form.defaultPaymentTerms.trim() || undefined,
@@ -366,6 +415,139 @@ export function CompanyForm({ company }: CompanyFormProps) {
               con tus clientes.
             </p>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Firma digital</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="signature">Imagen de la firma (PNG)</Label>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-white">
+                {isUploadingSignature ? (
+                  <Loader2 className="size-5 animate-spin text-muted-foreground" />
+                ) : signatureUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- firma remota en Cloudinary, sin dominio fijo que declarar
+                  <img
+                    src={signatureUrl}
+                    alt="Firma sobre fondo claro"
+                    className="h-full w-full object-contain p-1"
+                  />
+                ) : (
+                  <span className="text-center text-[10px] text-muted-foreground">
+                    Sin firma
+                  </span>
+                )}
+              </div>
+              <div className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-neutral-900">
+                {isUploadingSignature ? (
+                  <Loader2 className="size-5 animate-spin text-neutral-400" />
+                ) : signatureUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- firma remota en Cloudinary, sin dominio fijo que declarar
+                  <img
+                    src={signatureUrl}
+                    alt="Firma sobre fondo oscuro"
+                    className="h-full w-full object-contain p-1"
+                  />
+                ) : (
+                  <span className="text-center text-[10px] text-neutral-400">
+                    Sin firma
+                  </span>
+                )}
+              </div>
+              <input
+                ref={signatureInputRef}
+                id="signature"
+                type="file"
+                accept="image/png"
+                onChange={(event) => void handleSignatureChange(event)}
+                className="hidden"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isUploadingSignature}
+                onClick={() => signatureInputRef.current?.click()}
+              >
+                {isUploadingSignature
+                  ? "Subiendo..."
+                  : signatureUrl
+                    ? "Cambiar firma"
+                    : "Subir firma"}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Debe ser PNG con fondo transparente. El recuadro oscuro sirve
+              para detectar si la imagen en realidad trae fondo blanco: si
+              ahí se ve un cuadro claro alrededor del trazo, exporta de
+              nuevo la firma con transparencia real.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-2 border-t border-border pt-3">
+            <p className="text-sm font-medium">Dónde se estampa</p>
+            <div className="flex items-start gap-2 rounded-lg border border-border p-3">
+              <input
+                id="signatureInCollection"
+                type="checkbox"
+                className="mt-0.5"
+                checked={form.signatureInCollection}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    signatureInCollection: event.target.checked,
+                  }))
+                }
+              />
+              <Label htmlFor="signatureInCollection" className="font-normal">
+                Cuenta de cobro
+              </Label>
+            </div>
+            <div className="flex items-start gap-2 rounded-lg border border-border p-3">
+              <input
+                id="signatureInWorkOrder"
+                type="checkbox"
+                className="mt-0.5"
+                checked={form.signatureInWorkOrder}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    signatureInWorkOrder: event.target.checked,
+                  }))
+                }
+              />
+              <Label htmlFor="signatureInWorkOrder" className="font-normal">
+                Informe técnico
+              </Label>
+            </div>
+            <div className="flex items-start gap-2 rounded-lg border border-border p-3">
+              <input
+                id="signatureInQuote"
+                type="checkbox"
+                className="mt-0.5"
+                checked={form.signatureInQuote}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    signatureInQuote: event.target.checked,
+                  }))
+                }
+              />
+              <Label htmlFor="signatureInQuote" className="font-normal">
+                Cotización
+              </Label>
+            </div>
+          </div>
+
+          <p className="text-xs font-medium text-amber-700">
+            Con una firma cargada, todos los documentos que marques arriba
+            saldrán firmados automáticamente, sin revisión manual antes de
+            enviarlos o imprimirlos.
+          </p>
         </CardContent>
       </Card>
 

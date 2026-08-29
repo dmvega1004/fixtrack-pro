@@ -12,6 +12,7 @@ import { formatDate } from "@/lib/format/dates";
 import { formatCurrency } from "@/lib/format/currency";
 import { cn } from "@/lib/utils";
 import { cloudinaryUrl } from "@/lib/image/cloudinary-url";
+import { SignatureLine } from "@/components/shared/signature-line";
 import { PrintLetterhead, PRINT_BRAND_BLUE as BRAND_BLUE } from "./print-letterhead";
 
 interface WorkOrderPrintDocumentProps {
@@ -109,10 +110,17 @@ function BillingRow({
   );
 }
 
-function SignatureBox({ title }: { title: string }) {
+function SignatureBox({
+  title,
+  signatureImageUrl,
+}: {
+  title: string;
+  /** Solo el lado de quien EMITE el documento pasa esto — el del cliente nunca. */
+  signatureImageUrl?: string | null;
+}) {
   return (
     <div className="flex flex-col gap-8">
-      <div className="h-10 border-b border-neutral-400" />
+      <SignatureLine signatureImageUrl={signatureImageUrl} />
       <div className="flex flex-col gap-3 text-xs text-neutral-600">
         <span className="font-medium text-neutral-800">{title}</span>
         <span>Nombre: ____________________________</span>
@@ -401,7 +409,12 @@ export function WorkOrderPrintDocument({
 
       <footer className="mt-10 flex flex-col gap-8 break-inside-avoid">
         <div className="grid grid-cols-1 gap-10 sm:grid-cols-2">
-          <SignatureBox title="Técnico responsable" />
+          <SignatureBox
+            title="Técnico responsable"
+            signatureImageUrl={
+              company.signatureInWorkOrder ? company.signatureImageUrl : null
+            }
+          />
           <SignatureBox title="Recibido por el cliente" />
         </div>
         {/* En pantalla se ve acá; al imprimir la reemplaza el pie fijo de abajo,
