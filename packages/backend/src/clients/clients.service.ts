@@ -1,9 +1,17 @@
 import {
+  BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Client, Prisma } from 'database';
+import { Client, Prisma, Role } from 'database';
+import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
+import {
+  cloudinaryRootFolder,
+  CloudinaryService,
+} from '../cloudinary/cloudinary.service';
+import { validateImageFile } from '../cloudinary/validate-image-file';
 import { PrismaService } from '../prisma.service';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
@@ -16,6 +24,32 @@ export type ClientListItem = Client & {
   orderCount: number;
 };
 
+/** Lado máximo del logo del formato del cliente: no necesita alta resolución. */
+const MAX_REPORT_FORMAT_LOGO_DIMENSION = 512;
+
+/**
+ * Campos del formato de informe propio del cliente (Módulo de Formatos).
+ * RBAC: solo ADMIN/COORDINATOR pueden tocarlos (ver ensureCanConfigureReportFormat) —
+ * el resto de la ficha del cliente (name, phone, city, etc.) sigue abierta a
+ * cualquier rol autenticado, sin cambios.
+ */
+const REPORT_FORMAT_FIELD_NAMES = [
+  'reportFormatEnabled',
+  'reportFormatTitle',
+  'reportFormatCode',
+  'reportFormatVersion',
+  'reportFormatDate',
+  'reportFormatAccentColor',
+  'reportFormatFooter',
+  'reportFormatIssuer',
+  'reportFormatS1Label',
+  'reportFormatS1Source',
+  'reportFormatS2Label',
+  'reportFormatS2Source',
+  'reportFormatS3Label',
+  'reportFormatS3Source',
+] as const satisfies readonly (keyof CreateClientDto)[];
+
 /**
  * REGLA DE ORO MULTI-TENANT:
  * Todos los métodos reciben `companyId` como PRIMER parámetro obligatorio
@@ -24,9 +58,18 @@ export type ClientListItem = Client & {
  */
 @Injectable()
 export class ClientsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cloudinary: CloudinaryService,
+  ) {}
 
-  create(companyId: string, dto: CreateClientDto): Promise<Client> {
+  create(user: AuthenticatedUser, dto: CreateClientDto): Promise<Client> {
+    this.ensureCanConfigureReportFormat(user, dto);
+    this.ensureReportFormatTitlePresent(
+      dto.reportFormatEnabled ?? false,
+      dto.reportFormatTitle,
+    );
+
     return this.prisma.client.create({
       data: {
         name: dto.name.trim(),
@@ -35,8 +78,10 @@ export class ClientsService {
         documentType: dto.documentType,
         documentNumber: dto.documentNumber?.trim(),
         address: dto.address?.trim(),
+        city: dto.city?.trim(),
         paymentTermDays: dto.paymentTermDays,
-        companyId, // candado: el cliente nace amarrado al tenant del token
+        ...this.reportFormatData(dto),
+        companyId: user.companyId, // candado: el cliente nace amarrado al tenant del token
       },
     });
   }
@@ -75,12 +120,25 @@ export class ClientsService {
   }
 
   async update(
-    companyId: string,
+    user: AuthenticatedUser,
     id: string,
     dto: UpdateClientDto,
   ): Promise<Client> {
     // Verifica pertenencia al tenant ANTES de tocar el registro (404 si es ajeno)
-    await this.findOne(companyId, id);
+    const existing = await this.findOne(user.companyId, id);
+
+    this.ensureCanConfigureReportFormat(user, dto);
+    // Estado EFECTIVO tras el merge (no solo lo que trae este PATCH parcial):
+    // si el cliente ya tenía el formato activo y este request solo cambia
+    // otro campo, reportFormatEnabled no viene en el dto — hay que mirar lo
+    // ya guardado, igual que otras reglas de negocio de este proyecto (ej.
+    // billedAt en WorkOrdersService).
+    this.ensureReportFormatTitlePresent(
+      dto.reportFormatEnabled ?? existing.reportFormatEnabled,
+      dto.reportFormatTitle !== undefined
+        ? dto.reportFormatTitle
+        : existing.reportFormatTitle,
+    );
 
     return this.prisma.client.update({
       where: { id },
@@ -91,9 +149,104 @@ export class ClientsService {
         documentType: dto.documentType,
         documentNumber: dto.documentNumber?.trim(),
         address: dto.address?.trim(),
+        city: dto.city?.trim(),
         paymentTermDays: dto.paymentTermDays,
+        ...this.reportFormatData(dto),
       },
     });
+  }
+
+  /**
+   * POST /clients/:id/report-format-logo — sube el logo del formato de
+   * informe propio de ESTE cliente. Mismo patrón que CompanyService.updateLogo:
+   * borra el logo anterior en Cloudinary si era realmente un archivo
+   * nuestro (extractPublicId devuelve null para rutas ajenas/legacy).
+   * Carpeta separada por cliente para no mezclar logos entre clientes.
+   */
+  async updateReportFormatLogo(
+    companyId: string,
+    id: string,
+    file: Express.Multer.File | undefined,
+  ): Promise<Client> {
+    validateImageFile(file);
+
+    const current = await this.findOne(companyId, id); // candado + 404
+
+    const uploaded = await this.cloudinary.uploadBuffer(file.buffer, {
+      folder: `${cloudinaryRootFolder()}/${companyId}/clients/${id}/report-format`,
+      maxDimension: MAX_REPORT_FORMAT_LOGO_DIMENSION,
+    });
+
+    const updated = await this.prisma.client.update({
+      where: { id },
+      data: { reportFormatLogoUrl: uploaded.secure_url },
+    });
+
+    if (current.reportFormatLogoUrl) {
+      const oldPublicId = this.cloudinary.extractPublicId(
+        current.reportFormatLogoUrl,
+      );
+      if (oldPublicId) {
+        await this.cloudinary.destroy(oldPublicId);
+      }
+    }
+
+    return updated;
+  }
+
+  /**
+   * RBAC: configurar el formato de informe propio es de ADMIN/COORDINATOR —
+   * igual que el resto de la ficha del cliente en la práctica (TECHNICIAN
+   * puede crear/editar clientes en campo, pero nunca este bloque en
+   * particular: implica identidad de marca de otra empresa en un documento
+   * oficial).
+   */
+  private ensureCanConfigureReportFormat(
+    user: AuthenticatedUser,
+    dto: CreateClientDto | UpdateClientDto,
+  ): void {
+    if (user.role !== Role.TECHNICIAN) return;
+
+    const touched = REPORT_FORMAT_FIELD_NAMES.filter(
+      (field) => dto[field] !== undefined,
+    );
+    if (touched.length > 0) {
+      throw new ForbiddenException(
+        `Solo ADMIN o COORDINATOR pueden configurar el formato de informe del cliente. ` +
+          `Campos no permitidos: ${touched.join(', ')}`,
+      );
+    }
+  }
+
+  /** El título es obligatorio si el formato está activo — lo demás es opcional. */
+  private ensureReportFormatTitlePresent(
+    effectiveEnabled: boolean,
+    effectiveTitle: string | null | undefined,
+  ): void {
+    if (effectiveEnabled && !effectiveTitle?.trim()) {
+      throw new BadRequestException(
+        'reportFormatTitle es obligatorio cuando el formato de informe está activo',
+      );
+    }
+  }
+
+  private reportFormatData(dto: CreateClientDto | UpdateClientDto) {
+    return {
+      reportFormatEnabled: dto.reportFormatEnabled,
+      reportFormatTitle: dto.reportFormatTitle?.trim(),
+      reportFormatCode: dto.reportFormatCode?.trim(),
+      reportFormatVersion: dto.reportFormatVersion?.trim(),
+      reportFormatDate: dto.reportFormatDate?.trim(),
+      reportFormatAccentColor: dto.reportFormatAccentColor,
+      reportFormatFooter: dto.reportFormatFooter?.trim(),
+      reportFormatIssuer: dto.reportFormatIssuer?.trim(),
+      reportFormatS1Label: dto.reportFormatS1Label?.trim(),
+      reportFormatS1Source: dto.reportFormatS1Source,
+      reportFormatS2Label: dto.reportFormatS2Label?.trim(),
+      reportFormatS2Source: dto.reportFormatS2Source,
+      reportFormatS3Label: dto.reportFormatS3Label?.trim(),
+      reportFormatS3Source: dto.reportFormatS3Source,
+    };
   }
 
   async remove(companyId: string, id: string): Promise<Client> {

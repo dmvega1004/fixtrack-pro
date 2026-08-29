@@ -41,6 +41,17 @@ export class CreateWorkOrderDto {
   clientId: string;
 
   /**
+   * Cliente FINAL del servicio, cuando se trabaja como subcontratista de
+   * `clientId` (ver WorkOrder.endClientName en el schema). Opcional: en el
+   * formato de informe propio del cliente contratante, vacío = línea en
+   * blanco para llenar a mano.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(150)
+  endClientName?: string;
+
+  /**
    * Equipos a intervenir (opcional, varios): la empresa también presta
    * servicios locativos (sellado, limpieza, instalación) sin equipo
    * asociado — un array vacío u omitido es un servicio locativo. Una
@@ -78,7 +89,8 @@ export class CreateWorkOrderDto {
    */
   @IsOptional()
   @IsEnum(ServiceType, {
-    message: 'serviceType debe ser CORRECTIVE, PREVENTIVE, INSPECTION o INSTALLATION',
+    message:
+      'serviceType debe ser CORRECTIVE, PREVENTIVE, INSPECTION o INSTALLATION',
   })
   serviceType?: ServiceType;
 }
