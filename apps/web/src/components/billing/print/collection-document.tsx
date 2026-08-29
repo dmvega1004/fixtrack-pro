@@ -104,7 +104,10 @@ export function CollectionDocument({
   company,
   partsSummary,
 }: CollectionDocumentProps) {
-  const billing = partsSummary.billing;
+  // Esta página solo la alcanzan ADMIN/COORDINATOR (TECHNICIAN se redirige
+  // en /ordenes/[id]/cuenta-de-cobro/page.tsx antes de llegar acá), así que
+  // billing siempre viene presente — ver WorkOrderPartsService.listParts.
+  const billing = partsSummary.billing!;
   const currency = company.currency;
 
   const documentLabel =

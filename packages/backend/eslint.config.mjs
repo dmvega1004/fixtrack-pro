@@ -29,6 +29,11 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-floating-promises': 'warn',
       '@typescript-eslint/no-unsafe-argument': 'warn',
+      // ignoreRestSiblings: el patrón RBAC de este proyecto para redactar
+      // campos (`const { unitCost: _unitCost, ...rest } = line;`) descarta
+      // el campo sensible destructurándolo sin usarlo — eso es intencional,
+      // no una variable olvidada.
+      '@typescript-eslint/no-unused-vars': ['error', { ignoreRestSiblings: true }],
       "prettier/prettier": ["error", { endOfLine: "auto" }],
     },
   },

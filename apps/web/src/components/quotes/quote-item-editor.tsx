@@ -61,7 +61,10 @@ export function QuoteItemEditor({ items, onChange, spareParts, currency }: Quote
       spareParts.map((part) => ({
         id: part.id,
         label: part.name,
-        hint: `${part.sku} · ${formatCurrency(part.salePrice, currency)}`,
+        // El módulo de cotizaciones es ADMIN/COORDINATOR-only: spareParts
+        // siempre trae salePrice (redactado solo para TECHNICIAN); el
+        // fallback es solo para el tipo compartido.
+        hint: `${part.sku} · ${formatCurrency(part.salePrice ?? "0", currency)}`,
       })),
     [spareParts, currency],
   );
@@ -87,7 +90,7 @@ export function QuoteItemEditor({ items, onChange, spareParts, currency }: Quote
       {
         description: part.name,
         quantity: "1",
-        unitPrice: part.salePrice,
+        unitPrice: part.salePrice ?? "0",
         sparePartId: part.id,
       },
     ]);

@@ -51,7 +51,7 @@ export function WorkOrdersList({ workOrders }: WorkOrdersListProps) {
                     <span className="whitespace-nowrap font-medium">
                       {formatOrderNumber(order.orderNumber)}
                     </span>
-                    {order.collectionNumber !== null && (
+                    {order.collectionNumber != null && (
                       <span className="whitespace-nowrap text-xs text-muted-foreground">
                         {formatCollectionNumber(order.collectionNumber)}
                       </span>

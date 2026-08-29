@@ -6,7 +6,8 @@ import type { PaymentStatus } from "./work-orders";
 export interface WorkOrderPartLine {
   id: string;
   quantity: number;
-  unitPrice: string;
+  /** Redactado por el backend para TECHNICIAN (RBAC financiero). */
+  unitPrice?: string;
   /** Redactado por el backend para todo rol distinto de ADMIN. */
   unitCost?: string;
   workOrderId: string;
@@ -23,7 +24,8 @@ export interface WorkOrderPartLine {
 
 /**
  * Cierre económico de la orden. Los montos son precios al cliente (no
- * costos): visibles para los 3 roles; solo ADMIN puede editarlos.
+ * costos): visibles para ADMIN/COORDINATOR; solo ADMIN puede editarlos.
+ * Omitido por completo para TECHNICIAN (ver WorkOrderPartsSummary.billing).
  */
 export interface WorkOrderBilling {
   laborAmount: string;
@@ -45,10 +47,12 @@ export interface WorkOrderBilling {
 
 export interface WorkOrderPartsSummary {
   items: WorkOrderPartLine[];
-  totalSale: string;
+  /** Omitido para TECHNICIAN (RBAC financiero) — ver WorkOrderPartLine.unitPrice. */
+  totalSale?: string;
   /** Solo presente para ADMIN. */
   totalCost?: string;
-  billing: WorkOrderBilling;
+  /** Omitido para TECHNICIAN (RBAC financiero). */
+  billing?: WorkOrderBilling;
   /**
    * Costos internos (bloque "Costos internos", pestaña «Valores») — lo que
    * el trabajo costó fuera del inventario. Solo presente para ADMIN, igual

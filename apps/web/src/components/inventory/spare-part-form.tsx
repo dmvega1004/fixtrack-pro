@@ -54,7 +54,10 @@ function toFormState(part: SparePart): SparePartFormState {
     description: part.description ?? "",
     category: (part.category as SparePartCategory) ?? "REPUESTO",
     cost: part.cost ?? "",
-    salePrice: part.salePrice,
+    // Este formulario solo lo monta ADMIN (rutas /inventario/nuevo y
+    // /inventario/[id]/editar), que siempre recibe salePrice — el
+    // fallback es solo para el tipo compartido, redactado para TECHNICIAN.
+    salePrice: part.salePrice ?? "",
     stock: String(part.stock),
     minStock: String(part.minStock),
     trackStock: part.trackStock,

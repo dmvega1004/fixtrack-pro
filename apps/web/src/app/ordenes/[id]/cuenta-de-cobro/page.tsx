@@ -26,7 +26,7 @@ export async function generateMetadata({
 
   try {
     const order = await getWorkOrder(id);
-    if (order.collectionNumber === null) {
+    if (order.collectionNumber == null) {
       return { title: "Cuenta de cobro" };
     }
     return {
@@ -43,7 +43,10 @@ export async function generateMetadata({
 /**
  * Fuera del grupo (dashboard): no hereda el layout con AppShell, pero por
  * eso repite acá la misma protección de sesión que aplica DashboardLayout
- * para el resto de rutas del panel — mismo patrón que /imprimir.
+ * para el resto de rutas del panel — mismo patrón que /imprimir. La cuenta
+ * de cobro es un documento financiero: el TECHNICIAN se redirige acá,
+ * mismo patrón que /cotizaciones/[id]/documento (RBAC financiero — un
+ * técnico no tiene por qué ver el total cobrado al cliente).
  */
 export default async function CuentaDeCobroPage({
   params,
@@ -52,6 +55,9 @@ export default async function CuentaDeCobroPage({
   const session = await getSession();
   if (!session) {
     redirect("/login");
+  }
+  if (session.role === "TECHNICIAN") {
+    redirect("/");
   }
 
   let order;
@@ -66,7 +72,7 @@ export default async function CuentaDeCobroPage({
 
   // Sin cuenta de cobro generada todavía: no hay documento que mostrar
   // (la generación es un paso ADMIN aparte, ver botón en el detalle de orden).
-  if (order.collectionNumber === null) {
+  if (order.collectionNumber == null) {
     notFound();
   }
 

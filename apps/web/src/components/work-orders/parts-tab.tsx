@@ -18,8 +18,8 @@ interface PartsTabProps {
   /** true si status es COMPLETED o DELIVERED — condición para admitir pagos. */
   isClosed: boolean;
   payments: Payment[];
-  /** Consecutivo de la cuenta de cobro emitida sobre esta orden; null hasta que se genera. */
-  collectionNumber: number | null;
+  /** Consecutivo de la cuenta de cobro emitida sobre esta orden; null hasta que se genera. Ausente para TECHNICIAN. */
+  collectionNumber?: number | null;
 }
 
 export function PartsTab({
@@ -35,9 +35,15 @@ export function PartsTab({
 }: PartsTabProps) {
   const { items, totalSale, totalCost, billing, directCostAmount, directCostDescription } =
     summary;
-  const balance = (Number(billing.total) - Number(billing.paidAmount)).toFixed(2);
+  // RBAC financiero: totalSale/billing vienen omitidos del todo para
+  // TECHNICIAN (ver WorkOrderPartsService.listParts) — ni un precio
+  // unitario, ni el subtotal de repuestos, ni el cierre económico.
+  const hasFinancials = billing !== undefined && totalSale !== undefined;
+  const balance = billing
+    ? (Number(billing.total) - Number(billing.paidAmount)).toFixed(2)
+    : "0";
   const margin =
-    totalCost !== undefined
+    totalCost !== undefined && totalSale !== undefined
       ? Number(totalSale) - Number(totalCost)
       : undefined;
 
@@ -56,8 +62,12 @@ export function PartsTab({
                   <th className="px-4 py-3 font-medium">Repuesto</th>
                   <th className="px-4 py-3 font-medium">SKU</th>
                   <th className="px-4 py-3 font-medium">Cantidad</th>
-                  <th className="px-4 py-3 font-medium">Precio unitario</th>
-                  <th className="px-4 py-3 font-medium">Subtotal</th>
+                  {hasFinancials && (
+                    <>
+                      <th className="px-4 py-3 font-medium">Precio unitario</th>
+                      <th className="px-4 py-3 font-medium">Subtotal</th>
+                    </>
+                  )}
                   {!isTerminal && <th className="px-4 py-3" />}
                 </tr>
               </thead>
@@ -69,15 +79,19 @@ export function PartsTab({
                       {line.sparePart.sku}
                     </td>
                     <td className="px-4 py-3">{line.quantity}</td>
-                    <td className="px-4 py-3">
-                      {formatCurrency(line.unitPrice, currency)}
-                    </td>
-                    <td className="px-4 py-3">
-                      {formatCurrency(
-                        Number(line.unitPrice) * line.quantity,
-                        currency,
-                      )}
-                    </td>
+                    {hasFinancials && line.unitPrice !== undefined && (
+                      <>
+                        <td className="px-4 py-3">
+                          {formatCurrency(line.unitPrice, currency)}
+                        </td>
+                        <td className="px-4 py-3">
+                          {formatCurrency(
+                            Number(line.unitPrice) * line.quantity,
+                            currency,
+                          )}
+                        </td>
+                      </>
+                    )}
                     {!isTerminal && (
                       <td className="px-4 py-3 text-right">
                         <RemovePartButton
@@ -112,55 +126,65 @@ export function PartsTab({
                 <span className="text-xs text-muted-foreground">
                   SKU {line.sparePart.sku}
                 </span>
-                <div className="flex justify-between text-sm">
-                  <span>
-                    {line.quantity} × {formatCurrency(line.unitPrice, currency)}
-                  </span>
-                  <span className="font-medium">
-                    {formatCurrency(
-                      Number(line.unitPrice) * line.quantity,
-                      currency,
-                    )}
-                  </span>
-                </div>
+                {hasFinancials && line.unitPrice !== undefined ? (
+                  <div className="flex justify-between text-sm">
+                    <span>
+                      {line.quantity} × {formatCurrency(line.unitPrice, currency)}
+                    </span>
+                    <span className="font-medium">
+                      {formatCurrency(
+                        Number(line.unitPrice) * line.quantity,
+                        currency,
+                      )}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-sm">Cantidad: {line.quantity}</span>
+                )}
               </div>
             ))}
           </div>
 
-          <div className="flex flex-col gap-1 rounded-lg border border-border bg-muted/50 p-4 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Subtotal repuestos</span>
-              <span className="font-semibold">
-                {formatCurrency(totalSale, currency)}
-              </span>
+          {hasFinancials && (
+            <div className="flex flex-col gap-1 rounded-lg border border-border bg-muted/50 p-4 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Subtotal repuestos</span>
+                <span className="font-semibold">
+                  {formatCurrency(totalSale, currency)}
+                </span>
+              </div>
+              {totalCost !== undefined && (
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Costo total</span>
+                  <span>{formatCurrency(totalCost, currency)}</span>
+                </div>
+              )}
+              {margin !== undefined && (
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Margen</span>
+                  <span>{formatCurrency(margin, currency)}</span>
+                </div>
+              )}
             </div>
-            {totalCost !== undefined && (
-              <div className="flex justify-between text-muted-foreground">
-                <span>Costo total</span>
-                <span>{formatCurrency(totalCost, currency)}</span>
-              </div>
-            )}
-            {margin !== undefined && (
-              <div className="flex justify-between text-muted-foreground">
-                <span>Margen</span>
-                <span>{formatCurrency(margin, currency)}</span>
-              </div>
-            )}
-          </div>
+          )}
         </>
       )}
 
       {!isTerminal && <AddPartPanel orderId={orderId} catalog={catalog} />}
 
-      <BillingSection
-        orderId={orderId}
-        billing={billing}
-        partsTotal={totalSale}
-        currency={currency}
-        isAdmin={isAdmin}
-        isTerminal={isTerminal}
-        collectionNumber={collectionNumber}
-      />
+      {/* RBAC financiero: billing viene omitido del todo para TECHNICIAN —
+          sin cierre económico que mostrar, no hay nada que renderizar. */}
+      {billing !== undefined && totalSale !== undefined && (
+        <BillingSection
+          orderId={orderId}
+          billing={billing}
+          partsTotal={totalSale}
+          currency={currency}
+          isAdmin={isAdmin}
+          isTerminal={isTerminal}
+          collectionNumber={collectionNumber}
+        />
+      )}
 
       {isAdmin && directCostAmount !== undefined && (
         <DirectCostSection

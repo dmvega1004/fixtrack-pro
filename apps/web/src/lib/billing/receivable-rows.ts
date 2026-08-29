@@ -31,10 +31,12 @@ export function buildReceivableRows(
       isOverdue: receivable.isOverdue,
       paymentStatus: receivable.paymentStatus,
     })),
+    // /cobros es ADMIN/COORDINATOR-only: paidOrders siempre trae estos
+    // campos (redactados solo para TECHNICIAN) — ver WorkOrdersService.toView.
     ...paidOrders.map((order) => ({
       orderId: order.id,
       orderNumber: order.orderNumber,
-      collectionNumber: order.collectionNumber,
+      collectionNumber: order.collectionNumber ?? null,
       clientName: order.client.name,
       description: order.description,
       total: order.totalAmount!,
@@ -45,7 +47,7 @@ export function buildReceivableRows(
         : 0,
       paymentTermDays: 0,
       isOverdue: false,
-      paymentStatus: order.paymentStatus,
+      paymentStatus: order.paymentStatus!,
     })),
   ];
 }

@@ -38,8 +38,9 @@ export default async function InventarioPage({
   const isAdmin = session?.role === "ADMIN";
 
   // Derivado de la respuesta real, no del rol: si el backend redactó `cost`
-  // para este usuario, ningún repuesto lo traerá.
+  // (o `salePrice`, para TECHNICIAN) para este usuario, ningún repuesto lo traerá.
   const showCost = allParts.some((part) => part.cost !== undefined);
+  const showSalePrice = allParts.some((part) => part.salePrice !== undefined);
   const lowStockCount = allParts.filter(needsRestock).length;
 
   let visibleParts = lowStockOnly
@@ -84,6 +85,7 @@ export default async function InventarioPage({
           currency={company.currency}
           canEdit={isAdmin}
           showCost={showCost}
+          showSalePrice={showSalePrice}
         />
       )}
     </div>

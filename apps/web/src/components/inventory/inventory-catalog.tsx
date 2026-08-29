@@ -16,6 +16,8 @@ interface InventoryCatalogProps {
   /** Derivado de la respuesta del backend (no del rol): true si al menos un
    * repuesto trajo `cost`. La UI nunca decide esto por su cuenta. */
   showCost: boolean;
+  /** Igual que showCost, pero para `salePrice` — redactado para TECHNICIAN. */
+  showSalePrice: boolean;
 }
 
 function marginPercent(salePrice: number, cost: number): number | null {
@@ -28,6 +30,7 @@ export function InventoryCatalog({
   currency,
   canEdit,
   showCost,
+  showSalePrice,
 }: InventoryCatalogProps) {
   const [query, setQuery] = useState("");
 
@@ -65,7 +68,9 @@ export function InventoryCatalog({
                   <th className="px-4 py-3 font-medium">SKU</th>
                   <th className="px-4 py-3 font-medium">Repuesto</th>
                   <th className="px-4 py-3 font-medium">Stock</th>
-                  <th className="px-4 py-3 font-medium">Precio venta</th>
+                  {showSalePrice && (
+                    <th className="px-4 py-3 font-medium">Precio venta</th>
+                  )}
                   {showCost && (
                     <th className="px-4 py-3 font-medium">Costo</th>
                   )}
@@ -80,7 +85,7 @@ export function InventoryCatalog({
                   const cost =
                     part.cost !== undefined ? Number(part.cost) : undefined;
                   const margin =
-                    cost !== undefined
+                    cost !== undefined && part.salePrice !== undefined
                       ? marginPercent(Number(part.salePrice), cost)
                       : undefined;
 
@@ -102,9 +107,11 @@ export function InventoryCatalog({
                           trackStock={part.trackStock}
                         />
                       </td>
-                      <td className="px-4 py-3">
-                        {formatCurrency(part.salePrice, currency)}
-                      </td>
+                      {showSalePrice && (
+                        <td className="px-4 py-3">
+                          {formatCurrency(part.salePrice!, currency)}
+                        </td>
+                      )}
                       {showCost && (
                         <td className="px-4 py-3">
                           {cost !== undefined
@@ -144,7 +151,7 @@ export function InventoryCatalog({
               const cost =
                 part.cost !== undefined ? Number(part.cost) : undefined;
               const margin =
-                cost !== undefined
+                cost !== undefined && part.salePrice !== undefined
                   ? marginPercent(Number(part.salePrice), cost)
                   : undefined;
 
@@ -168,12 +175,14 @@ export function InventoryCatalog({
                   </div>
                   <CategoryBadge category={part.category} />
                   <div className="flex flex-col gap-1 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">
-                        Precio venta
-                      </span>
-                      <span>{formatCurrency(part.salePrice, currency)}</span>
-                    </div>
+                    {showSalePrice && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">
+                          Precio venta
+                        </span>
+                        <span>{formatCurrency(part.salePrice!, currency)}</span>
+                      </div>
+                    )}
                     {showCost && (
                       <div className="flex justify-between text-muted-foreground">
                         <span>Costo</span>

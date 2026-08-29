@@ -13,7 +13,8 @@ export interface SparePart {
   minStock: number;
   /** false = se pide contra pedido: no entra en alertas ni mueve stock. */
   trackStock: boolean;
-  salePrice: string;
+  /** Redactado por el backend para TECHNICIAN (RBAC financiero). */
+  salePrice?: string;
   /** Redactado por el backend para todo rol distinto de ADMIN. */
   cost?: string;
   companyId: string;
@@ -39,7 +40,10 @@ interface GetSparePartsOptions {
   lowStock?: boolean;
 }
 
-/** GET /spare-parts[?lowStock=true]. Catálogo completo (visible a los 3 roles). */
+/**
+ * GET /spare-parts[?lowStock=true]. Catálogo completo (visible a los 3
+ * roles); salePrice viene omitido para TECHNICIAN.
+ */
 export function getSpareParts(
   options: GetSparePartsOptions = {},
 ): Promise<SparePart[]> {

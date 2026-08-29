@@ -8,8 +8,13 @@ import { deleteWorkOrderAction, changeStatusAction } from "@/app/(dashboard)/ord
 interface DeleteOrderButtonProps {
   orderId: string;
   orderNumber: number;
-  /** Consecutivo de la cuenta de cobro emitida sobre esta orden; null hasta que se genera. */
-  collectionNumber: number | null;
+  /**
+   * Consecutivo de la cuenta de cobro emitida sobre esta orden; null hasta
+   * que se genera. Este botón solo lo monta ADMIN, pero el tipo es
+   * opcional porque viene de WorkOrder.collectionNumber, redactado para
+   * TECHNICIAN.
+   */
+  collectionNumber?: number | null;
 }
 
 /**
@@ -50,7 +55,7 @@ export function DeleteOrderButton({
           Los repuestos consumidos por esta orden volverán al inventario
           automáticamente.
         </p>
-        {collectionNumber !== null && (
+        {collectionNumber != null && (
           <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-900">
             Esta orden tiene la cuenta de cobro{" "}
             {formatCollectionNumber(collectionNumber)} emitida. Al eliminarla

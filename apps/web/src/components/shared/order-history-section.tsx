@@ -46,7 +46,7 @@ interface OrderEntryProps {
 }
 
 function resolveValue(order: WorkOrder, estimatedValue: number | undefined) {
-  if (order.totalAmount !== null) {
+  if (order.totalAmount != null) {
     return { value: Number(order.totalAmount), isEstimated: false };
   }
   if (estimatedValue !== undefined) {
@@ -79,7 +79,7 @@ function OrderRow({ order, isAdmin, currency, estimatedValue }: OrderEntryProps)
             )}
           </span>
         )}
-        {isAdmin && <PaymentStatusChip status={order.paymentStatus} />}
+        {isAdmin && order.paymentStatus && <PaymentStatusChip status={order.paymentStatus} />}
         <StatusChip status={order.status} />
         <span className="text-xs whitespace-nowrap text-muted-foreground">
           {formatDate(order.createdAt)}
@@ -120,7 +120,7 @@ function OrderCard({ order, isAdmin, currency, estimatedValue }: OrderEntryProps
           </span>
         )}
         <StatusChip status={order.status} />
-        {isAdmin && <PaymentStatusChip status={order.paymentStatus} />}
+        {isAdmin && order.paymentStatus && <PaymentStatusChip status={order.paymentStatus} />}
       </div>
     </Link>
   );

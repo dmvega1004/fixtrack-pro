@@ -11,7 +11,12 @@ import { generateCollectionDocumentAction } from "@/app/(dashboard)/ordenes/[id]
 
 interface CollectionDocumentButtonProps {
   orderId: string;
-  collectionNumber: number | null;
+  /**
+   * Este botón solo lo monta ADMIN (candado en el componente padre), pero
+   * el tipo es opcional porque viene de WorkOrder.collectionNumber,
+   * redactado para TECHNICIAN.
+   */
+  collectionNumber?: number | null;
   /** Título configurado de la empresa (ej. "Cuenta de cobro") para el label del botón. */
   docTitle: string;
 }
@@ -29,7 +34,7 @@ export function CollectionDocumentButton({
   const router = useRouter();
   const [isGenerating, setIsGenerating] = useState(false);
 
-  if (collectionNumber !== null) {
+  if (collectionNumber != null) {
     return (
       <Link
         href={`/ordenes/${orderId}/cuenta-de-cobro`}

@@ -36,7 +36,10 @@ const PART_SUMMARY = {
  * financiero): unitCost solo para ADMIN; unitPrice también se omite para
  * TECHNICIAN (ve qué repuesto y cuánta cantidad, nunca el precio).
  */
-export type WorkOrderPartView = Omit<WorkOrderPart, 'unitCost' | 'unitPrice'> & {
+export type WorkOrderPartView = Omit<
+  WorkOrderPart,
+  'unitCost' | 'unitPrice'
+> & {
   unitCost?: WorkOrderPart['unitCost'];
   unitPrice?: WorkOrderPart['unitPrice'];
 };

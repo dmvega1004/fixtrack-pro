@@ -43,15 +43,19 @@ export interface WorkOrder {
   clientId: string;
   userId: string | null;
   companyId: string;
-  /** Mano de obra cobrada en la orden. */
-  laborAmount: string;
+  /**
+   * Mano de obra cobrada en la orden. Omitido por el backend para
+   * TECHNICIAN (RBAC financiero) — igual que el resto de los campos
+   * monetarios de este bloque.
+   */
+  laborAmount?: string;
   /** Cargos adicionales (transporte u otros), con su descripción. */
-  additionalAmount: string;
-  additionalDescription: string | null;
-  discountAmount: string;
+  additionalAmount?: string;
+  additionalDescription?: string | null;
+  discountAmount?: string;
   /** Congelados al pasar la orden a COMPLETED; null mientras sigue abierta. */
-  taxRateApplied: string | null;
-  totalAmount: string | null;
+  taxRateApplied?: string | null;
+  totalAmount?: string | null;
   /**
    * Costo interno del trabajo, fuera de inventario (ver módulo de
    * Rentabilidad). Redactado por el backend para todo rol distinto de
@@ -60,10 +64,11 @@ export interface WorkOrder {
   directCostAmount?: string;
   directCostDescription?: string | null;
   billedAt: string | null;
-  paymentStatus: PaymentStatus;
-  /** Consecutivo de la cuenta de cobro emitida sobre esta orden; null hasta que se genera. */
-  collectionNumber: number | null;
-  collectionIssuedAt: string | null;
+  /** Omitido para TECHNICIAN. */
+  paymentStatus?: PaymentStatus;
+  /** Consecutivo de la cuenta de cobro emitida sobre esta orden; null hasta que se genera. Omitido para TECHNICIAN. */
+  collectionNumber?: number | null;
+  collectionIssuedAt?: string | null;
   createdAt: string;
   updatedAt: string;
   client: WorkOrderClient;

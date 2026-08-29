@@ -1126,7 +1126,9 @@ export class WorkOrdersService {
     // bitácora (ver más abajo). workOrder ya viene de findOne(), con
     // user/equipments incluidos.
     const actorName = activityAuthorName(user);
-    const oldEquipments = workOrder.equipmentLinks.map((link) => link.equipment);
+    const oldEquipments = workOrder.equipmentLinks.map(
+      (link) => link.equipment,
+    );
     const oldEquipmentIds = new Set(oldEquipments.map((e) => e.id));
     const oldEquipmentsById = new Map(
       oldEquipments.map((equipment) => [equipment.id, equipment]),

@@ -32,7 +32,7 @@ export function WorkOrderCard({ order }: WorkOrderCardProps) {
         </span>
         <StatusChip status={order.status} />
       </div>
-      {order.collectionNumber !== null && (
+      {order.collectionNumber != null && (
         <span className="text-xs text-muted-foreground">
           {formatCollectionNumber(order.collectionNumber)}
         </span>

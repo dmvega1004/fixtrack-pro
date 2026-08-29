@@ -61,16 +61,18 @@ export default async function ClienteDetallePage({ params }: ClienteDetallePageP
   // abiertas no, así que para mostrar un valor "estimado" en el historial
   // hay que pedir su cierre económico en vivo. Se acota a las abiertas de
   // ESTE cliente (normalmente pocas), no a las de toda la empresa.
-  const openOrders = isAdmin ? history.filter((order) => order.totalAmount === null) : [];
+  const openOrders = isAdmin ? history.filter((order) => order.totalAmount == null) : [];
   const openBillings = await Promise.all(
     openOrders.map((order) => getWorkOrderParts(order.id)),
   );
+  // openOrders solo se llena para isAdmin (arriba): billing siempre viene
+  // presente en ese caso (RBAC financiero — ver WorkOrderPartsService.listParts).
   const estimatedValueByOrderId = new Map(
-    openOrders.map((order, index) => [order.id, Number(openBillings[index].billing.total)]),
+    openOrders.map((order, index) => [order.id, Number(openBillings[index].billing!.total)]),
   );
 
   const totalBilledHistoric = history
-    .filter((order) => order.totalAmount !== null)
+    .filter((order) => order.totalAmount != null)
     .reduce((sum, order) => sum + Number(order.totalAmount), 0);
   const pendingBalance = Number(
     clientBalances.find((entry) => entry.clientId === client.id)?.balance ?? 0,

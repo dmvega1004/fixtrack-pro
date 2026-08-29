@@ -21,8 +21,13 @@ interface BillingSectionProps {
   currency: string;
   isAdmin: boolean;
   isTerminal: boolean;
-  /** Consecutivo de la cuenta de cobro emitida sobre esta orden; null hasta que se genera. */
-  collectionNumber: number | null;
+  /**
+   * Consecutivo de la cuenta de cobro emitida sobre esta orden; null hasta
+   * que se genera. Este componente solo se monta cuando `billing` está
+   * presente (ADMIN/COORDINATOR), pero el tipo se declara opcional porque
+   * viene de WorkOrder.collectionNumber, redactado para TECHNICIAN.
+   */
+  collectionNumber?: number | null;
 }
 
 interface BillingFormState {
@@ -142,7 +147,7 @@ export function BillingSection({
         <BilledAtEditor orderId={orderId} billedAt={billing.billedAt} />
       )}
 
-      {canEdit && collectionNumber !== null && (
+      {canEdit && collectionNumber != null && (
         <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
           Esta orden tiene la cuenta de cobro {formatCollectionNumber(collectionNumber)}{" "}
           emitida. Si cambias los valores, el documento que tiene el cliente
