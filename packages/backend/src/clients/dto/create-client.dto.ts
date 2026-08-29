@@ -28,6 +28,7 @@ export const REPORT_FORMAT_SOURCES = [
   'DESCRIPTION',
   'DIAGNOSIS',
   'OBSERVATIONS',
+  'SUGGESTIONS',
   'EMPTY',
 ] as const;
 
@@ -136,7 +137,7 @@ export class CreateClientDto {
   @IsOptional()
   @IsIn(REPORT_FORMAT_SOURCES, {
     message:
-      'reportFormatS1Source debe ser DESCRIPTION, DIAGNOSIS, OBSERVATIONS o EMPTY',
+      'reportFormatS1Source debe ser DESCRIPTION, DIAGNOSIS, OBSERVATIONS, SUGGESTIONS o EMPTY',
   })
   reportFormatS1Source?: string;
 
@@ -148,7 +149,7 @@ export class CreateClientDto {
   @IsOptional()
   @IsIn(REPORT_FORMAT_SOURCES, {
     message:
-      'reportFormatS2Source debe ser DESCRIPTION, DIAGNOSIS, OBSERVATIONS o EMPTY',
+      'reportFormatS2Source debe ser DESCRIPTION, DIAGNOSIS, OBSERVATIONS, SUGGESTIONS o EMPTY',
   })
   reportFormatS2Source?: string;
 
@@ -160,7 +161,7 @@ export class CreateClientDto {
   @IsOptional()
   @IsIn(REPORT_FORMAT_SOURCES, {
     message:
-      'reportFormatS3Source debe ser DESCRIPTION, DIAGNOSIS, OBSERVATIONS o EMPTY',
+      'reportFormatS3Source debe ser DESCRIPTION, DIAGNOSIS, OBSERVATIONS, SUGGESTIONS o EMPTY',
   })
   reportFormatS3Source?: string;
 }
