@@ -375,6 +375,13 @@ model WorkOrder {
   /// Bucaramanga, servicio prestado en otra ciudad). Si está vacía, el
   /// formato de informe propio del cliente usa Client.city como respaldo.
   serviceCity           String?
+  /// Hora del servicio en formato HH:mm, capturada por el usuario — texto
+  /// libre, NUNCA un instante calculado: cerrar la orden es un acto
+  /// administrativo (suele pasar cuando el técnico vuelve a la oficina),
+  /// no el momento real del trabajo. Guardarla como texto evita reintroducir
+  /// problemas de zona horaria. Vacía: el formato de informe propio del
+  /// cliente usa la hora de cierre (billedAt) como respaldo.
+  serviceTime           String?
   /// Cliente dueño de la orden — vínculo principal. Toda orden pertenece a
   /// un cliente; los equipos son opcionales y pueden ser varios (ver
   /// equipmentLinks) — cero equipos es un servicio locativo.
