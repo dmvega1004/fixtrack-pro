@@ -36,12 +36,25 @@ export interface WorkOrder {
   diagnosis: string | null;
   observations: string | null;
   /**
+   * Recomendaciones al cliente, separadas de `observations` (notas de lo
+   * que se hizo). Alimenta la sección SUGGESTIONS del formato de informe
+   * propio del cliente y, si tiene contenido, un bloque propio en el
+   * informe de la empresa.
+   */
+  suggestions: string | null;
+  /**
    * Cliente FINAL del servicio, cuando se trabaja como subcontratista de
    * `client` (ver WorkOrder.endClientName en el schema). Vacío si no se
    * definió — la línea "Cliente" del formato de informe propio sale en
    * blanco.
    */
   endClientName: string | null;
+  /**
+   * Ciudad donde se ejecutó ESTE servicio — puede diferir de la ciudad
+   * registrada en la ficha del cliente. Vacío: el formato de informe
+   * propio del cliente usa la ciudad del cliente como respaldo.
+   */
+  serviceCity: string | null;
   status: OrderStatus;
   priority: Priority;
   /** CORRECTIVE por defecto. El técnico no puede cambiarlo tras la creación. */

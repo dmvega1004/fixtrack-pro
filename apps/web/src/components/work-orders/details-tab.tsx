@@ -3,6 +3,8 @@ import type { Technician } from "@/lib/api/users";
 import { DescriptionEditor } from "./description-editor";
 import { DiagnosisEditor } from "./diagnosis-editor";
 import { ObservationsEditor } from "./observations-editor";
+import { SuggestionsEditor } from "./suggestions-editor";
+import { ServiceLocationEditor } from "./service-location-editor";
 import { ReassignTechnician } from "./reassign-technician";
 import { PriorityEditor } from "./priority-editor";
 import { ServiceTypeEditor } from "./service-type-editor";
@@ -40,6 +42,19 @@ export function DetailsTab({
       <ObservationsEditor
         orderId={order.id}
         initialObservations={order.observations}
+        isTerminal={isTerminal}
+      />
+
+      <SuggestionsEditor
+        orderId={order.id}
+        initialSuggestions={order.suggestions}
+        isTerminal={isTerminal}
+      />
+
+      <ServiceLocationEditor
+        orderId={order.id}
+        initialEndClientName={order.endClientName}
+        initialServiceCity={order.serviceCity}
         isTerminal={isTerminal}
       />
 

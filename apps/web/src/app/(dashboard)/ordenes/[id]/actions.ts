@@ -85,6 +85,34 @@ export async function saveObservationsAction(
   );
 }
 
+export async function saveSuggestionsAction(
+  orderId: string,
+  suggestions: string,
+): Promise<ActionResult> {
+  return runMutation(orderId, () =>
+    serverFetch(`/work-orders/${orderId}`, {
+      method: "PATCH",
+      body: { suggestions },
+    }),
+  );
+}
+
+/**
+ * Cliente final y ciudad del servicio se guardan juntos en un solo PATCH —
+ * un bloque, un botón de guardar (ver ServiceLocationEditor).
+ */
+export async function saveServiceLocationAction(
+  orderId: string,
+  input: { endClientName: string; serviceCity: string },
+): Promise<ActionResult> {
+  return runMutation(orderId, () =>
+    serverFetch(`/work-orders/${orderId}`, {
+      method: "PATCH",
+      body: input,
+    }),
+  );
+}
+
 export async function reassignTechnicianAction(
   orderId: string,
   userId: string | null,
