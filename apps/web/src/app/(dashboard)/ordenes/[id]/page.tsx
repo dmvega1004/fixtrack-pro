@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Printer } from "lucide-react";
 import { getSession } from "@/lib/session";
 import { getWorkOrder } from "@/lib/api/work-orders";
+import { getClient } from "@/lib/api/clients";
 import { getWorkOrderParts } from "@/lib/api/work-order-parts";
 import { getSpareParts } from "@/lib/api/spare-parts";
 import { getTechnicians } from "@/lib/api/users";
@@ -63,6 +64,7 @@ export default async function OrdenDetallePage({
     catalog,
     photos,
     company,
+    client,
     clientEquipments,
     payments,
     activityLog,
@@ -72,6 +74,7 @@ export default async function OrdenDetallePage({
     isTerminal ? Promise.resolve([]) : getSpareParts(),
     getPhotos(id),
     getCompany(),
+    getClient(order.clientId),
     canManage ? getEquipments({ clientId: order.clientId }) : Promise.resolve([]),
     isAdmin && isClosed ? getWorkOrderPayments(id) : Promise.resolve([]),
     getActivityLog(id),
@@ -97,6 +100,15 @@ export default async function OrdenDetallePage({
               <Printer className="size-4" />
               Imprimir orden
             </Link>
+            {client.reportFormatEnabled && (
+              <Link
+                href={`/ordenes/${order.id}/formato-cliente`}
+                className={buttonVariants({ variant: "outline", size: "sm" })}
+              >
+                <Printer className="size-4" />
+                Imprimir formato del cliente
+              </Link>
+            )}
             {isAdmin && isClosed && (
               <CollectionDocumentButton
                 orderId={order.id}

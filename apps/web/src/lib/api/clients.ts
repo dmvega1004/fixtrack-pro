@@ -1,16 +1,12 @@
 import { serverFetch } from "./server-fetch";
 import type { DocumentType } from "@/lib/document-type";
+import type { ReportFormatSource } from "@/lib/report-format";
 
 export type { DocumentType } from "@/lib/document-type";
-
-/** Debe reflejar exactamente REPORT_FORMAT_SOURCES del backend (create-client.dto.ts). */
-export const REPORT_FORMAT_SOURCES = [
-  "DESCRIPTION",
-  "DIAGNOSIS",
-  "OBSERVATIONS",
-  "EMPTY",
-] as const;
-export type ReportFormatSource = (typeof REPORT_FORMAT_SOURCES)[number];
+// REPORT_FORMAT_SOURCES/ReportFormatSource viven en lib/report-format.ts
+// (sin dependencias de servidor) — ver ese archivo para el porqué.
+export { REPORT_FORMAT_SOURCES } from "@/lib/report-format";
+export type { ReportFormatSource } from "@/lib/report-format";
 
 // Debe reflejar exactamente el modelo Client de packages/database/prisma/schema.prisma
 export interface Client {

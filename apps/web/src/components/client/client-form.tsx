@@ -9,19 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DOCUMENT_TYPES, DOCUMENT_TYPE_LABELS, type DocumentType } from "@/lib/document-type";
+import type { Client } from "@/lib/api/clients";
 import {
   REPORT_FORMAT_SOURCES,
-  type Client,
+  REPORT_FORMAT_SOURCE_LABELS,
   type ReportFormatSource,
-} from "@/lib/api/clients";
+} from "@/lib/report-format";
 import { createClientAction, updateClientAction } from "@/app/(dashboard)/clientes/actions";
-
-const REPORT_FORMAT_SOURCE_LABELS: Record<ReportFormatSource, string> = {
-  DESCRIPTION: "Descripción del problema",
-  DIAGNOSIS: "Diagnóstico",
-  OBSERVATIONS: "Observaciones / notas del servicio",
-  EMPTY: "En blanco (para llenar a mano)",
-};
 
 const DEFAULT_ACCENT_COLOR = "#2563EB";
 

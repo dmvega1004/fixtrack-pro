@@ -35,6 +35,13 @@ export interface WorkOrder {
   description: string;
   diagnosis: string | null;
   observations: string | null;
+  /**
+   * Cliente FINAL del servicio, cuando se trabaja como subcontratista de
+   * `client` (ver WorkOrder.endClientName en el schema). Vacío si no se
+   * definió — la línea "Cliente" del formato de informe propio sale en
+   * blanco.
+   */
+  endClientName: string | null;
   status: OrderStatus;
   priority: Priority;
   /** CORRECTIVE por defecto. El técnico no puede cambiarlo tras la creación. */
