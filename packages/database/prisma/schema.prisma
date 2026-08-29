@@ -305,6 +305,11 @@ model WorkOrder {
   diagnosis             String?
   /// Notas del servicio realizado, separadas del diagnóstico inicial.
   observations          String?
+  /// Recomendaciones al cliente (ej. "cambiar el filtro cada 3 meses"),
+  /// separadas de `observations` (notas de LO QUE SE HIZO). Alimenta la
+  /// sección SUGGESTIONS del formato de informe propio del cliente y, si
+  /// tiene contenido, un bloque propio en el informe de la empresa.
+  suggestions           String?
   /// CORRECTIVE por defecto: valor honesto para las órdenes existentes al
   /// introducir este campo (nadie sabía que eran inspecciones) — el
   /// usuario corrige las que en realidad lo fueron.
@@ -346,6 +351,11 @@ model WorkOrder {
   /// destinatario real del servicio. Opcional — vacío, la línea sale en
   /// blanco para llenarla a mano (ver /ordenes/[id]/formato-cliente).
   endClientName         String?
+  /// Ciudad donde se ejecutó ESTE servicio — puede diferir de la ciudad
+  /// registrada en la ficha del cliente (ej. cliente con sede en
+  /// Bucaramanga, servicio prestado en otra ciudad). Si está vacía, el
+  /// formato de informe propio del cliente usa Client.city como respaldo.
+  serviceCity           String?
   /// Cliente dueño de la orden — vínculo principal. Toda orden pertenece a
   /// un cliente; los equipos son opcionales y pueden ser varios (ver
   /// equipmentLinks) — cero equipos es un servicio locativo.
