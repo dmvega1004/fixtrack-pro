@@ -38,6 +38,8 @@ interface ReportFormatFormState {
   s2Source: ReportFormatSource;
   s3Label: string;
   s3Source: ReportFormatSource;
+  includePhotos: boolean;
+  photosLabel: string;
 }
 
 function toReportFormatState(client?: Client): ReportFormatFormState {
@@ -56,6 +58,8 @@ function toReportFormatState(client?: Client): ReportFormatFormState {
     s2Source: client?.reportFormatS2Source ?? "DIAGNOSIS",
     s3Label: client?.reportFormatS3Label ?? "",
     s3Source: client?.reportFormatS3Source ?? "OBSERVATIONS",
+    includePhotos: client?.reportFormatIncludePhotos ?? true,
+    photosLabel: client?.reportFormatPhotosLabel ?? "",
   };
 }
 
@@ -212,6 +216,8 @@ export function ClientForm({
         reportFormatS2Source: reportFormat.s2Source,
         reportFormatS3Label: reportFormat.s3Label.trim() || undefined,
         reportFormatS3Source: reportFormat.s3Source,
+        reportFormatIncludePhotos: reportFormat.includePhotos,
+        reportFormatPhotosLabel: reportFormat.photosLabel.trim() || undefined,
       }),
     };
 
@@ -556,6 +562,50 @@ export function ClientForm({
                       </div>
                     </div>
                   ))}
+                </div>
+
+                <div className="flex flex-col gap-3 border-t border-border pt-3">
+                  <p className="text-sm font-medium">Registro fotográfico</p>
+                  <div className="flex items-start gap-2 rounded-lg border border-border p-3">
+                    <input
+                      id="reportFormatIncludePhotos"
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={reportFormat.includePhotos}
+                      onChange={(event) =>
+                        setReportFormat((current) => ({
+                          ...current,
+                          includePhotos: event.target.checked,
+                        }))
+                      }
+                    />
+                    <div className="flex flex-col gap-1">
+                      <Label
+                        htmlFor="reportFormatIncludePhotos"
+                        className="font-normal"
+                      >
+                        Incluir el registro fotográfico
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        No todos los formatos corporativos admiten fotos —
+                        desactívalo si el de este cliente no las lleva.
+                      </p>
+                    </div>
+                  </div>
+
+                  {reportFormat.includePhotos && (
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="reportFormatPhotosLabel">
+                        Etiqueta de la franja
+                      </Label>
+                      <Input
+                        id="reportFormatPhotosLabel"
+                        value={reportFormat.photosLabel}
+                        onChange={updateReportFormat("photosLabel")}
+                        placeholder="Registro fotográfico"
+                      />
+                    </div>
+                  )}
                 </div>
               </>
             )}

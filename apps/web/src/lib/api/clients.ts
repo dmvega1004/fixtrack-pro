@@ -37,6 +37,8 @@ export interface Client {
   reportFormatS2Source: ReportFormatSource | null;
   reportFormatS3Label: string | null;
   reportFormatS3Source: ReportFormatSource | null;
+  reportFormatIncludePhotos: boolean;
+  reportFormatPhotosLabel: string | null;
 
   companyId: string;
   createdAt: string;
@@ -61,6 +63,8 @@ export interface ReportFormatInput {
   reportFormatS2Source?: ReportFormatSource;
   reportFormatS3Label?: string;
   reportFormatS3Source?: ReportFormatSource;
+  reportFormatIncludePhotos?: boolean;
+  reportFormatPhotosLabel?: string;
 }
 
 export interface CreateClientInput extends ReportFormatInput {
