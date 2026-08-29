@@ -756,13 +756,15 @@ export class WorkOrdersService {
       (dto.laborAmount !== undefined ||
         dto.additionalAmount !== undefined ||
         dto.additionalDescription !== undefined ||
-        dto.discountAmount !== undefined) &&
+        dto.discountAmount !== undefined ||
+        dto.items !== undefined) &&
       Object.entries(dto).every(
         ([key, value]) =>
           key === 'laborAmount' ||
           key === 'additionalAmount' ||
           key === 'additionalDescription' ||
           key === 'discountAmount' ||
+          key === 'items' ||
           value === undefined,
       );
 
@@ -778,14 +780,34 @@ export class WorkOrdersService {
         select: { currency: true },
       });
 
-      const parts = await this.prisma.workOrderPart.findMany({
-        where: { workOrderId: id, companyId: user.companyId },
-        select: { unitPrice: true, quantity: true },
-      });
+      const [parts, existingItems] = await Promise.all([
+        this.prisma.workOrderPart.findMany({
+          where: { workOrderId: id, companyId: user.companyId },
+          select: { unitPrice: true, quantity: true },
+        }),
+        this.prisma.workOrderItem.findMany({
+          where: { workOrderId: id, companyId: user.companyId },
+          orderBy: { position: 'asc' },
+        }),
+      ]);
       const partsTotal = parts.reduce(
         (acc, p) => acc.add(p.unitPrice.mul(p.quantity)),
         new Prisma.Decimal(0),
       );
+      // Conceptos: si el dto los trae, esos son los que van a quedar
+      // guardados (reemplazo completo) y sobre esos se calcula el total —
+      // si no vinieron, la orden conserva los que ya tenía.
+      const oldItemsTotal = existingItems.reduce(
+        (acc, i) => acc.add(i.unitPrice.mul(i.quantity)),
+        new Prisma.Decimal(0),
+      );
+      const newItemsTotal =
+        dto.items !== undefined
+          ? dto.items.reduce(
+              (acc, i) => acc.add(new Prisma.Decimal(i.unitPrice).mul(i.quantity)),
+              new Prisma.Decimal(0),
+            )
+          : oldItemsTotal;
 
       const newLaborAmount =
         dto.laborAmount !== undefined
@@ -806,6 +828,7 @@ export class WorkOrdersService {
       const { total: newTotal } = calculateBilling({
         laborAmount: newLaborAmount,
         partsTotal,
+        itemsTotal: newItemsTotal,
         additionalAmount: newAdditionalAmount,
         discountAmount: newDiscountAmount,
         taxRate: workOrder.taxRateApplied!,
@@ -839,6 +862,22 @@ export class WorkOrdersService {
             discountAmount: dto.discountAmount,
             totalAmount: newTotal,
             paymentStatus: newPaymentStatus,
+            // Reemplazo completo (semántica PATCH), igual que equipmentIds:
+            // borra los conceptos actuales y crea los del array recibido.
+            ...(dto.items !== undefined && {
+              items: {
+                deleteMany: {},
+                createMany: {
+                  data: dto.items.map((item, index) => ({
+                    companyId: user.companyId, // candado
+                    position: index,
+                    description: item.description.trim(),
+                    quantity: item.quantity,
+                    unitPrice: item.unitPrice,
+                  })),
+                },
+              },
+            }),
           },
           include: WORK_ORDER_INCLUDE,
         });
@@ -923,6 +962,24 @@ export class WorkOrdersService {
           tx,
         );
 
+        // Conceptos: un evento agregado (total desglosado), no uno por
+        // fila — mismo criterio que "Total a cobrar" más abajo: lo que le
+        // importa a la bitácora es cuánto cambió, no reconstruir cada fila.
+        await this.activityService.recordFieldChange(
+          {
+            companyId: user.companyId,
+            workOrderId: id,
+            userId: user.userId,
+            userName: actorName,
+            action: ActivityAction.BILLING_UPDATED,
+            field: 'Conceptos (orden cerrada)',
+            oldValue: formatActivityCurrency(oldItemsTotal, company.currency),
+            newValue: formatActivityCurrency(newItemsTotal, company.currency),
+            isFinancial: true,
+          },
+          tx,
+        );
+
         // Total: consecuencia de los campos de arriba, no un campo que el
         // usuario haya tocado directamente — pero es el número que de
         // verdad le importa a Cobros, así que queda su propio evento.
@@ -987,6 +1044,7 @@ export class WorkOrdersService {
         forbiddenFields.push('additionalDescription');
       if (dto.discountAmount !== undefined)
         forbiddenFields.push('discountAmount');
+      if (dto.items !== undefined) forbiddenFields.push('items');
       // billedAt no aparece acá: si llegó hasta este punto ya no está
       // presente en el dto (el bloque de arriba lo maneja o lo rechaza).
 
@@ -1010,6 +1068,7 @@ export class WorkOrdersService {
         forbiddenBillingFields.push('additionalDescription');
       if (dto.discountAmount !== undefined)
         forbiddenBillingFields.push('discountAmount');
+      if (dto.items !== undefined) forbiddenBillingFields.push('items');
       // billedAt: mismo caso que arriba, ya no puede estar presente acá.
 
       if (forbiddenBillingFields.length > 0) {
@@ -1061,12 +1120,13 @@ export class WorkOrdersService {
       dto.laborAmount !== undefined ||
       dto.additionalAmount !== undefined ||
       dto.additionalDescription !== undefined ||
-      dto.discountAmount !== undefined;
+      dto.discountAmount !== undefined ||
+      dto.items !== undefined;
 
     let currency: string | undefined;
 
     if (dto.status === OrderStatus.COMPLETED) {
-      const [company, parts] = await Promise.all([
+      const [company, parts, existingItems] = await Promise.all([
         this.prisma.company.findUniqueOrThrow({
           where: { id: user.companyId },
           select: { taxRate: true, currency: true },
@@ -1075,6 +1135,15 @@ export class WorkOrdersService {
           where: { workOrderId: id, companyId: user.companyId },
           select: { unitPrice: true, quantity: true },
         }),
+        // Solo hace falta si el dto no trae conceptos propios (si los
+        // trae, esos son los que van a quedar guardados y sobre esos se
+        // congela el total).
+        dto.items === undefined
+          ? this.prisma.workOrderItem.findMany({
+              where: { workOrderId: id, companyId: user.companyId },
+              select: { unitPrice: true, quantity: true },
+            })
+          : Promise.resolve([]),
       ]);
       currency = company.currency;
 
@@ -1082,6 +1151,16 @@ export class WorkOrdersService {
         (acc, p) => acc.add(p.unitPrice.mul(p.quantity)),
         new Prisma.Decimal(0),
       );
+      const itemsTotal =
+        dto.items !== undefined
+          ? dto.items.reduce(
+              (acc, i) => acc.add(new Prisma.Decimal(i.unitPrice).mul(i.quantity)),
+              new Prisma.Decimal(0),
+            )
+          : existingItems.reduce(
+              (acc, i) => acc.add(i.unitPrice.mul(i.quantity)),
+              new Prisma.Decimal(0),
+            );
 
       const { total } = calculateBilling({
         laborAmount:
@@ -1089,6 +1168,7 @@ export class WorkOrdersService {
             ? new Prisma.Decimal(dto.laborAmount)
             : workOrder.laborAmount,
         partsTotal,
+        itemsTotal,
         additionalAmount:
           dto.additionalAmount !== undefined
             ? new Prisma.Decimal(dto.additionalAmount)
@@ -1170,6 +1250,24 @@ export class WorkOrdersService {
                 data: dto.equipmentIds.map((equipmentId) => ({
                   equipmentId,
                   companyId: user.companyId, // candado
+                })),
+              },
+            },
+          }),
+          // Conceptos de valorización: mismo patrón "reemplazo completo"
+          // que equipmentLinks arriba. Solo llega hasta acá si la orden
+          // sigue abierta (totalAmount null) — con la orden ya cerrada,
+          // este mismo campo lo maneja la rama isBillingOnlyEdit de arriba.
+          ...(dto.items !== undefined && {
+            items: {
+              deleteMany: {},
+              createMany: {
+                data: dto.items.map((item, index) => ({
+                  companyId: user.companyId, // candado
+                  position: index,
+                  description: item.description.trim(),
+                  quantity: item.quantity,
+                  unitPrice: item.unitPrice,
                 })),
               },
             },

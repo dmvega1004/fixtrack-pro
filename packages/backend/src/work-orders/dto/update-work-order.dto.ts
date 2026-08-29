@@ -1,6 +1,8 @@
 import { PartialType } from '@nestjs/mapped-types';
 import { OrderStatus } from 'database';
+import { Type } from 'class-transformer';
 import {
+  IsArray,
   IsDateString,
   IsEnum,
   IsNumber,
@@ -8,8 +10,10 @@ import {
   IsString,
   MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator';
 import { CreateWorkOrderDto } from './create-work-order.dto';
+import { WorkOrderItemInputDto } from './work-order-item.dto';
 
 /**
  * Campos de creación (opcionales) + status para avanzar el ciclo de vida:
@@ -64,6 +68,19 @@ export class UpdateWorkOrderDto extends PartialType(CreateWorkOrderDto) {
   )
   @Min(0)
   discountAmount?: number;
+
+  /**
+   * Conceptos de valorización (desglose del cobro, ver WorkOrderItem):
+   * reemplazo completo del set actual, mismo patrón que equipmentIds y
+   * QuoteItem.items — un array vacío es válido y explícito (deja la orden
+   * sin conceptos); `undefined` no toca nada. Solo ADMIN (RBAC en el
+   * service), mismo criterio que laborAmount/additionalAmount/discountAmount.
+   */
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => WorkOrderItemInputDto)
+  items?: WorkOrderItemInputDto[];
 
   /**
    * Corrección puntual de la fecha de facturación de una orden YA

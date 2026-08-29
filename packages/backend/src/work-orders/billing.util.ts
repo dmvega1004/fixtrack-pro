@@ -3,6 +3,8 @@ import { Prisma, PaymentStatus } from 'database';
 export interface BillingComponents {
   laborAmount: Prisma.Decimal;
   partsTotal: Prisma.Decimal;
+  /** Σ(WorkOrderItem.quantity × unitPrice) — conceptos, ver WorkOrderItem en el schema. */
+  itemsTotal: Prisma.Decimal;
   additionalAmount: Prisma.Decimal;
   discountAmount: Prisma.Decimal;
   taxRate: Prisma.Decimal;
@@ -19,13 +21,14 @@ export interface BillingResult {
  * en vivo (WorkOrderPartsService.listParts) y el congelamiento al pasar a
  * COMPLETED (WorkOrdersService.update):
  *
- *   subtotal  = mano de obra + repuestos (precio de venta) + adicionales − descuento
+ *   subtotal  = mano de obra + repuestos (precio de venta) + conceptos + adicionales − descuento
  *   impuesto  = subtotal × tasa / 100
  *   total     = subtotal + impuesto
  */
 export function calculateBilling(components: BillingComponents): BillingResult {
   const subtotal = components.laborAmount
     .add(components.partsTotal)
+    .add(components.itemsTotal)
     .add(components.additionalAmount)
     .sub(components.discountAmount);
   const taxAmount = subtotal.mul(components.taxRate).div(100);

@@ -10,6 +10,7 @@ import {
   Prisma,
   Role,
   WorkOrder,
+  WorkOrderItem,
   WorkOrderPart,
 } from 'database';
 import { activityAuthorName } from '../activity/activity-labels';
@@ -84,6 +85,12 @@ export interface WorkOrderPartsSummary {
   totalSale?: string;
   /** Costo total para la empresa — SOLO visible para ADMIN. */
   totalCost?: string;
+  /**
+   * Conceptos de valorización (desglose del cobro, ver WorkOrderItem) —
+   * omitido para TECHNICIAN, igual que `billing`: es información
+   * financiera, no algo que un técnico deba recibir del servidor.
+   */
+  concepts?: WorkOrderItem[];
   /** Desglose económico de la orden — omitido para TECHNICIAN (ver totalSale). */
   billing?: WorkOrderBilling;
   /**
@@ -264,11 +271,15 @@ export class WorkOrderPartsService {
     // Visibilidad + candado (404 si la orden es ajena o de otro técnico)
     const order = await this.workOrdersService.findOne(user, workOrderId);
 
-    const [lines, company, paidAgg] = await Promise.all([
+    const [lines, concepts, company, paidAgg] = await Promise.all([
       this.prisma.workOrderPart.findMany({
         where: { workOrderId, companyId: user.companyId }, // candado
         include: PART_SUMMARY,
         orderBy: { createdAt: 'asc' },
+      }),
+      this.prisma.workOrderItem.findMany({
+        where: { workOrderId, companyId: user.companyId }, // candado
+        orderBy: { position: 'asc' },
       }),
       this.prisma.company.findUniqueOrThrow({
         where: { id: user.companyId },
@@ -284,6 +295,10 @@ export class WorkOrderPartsService {
       (acc, l) => acc.add(l.unitPrice.mul(l.quantity)),
       new Prisma.Decimal(0),
     );
+    const itemsTotal = concepts.reduce(
+      (acc, c) => acc.add(c.unitPrice.mul(c.quantity)),
+      new Prisma.Decimal(0),
+    );
     const paidAmount = paidAgg._sum.amount ?? new Prisma.Decimal(0);
 
     const summary: WorkOrderPartsSummary = {
@@ -291,9 +306,11 @@ export class WorkOrderPartsService {
     };
 
     // RBAC financiero: TECHNICIAN no recibe ningún valor monetario — ni el
-    // subtotal de repuestos ni el desglose económico de la orden.
+    // subtotal de repuestos ni los conceptos ni el desglose económico de
+    // la orden.
     if (user.role !== Role.TECHNICIAN) {
       summary.totalSale = totalSale.toFixed(2);
+      summary.concepts = concepts;
       // El role check de arriba garantiza que `order` (mismo user, ver
       // WorkOrdersService.toView) trae estos campos sin redactar.
       summary.billing = this.buildBilling(
@@ -309,6 +326,7 @@ export class WorkOrderPartsService {
           | 'paymentStatus'
         >,
         totalSale,
+        itemsTotal,
         company.taxRate,
         paidAmount,
       );
@@ -351,6 +369,7 @@ export class WorkOrderPartsService {
       | 'paymentStatus'
     >,
     partsTotal: Prisma.Decimal,
+    itemsTotal: Prisma.Decimal,
     companyTaxRate: Prisma.Decimal,
     paidAmount: Prisma.Decimal,
   ): WorkOrderBilling {
@@ -360,6 +379,7 @@ export class WorkOrderPartsService {
     const { subtotal, taxAmount, total } = calculateBilling({
       laborAmount: order.laborAmount,
       partsTotal,
+      itemsTotal,
       additionalAmount: order.additionalAmount,
       discountAmount: order.discountAmount,
       taxRate,
