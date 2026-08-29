@@ -55,6 +55,13 @@ export interface WorkOrder {
    * propio del cliente usa la ciudad del cliente como respaldo.
    */
   serviceCity: string | null;
+  /**
+   * Hora del servicio, texto "HH:mm" capturado por el usuario — NUNCA un
+   * instante calculado (ver WorkOrder.serviceTime en el schema). Vacío: el
+   * formato de informe propio del cliente usa la hora de cierre (billedAt)
+   * como respaldo.
+   */
+  serviceTime: string | null;
   status: OrderStatus;
   priority: Priority;
   /** CORRECTIVE por defecto. El técnico no puede cambiarlo tras la creación. */

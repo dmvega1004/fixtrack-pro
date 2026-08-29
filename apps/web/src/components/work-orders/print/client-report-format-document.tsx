@@ -2,7 +2,7 @@ import type { WorkOrder } from "@/lib/api/work-orders";
 import type { Client, ReportFormatSource } from "@/lib/api/clients";
 import type { Attachment } from "@/lib/api/attachments";
 import { formatOrderNumber } from "@/lib/format/order-number";
-import { formatDate, formatTime } from "@/lib/format/dates";
+import { formatDate, formatTime, formatTimeOnly } from "@/lib/format/dates";
 import { cloudinaryUrl } from "@/lib/image/cloudinary-url";
 
 /** Color de acento por defecto si el cliente no configuró uno (raro: el color picker siempre trae un valor). */
@@ -175,8 +175,16 @@ export function ClientReportFormatDocument({
 
   // Fecha → fecha de facturación; si no existe (orden aún no cerrada), la de creación.
   const dateValue = formatDate(order.billedAt ?? order.createdAt);
-  // Hora → hora de cierre; billedAt solo existe si la orden ya se cerró.
-  const timeValue = order.billedAt ? formatTime(order.billedAt) : "";
+  // Hora → la que el usuario capturó (serviceTime); si no la cargó, la de
+  // cierre (corregida a America/Bogota — ver formatTime); si la orden
+  // sigue abierta, en blanco. Cerrar la orden es un acto administrativo
+  // que puede ocurrir horas después del trabajo real, así que serviceTime
+  // siempre tiene prioridad cuando existe.
+  const timeValue = order.serviceTime
+    ? formatTimeOnly(order.serviceTime)
+    : order.billedAt
+      ? formatTime(order.billedAt)
+      : "";
   // Ciudad → ciudad del servicio; si no está definida, la del cliente; si tampoco, en blanco.
   const cityValue = order.serviceCity ?? client.city ?? "";
   const endClientValue = order.endClientName ?? "";

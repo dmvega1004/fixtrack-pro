@@ -12,36 +12,45 @@ interface ServiceLocationEditorProps {
   orderId: string;
   initialEndClientName: string | null;
   initialServiceCity: string | null;
+  /** Texto "HH:mm" o null — ver WorkOrder.serviceTime en el schema. */
+  initialServiceTime: string | null;
   isTerminal: boolean;
 }
 
 /**
- * Cliente final y ciudad del servicio: dos campos cortos, un solo bloque,
- * un solo botón de guardar (PATCH combinado — ver saveServiceLocationAction).
- * Ambos alimentan el formato de informe propio del cliente. Mismo criterio
- * de bloqueo en estado terminal que Diagnóstico/Observaciones.
+ * Cliente final, ciudad y hora del servicio: campos cortos, un solo
+ * bloque, un solo botón de guardar (PATCH combinado — ver
+ * saveServiceLocationAction). Los tres alimentan el formato de informe
+ * propio del cliente. Mismo criterio de bloqueo en estado terminal que
+ * Diagnóstico/Observaciones.
  */
 export function ServiceLocationEditor({
   orderId,
   initialEndClientName,
   initialServiceCity,
+  initialServiceTime,
   isTerminal,
 }: ServiceLocationEditorProps) {
   const router = useRouter();
   const initialEndClient = initialEndClientName ?? "";
   const initialCity = initialServiceCity ?? "";
+  const initialTime = initialServiceTime ?? "";
   const [endClientName, setEndClientName] = useState(initialEndClient);
   const [serviceCity, setServiceCity] = useState(initialCity);
+  const [serviceTime, setServiceTime] = useState(initialTime);
   const [isSaving, setIsSaving] = useState(false);
 
   const hasChanges =
-    endClientName !== initialEndClient || serviceCity !== initialCity;
+    endClientName !== initialEndClient ||
+    serviceCity !== initialCity ||
+    serviceTime !== initialTime;
 
   async function handleSave() {
     setIsSaving(true);
     const result = await saveServiceLocationAction(orderId, {
       endClientName: endClientName.trim(),
       serviceCity: serviceCity.trim(),
+      serviceTime,
     });
     setIsSaving(false);
 
@@ -56,7 +65,7 @@ export function ServiceLocationEditor({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="endClientName">Cliente final</Label>
           <Input
@@ -86,6 +95,21 @@ export function ServiceLocationEditor({
           />
           <p className="text-xs text-muted-foreground">
             Si se deja vacía se usa la ciudad registrada del cliente.
+          </p>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="serviceTime">Hora del servicio</Label>
+          <Input
+            id="serviceTime"
+            type="time"
+            value={serviceTime}
+            onChange={(event: ChangeEvent<HTMLInputElement>) =>
+              setServiceTime(event.target.value)
+            }
+            disabled={isTerminal}
+          />
+          <p className="text-xs text-muted-foreground">
+            Si se deja vacía se usa la hora de cierre de la orden.
           </p>
         </div>
       </div>

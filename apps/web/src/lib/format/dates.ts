@@ -74,3 +74,20 @@ export function bogotaDayKey(date: Date): string {
     day: "2-digit",
   }).format(date);
 }
+
+/**
+ * "04:47 p. m." a partir de un "HH:mm" de texto plano (ver
+ * WorkOrder.serviceTime) — a propósito SIN pasar por Date ni por
+ * timeZone: es la hora de pared que el usuario escribió, no un instante.
+ * Meterla en un Date acá reintroduciría justo el problema de zona horaria
+ * que serviceTime evita guardando texto en vez de un timestamp. Mismo
+ * formato visual que formatTime, para que la casilla "Hora" del formato
+ * del cliente luzca igual venga de serviceTime o de la hora de cierre.
+ */
+export function formatTimeOnly(value: string): string {
+  const [hoursText, minutes] = value.split(":");
+  const hours = Number(hoursText);
+  const period = hours >= 12 ? "p. m." : "a. m.";
+  const hour12 = hours % 12 === 0 ? 12 : hours % 12;
+  return `${String(hour12).padStart(2, "0")}:${minutes} ${period}`;
+}
