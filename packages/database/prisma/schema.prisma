@@ -235,6 +235,12 @@ model Client {
   reportFormatS2Source    String?
   reportFormatS3Label     String?
   reportFormatS3Source    String?
+  /// No todos los formatos corporativos admiten fotos — el cliente decide.
+  reportFormatIncludePhotos Boolean @default(true)
+  /// Etiqueta de la franja del bloque fotográfico. Vacía = "Registro
+  /// fotográfico" (fallback en el frontend, igual criterio que el resto de
+  /// las etiquetas de este bloque).
+  reportFormatPhotosLabel   String?
 
   companyId       String
   company         Company     @relation(fields: [companyId], references: [id])
