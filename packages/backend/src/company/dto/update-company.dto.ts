@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsEmail,
   IsIn,
   IsInt,
@@ -112,6 +113,21 @@ export class UpdateCompanyDto {
   @IsString()
   @MaxLength(500)
   collectionDocFootnote?: string;
+
+  // --- Firma digital: dónde se estampa (la imagen se sube aparte, ver
+  // POST /company/signature) ---
+
+  @IsOptional()
+  @IsBoolean({ message: 'signatureInCollection debe ser verdadero o falso' })
+  signatureInCollection?: boolean;
+
+  @IsOptional()
+  @IsBoolean({ message: 'signatureInWorkOrder debe ser verdadero o falso' })
+  signatureInWorkOrder?: boolean;
+
+  @IsOptional()
+  @IsBoolean({ message: 'signatureInQuote debe ser verdadero o falso' })
+  signatureInQuote?: boolean;
 
   /**
    * Próximo consecutivo a asignar. Solo aplica a documentos futuros — no

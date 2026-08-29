@@ -60,4 +60,24 @@ export class CompanyController {
   ): Promise<PublicCompany> {
     return this.companyService.updateLogo(companyId, file);
   }
+
+  /**
+   * POST /company/signature — SOLO Administradores, multipart. La firma
+   * compromete a la empresa (queda estampada en documentos que salen sin
+   * revisión humana), así que ni el coordinador puede tocarla.
+   */
+  @Roles(Role.ADMIN)
+  @Post('signature')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: MAX_IMAGE_SIZE_BYTES },
+    }),
+  )
+  uploadSignature(
+    @CurrentUser('companyId') companyId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ): Promise<PublicCompany> {
+    return this.companyService.updateSignature(companyId, file);
+  }
 }

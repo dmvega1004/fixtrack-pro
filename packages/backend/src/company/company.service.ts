@@ -9,6 +9,13 @@ import { UpdateCompanyDto } from './dto/update-company.dto';
 const MAX_LOGO_DIMENSION = 512;
 
 /**
+ * Lado máximo de la firma: suficiente para verse nítida impresa a ~50mm
+ * de ancho (ver SIGNATURE preset en cloudinary-url.ts del frontend), sin
+ * guardar un archivo de escaneo gigante.
+ */
+const MAX_SIGNATURE_DIMENSION = 1000;
+
+/**
  * Proyección pública: sin el contador interno nextOrderNumber.
  * nextCollectionNumber SÍ es público (a diferencia de nextOrderNumber):
  * "Mi empresa" lo muestra y permite editarlo (número desde el cual
@@ -24,6 +31,10 @@ const COMPANY_SELECT = {
   address: true,
   website: true,
   logoUrl: true,
+  signatureImageUrl: true,
+  signatureInCollection: true,
+  signatureInWorkOrder: true,
+  signatureInQuote: true,
   currency: true,
   taxRate: true,
   collectionDocTitle: true,
@@ -58,6 +69,10 @@ export type PublicCompany = Pick<
   | 'address'
   | 'website'
   | 'logoUrl'
+  | 'signatureImageUrl'
+  | 'signatureInCollection'
+  | 'signatureInWorkOrder'
+  | 'signatureInQuote'
   | 'currency'
   | 'taxRate'
   | 'collectionDocTitle'
@@ -150,6 +165,9 @@ export class CompanyService {
         signerName: dto.signerName?.trim(),
         signerRole: dto.signerRole?.trim(),
         collectionDocFootnote: dto.collectionDocFootnote?.trim(),
+        signatureInCollection: dto.signatureInCollection,
+        signatureInWorkOrder: dto.signatureInWorkOrder,
+        signatureInQuote: dto.signatureInQuote,
         nextCollectionNumber: dto.nextCollectionNumber,
         nextQuoteNumber: dto.nextQuoteNumber,
         defaultPaymentTerms: dto.defaultPaymentTerms?.trim(),
@@ -200,6 +218,47 @@ export class CompanyService {
 
     if (current.logoUrl) {
       const oldPublicId = this.cloudinary.extractPublicId(current.logoUrl);
+      if (oldPublicId) {
+        await this.cloudinary.destroy(oldPublicId);
+      }
+    }
+
+    return updated;
+  }
+
+  /**
+   * Sube la nueva firma a Cloudinary y actualiza Company.signatureImageUrl
+   * — mismo patrón que updateLogo (incluido el borrado best-effort de la
+   * firma anterior). Solo PNG (ver validateImageFile): a diferencia del
+   * logo, esta imagen se estampa sobre documentos reales, así que exige
+   * el formato que admite fondo transparente.
+   */
+  async updateSignature(
+    companyId: string,
+    file: Express.Multer.File | undefined,
+  ): Promise<PublicCompany> {
+    validateImageFile(file, ['image/png']);
+
+    const current = await this.prisma.company.findUniqueOrThrow({
+      where: { id: companyId },
+      select: { signatureImageUrl: true },
+    });
+
+    const uploaded = await this.cloudinary.uploadBuffer(file.buffer, {
+      folder: `${cloudinaryRootFolder()}/${companyId}/brand`,
+      maxDimension: MAX_SIGNATURE_DIMENSION,
+    });
+
+    const updated = await this.prisma.company.update({
+      where: { id: companyId },
+      data: { signatureImageUrl: uploaded.secure_url },
+      select: COMPANY_SELECT,
+    });
+
+    if (current.signatureImageUrl) {
+      const oldPublicId = this.cloudinary.extractPublicId(
+        current.signatureImageUrl,
+      );
       if (oldPublicId) {
         await this.cloudinary.destroy(oldPublicId);
       }
