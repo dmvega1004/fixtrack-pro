@@ -143,6 +143,10 @@ export function WorkOrderPrintDocument({
   // para TECHNICIAN (ver WorkOrderPartsService.listParts) — sin ningún
   // valor que mostrar en este informe.
   const hasFinancials = billing !== undefined && partsSummary.totalSale !== undefined;
+  const conceptsTotal = (partsSummary.concepts ?? []).reduce(
+    (sum, concept) => sum + Number(concept.quantity) * Number(concept.unitPrice),
+    0,
+  );
 
   const documentLabel =
     client.documentType && client.documentNumber
@@ -320,12 +324,47 @@ export function WorkOrderPrintDocument({
         </table>
       </section>
 
+      {/* Conceptos: describen lo que se ejecutó, así que se muestran sin
+          costos incluso cuando hasFinancials es true — a diferencia de la
+          tabla de repuestos de arriba. Omitido por completo si la orden no
+          tiene conceptos o si el rol no los recibe (ver
+          WorkOrderPartsService.listParts: TECHNICIAN nunca recibe
+          partsSummary.concepts). */}
+      {partsSummary.concepts && partsSummary.concepts.length > 0 && (
+        <section className="mt-6 flex flex-col gap-3">
+          <SectionTitle>Conceptos</SectionTitle>
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-neutral-400 text-left text-[11px] tracking-wide text-neutral-500 uppercase">
+                <th className="py-1.5 pr-2 font-medium">Descripción</th>
+                <th className="py-1.5 text-right font-medium">Cant.</th>
+              </tr>
+            </thead>
+            <tbody>
+              {partsSummary.concepts.map((concept) => (
+                <tr key={concept.id} className="break-inside-avoid border-b border-neutral-200">
+                  <td className="py-1.5 pr-2">{concept.description}</td>
+                  <td className="py-1.5 text-right">{concept.quantity}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+
       {hasFinancials && billing && (
         <section className="mt-4 flex flex-col gap-2 break-inside-avoid">
           <SectionTitle>Cierre económico</SectionTitle>
           <table className="w-full border-collapse text-sm">
             <tbody>
               <BillingRow label="Repuestos" value={partsSummary.totalSale!} currency={company.currency} />
+              {conceptsTotal > 0 && (
+                <BillingRow
+                  label="Conceptos"
+                  value={conceptsTotal.toFixed(2)}
+                  currency={company.currency}
+                />
+              )}
               <BillingRow label="Mano de obra" value={billing.laborAmount} currency={company.currency} />
               {Number(billing.additionalAmount) > 0 && (
                 <BillingRow

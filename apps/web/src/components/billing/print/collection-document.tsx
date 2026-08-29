@@ -147,6 +147,16 @@ export function CollectionDocument({
       total: unitPrice * item.quantity,
     });
   }
+  for (const concept of partsSummary.concepts ?? []) {
+    const quantity = Number(concept.quantity);
+    const unitPrice = Number(concept.unitPrice);
+    valueRows.push({
+      concept: concept.description,
+      quantity,
+      unitPrice,
+      total: unitPrice * quantity,
+    });
+  }
   if (Number(billing.additionalAmount) > 0) {
     valueRows.push({
       concept: billing.additionalDescription ?? "Otros cargos",
