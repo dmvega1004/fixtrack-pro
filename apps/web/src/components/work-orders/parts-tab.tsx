@@ -5,6 +5,7 @@ import type { Payment } from "@/lib/api/payments";
 import { RemovePartButton } from "./remove-part-button";
 import { AddPartPanel } from "./add-part-panel";
 import { BillingSection } from "./billing-section";
+import { ConceptsSection } from "./concepts-section";
 import { DirectCostSection } from "./direct-cost-section";
 import { PaymentsPanel } from "./payments-panel";
 
@@ -33,12 +34,23 @@ export function PartsTab({
   payments,
   collectionNumber,
 }: PartsTabProps) {
-  const { items, totalSale, totalCost, billing, directCostAmount, directCostDescription } =
-    summary;
+  const {
+    items,
+    totalSale,
+    totalCost,
+    concepts,
+    billing,
+    directCostAmount,
+    directCostDescription,
+  } = summary;
   // RBAC financiero: totalSale/billing vienen omitidos del todo para
   // TECHNICIAN (ver WorkOrderPartsService.listParts) — ni un precio
   // unitario, ni el subtotal de repuestos, ni el cierre económico.
   const hasFinancials = billing !== undefined && totalSale !== undefined;
+  const conceptsTotal = (concepts ?? []).reduce(
+    (sum, concept) => sum + Number(concept.quantity) * Number(concept.unitPrice),
+    0,
+  );
   const balance = billing
     ? (Number(billing.total) - Number(billing.paidAmount)).toFixed(2)
     : "0";
@@ -172,6 +184,19 @@ export function PartsTab({
 
       {!isTerminal && <AddPartPanel orderId={orderId} catalog={catalog} />}
 
+      {/* RBAC financiero: concepts viene omitido del todo para TECHNICIAN —
+          igual criterio que billing, ver WorkOrderPartsService.listParts. */}
+      {concepts !== undefined && billing !== undefined && (
+        <ConceptsSection
+          orderId={orderId}
+          concepts={concepts}
+          currency={currency}
+          isAdmin={isAdmin}
+          isFrozen={billing.isFrozen}
+          isTerminal={isTerminal}
+        />
+      )}
+
       {/* RBAC financiero: billing viene omitido del todo para TECHNICIAN —
           sin cierre económico que mostrar, no hay nada que renderizar. */}
       {billing !== undefined && totalSale !== undefined && (
@@ -179,6 +204,7 @@ export function PartsTab({
           orderId={orderId}
           billing={billing}
           partsTotal={totalSale}
+          conceptsTotal={String(conceptsTotal)}
           currency={currency}
           isAdmin={isAdmin}
           isTerminal={isTerminal}

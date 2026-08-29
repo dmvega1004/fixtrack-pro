@@ -23,6 +23,20 @@ export interface WorkOrderPartLine {
 }
 
 /**
+ * Concepto de valorización (desglose del cobro, ver WorkOrderItem en el
+ * backend) — texto libre + cantidad + valor unitario, igual que un ítem de
+ * cotización. Visible para ADMIN/COORDINATOR, editable solo por ADMIN;
+ * omitido por completo para TECHNICIAN (ver WorkOrderPartsSummary.concepts).
+ */
+export interface WorkOrderConceptLine {
+  id: string;
+  position: number;
+  description: string;
+  quantity: string;
+  unitPrice: string;
+}
+
+/**
  * Cierre económico de la orden. Los montos son precios al cliente (no
  * costos): visibles para ADMIN/COORDINATOR; solo ADMIN puede editarlos.
  * Omitido por completo para TECHNICIAN (ver WorkOrderPartsSummary.billing).
@@ -51,6 +65,8 @@ export interface WorkOrderPartsSummary {
   totalSale?: string;
   /** Solo presente para ADMIN. */
   totalCost?: string;
+  /** Omitido para TECHNICIAN (RBAC financiero) — ver WorkOrderConceptLine. */
+  concepts?: WorkOrderConceptLine[];
   /** Omitido para TECHNICIAN (RBAC financiero). */
   billing?: WorkOrderBilling;
   /**

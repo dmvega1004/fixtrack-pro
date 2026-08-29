@@ -191,6 +191,31 @@ export async function saveBillingAction(
   );
 }
 
+export interface WorkOrderConceptInput {
+  description: string;
+  quantity: number;
+  unitPrice: number;
+}
+
+/**
+ * PATCH /work-orders/:id con `items` — reemplaza el set COMPLETO de
+ * conceptos de la orden (no es un delta, mismo criterio que
+ * updateOrderEquipmentsAction). Funciona tanto con la orden abierta como
+ * ya cerrada (ver isBillingOnlyEdit en el backend): en ambos casos el
+ * backend recalcula el total, con el IVA congelado si ya estaba cerrada.
+ */
+export async function saveConceptsAction(
+  orderId: string,
+  items: WorkOrderConceptInput[],
+): Promise<ActionResult> {
+  return runMutation(orderId, () =>
+    serverFetch(`/work-orders/${orderId}`, {
+      method: "PATCH",
+      body: { items },
+    }),
+  );
+}
+
 /**
  * PATCH /work-orders/:id con SOLO billedAt — corrige la fecha de
  * facturación de una orden ya facturada (ADMIN, ver RBAC en el service).

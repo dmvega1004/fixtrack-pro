@@ -18,6 +18,8 @@ interface BillingSectionProps {
   billing: WorkOrderBilling;
   /** Total de repuestos (WorkOrderPartsSummary.totalSale). */
   partsTotal: string;
+  /** Total de conceptos (Σ WorkOrderPartsSummary.concepts) — ver ConceptsSection. */
+  conceptsTotal: string;
   currency: string;
   isAdmin: boolean;
   isTerminal: boolean;
@@ -68,6 +70,7 @@ export function BillingSection({
   orderId,
   billing,
   partsTotal,
+  conceptsTotal,
   currency,
   isAdmin,
   isTerminal,
@@ -100,9 +103,11 @@ export function BillingSection({
     discount >= 0;
 
   // Vista previa en vivo mientras se edita: misma fórmula que el backend
-  // (subtotal = mano de obra + repuestos + adicionales − descuento).
+  // (subtotal = mano de obra + repuestos + conceptos + adicionales − descuento).
   const taxRatePercent = Number(billing.taxRate);
-  const previewSubtotal = isValid ? labor + Number(partsTotal) + additional - discount : null;
+  const previewSubtotal = isValid
+    ? labor + Number(partsTotal) + Number(conceptsTotal) + additional - discount
+    : null;
   const previewTax = previewSubtotal !== null ? (previewSubtotal * taxRatePercent) / 100 : null;
   const previewTotal =
     previewSubtotal !== null && previewTax !== null ? previewSubtotal + previewTax : null;
@@ -224,6 +229,9 @@ export function BillingSection({
 
       <div className="flex flex-col gap-1 border-t border-border pt-3 text-sm">
         <Row label="Repuestos" value={formatCurrency(partsTotal, currency)} />
+        {Number(conceptsTotal) > 0 && (
+          <Row label="Conceptos" value={formatCurrency(conceptsTotal, currency)} />
+        )}
         <Row label="Subtotal" value={formatCurrency(displaySubtotal, currency)} />
         <Row
           label={`IVA (${canEdit ? taxRatePercent : Number(billing.taxRate)}%)`}
