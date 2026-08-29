@@ -3,6 +3,15 @@ import type { DocumentType } from "@/lib/document-type";
 
 export type { DocumentType } from "@/lib/document-type";
 
+/** Debe reflejar exactamente REPORT_FORMAT_SOURCES del backend (create-client.dto.ts). */
+export const REPORT_FORMAT_SOURCES = [
+  "DESCRIPTION",
+  "DIAGNOSIS",
+  "OBSERVATIONS",
+  "EMPTY",
+] as const;
+export type ReportFormatSource = (typeof REPORT_FORMAT_SOURCES)[number];
+
 // Debe reflejar exactamente el modelo Client de packages/database/prisma/schema.prisma
 export interface Client {
   id: string;
@@ -12,8 +21,27 @@ export interface Client {
   documentType: string | null;
   documentNumber: string | null;
   address: string | null;
+  city: string | null;
   /** Días de crédito acordados con el cliente (ej. 30 = "pago a 30 días"). */
   paymentTermDays: number;
+
+  /** Formato de informe propio del cliente (Módulo de Formatos) — ver /ordenes/[id]/formato-cliente. */
+  reportFormatEnabled: boolean;
+  reportFormatTitle: string | null;
+  reportFormatCode: string | null;
+  reportFormatVersion: string | null;
+  reportFormatDate: string | null;
+  reportFormatLogoUrl: string | null;
+  reportFormatAccentColor: string | null;
+  reportFormatFooter: string | null;
+  reportFormatIssuer: string | null;
+  reportFormatS1Label: string | null;
+  reportFormatS1Source: ReportFormatSource | null;
+  reportFormatS2Label: string | null;
+  reportFormatS2Source: ReportFormatSource | null;
+  reportFormatS3Label: string | null;
+  reportFormatS3Source: ReportFormatSource | null;
+
   companyId: string;
   createdAt: string;
   updatedAt: string;
@@ -22,23 +50,42 @@ export interface Client {
   orderCount?: number;
 }
 
-export interface CreateClientInput {
+export interface ReportFormatInput {
+  reportFormatEnabled?: boolean;
+  reportFormatTitle?: string;
+  reportFormatCode?: string;
+  reportFormatVersion?: string;
+  reportFormatDate?: string;
+  reportFormatAccentColor?: string;
+  reportFormatFooter?: string;
+  reportFormatIssuer?: string;
+  reportFormatS1Label?: string;
+  reportFormatS1Source?: ReportFormatSource;
+  reportFormatS2Label?: string;
+  reportFormatS2Source?: ReportFormatSource;
+  reportFormatS3Label?: string;
+  reportFormatS3Source?: ReportFormatSource;
+}
+
+export interface CreateClientInput extends ReportFormatInput {
   name: string;
   email?: string;
   phone?: string;
   documentType?: DocumentType;
   documentNumber?: string;
   address?: string;
+  city?: string;
   paymentTermDays?: number;
 }
 
-export interface UpdateClientInput {
+export interface UpdateClientInput extends ReportFormatInput {
   name?: string;
   email?: string;
   phone?: string;
   documentType?: DocumentType;
   documentNumber?: string;
   address?: string;
+  city?: string;
   paymentTermDays?: number;
 }
 

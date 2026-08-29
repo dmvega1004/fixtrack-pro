@@ -29,7 +29,14 @@ export default async function EditarClientePage({ params }: EditarClientePagePro
         <h1 className="text-2xl font-semibold">Editar cliente</h1>
         <p className="text-sm text-muted-foreground">{client.name}</p>
       </div>
-      <ClientForm mode="edit" clientId={client.id} initial={client} />
+      <ClientForm
+        mode="edit"
+        clientId={client.id}
+        initial={client}
+        canConfigureReportFormat={
+          session?.role === "ADMIN" || session?.role === "COORDINATOR"
+        }
+      />
 
       {session?.role === "ADMIN" && (
         <div className="border-t border-border pt-4">
