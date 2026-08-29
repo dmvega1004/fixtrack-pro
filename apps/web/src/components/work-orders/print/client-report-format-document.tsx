@@ -22,6 +22,8 @@ function sectionContent(order: WorkOrder, source: ReportFormatSource | null): st
       return order.diagnosis ?? "";
     case "OBSERVATIONS":
       return order.observations ?? "";
+    case "SUGGESTIONS":
+      return order.suggestions ?? "";
     case "EMPTY":
     default:
       return "";
@@ -123,7 +125,8 @@ export function ClientReportFormatDocument({
   const dateValue = formatDate(order.billedAt ?? order.createdAt);
   // Hora → hora de cierre; billedAt solo existe si la orden ya se cerró.
   const timeValue = order.billedAt ? formatTime(order.billedAt) : "";
-  const cityValue = client.city ?? "";
+  // Ciudad → ciudad del servicio; si no está definida, la del cliente; si tampoco, en blanco.
+  const cityValue = order.serviceCity ?? client.city ?? "";
   const endClientValue = order.endClientName ?? "";
 
   const sections = [

@@ -64,7 +64,7 @@ function Callout({
   title,
   children,
 }: {
-  variant: "amber" | "blue";
+  variant: "amber" | "blue" | "green";
   title: string;
   children: string;
 }) {
@@ -74,7 +74,9 @@ function Callout({
         "print-color-exact rounded-md border-l-4 p-4",
         variant === "amber"
           ? "border-amber-500 bg-amber-50 text-amber-900"
-          : "border-blue-500 bg-blue-50 text-blue-900",
+          : variant === "blue"
+            ? "border-blue-500 bg-blue-50 text-blue-900"
+            : "border-green-600 bg-green-50 text-green-900",
       )}
     >
       <p className="mb-1 text-xs font-semibold tracking-wide uppercase">{title}</p>
@@ -239,6 +241,14 @@ export function WorkOrderPrintDocument({
         <div className="mt-4 break-inside-avoid">
           <Callout variant="blue" title="Observaciones y recomendaciones">
             {order.observations}
+          </Callout>
+        </div>
+      )}
+
+      {order.suggestions && (
+        <div className="mt-4 break-inside-avoid">
+          <Callout variant="green" title="Sugerencias y recomendaciones">
+            {order.suggestions}
           </Callout>
         </div>
       )}

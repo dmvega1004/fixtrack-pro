@@ -10,6 +10,7 @@ export const REPORT_FORMAT_SOURCES = [
   "DESCRIPTION",
   "DIAGNOSIS",
   "OBSERVATIONS",
+  "SUGGESTIONS",
   "EMPTY",
 ] as const;
 export type ReportFormatSource = (typeof REPORT_FORMAT_SOURCES)[number];
@@ -18,5 +19,6 @@ export const REPORT_FORMAT_SOURCE_LABELS: Record<ReportFormatSource, string> = {
   DESCRIPTION: "Descripción del problema",
   DIAGNOSIS: "Diagnóstico",
   OBSERVATIONS: "Observaciones / notas del servicio",
+  SUGGESTIONS: "Sugerencias y recomendaciones",
   EMPTY: "En blanco (para llenar a mano)",
 };
