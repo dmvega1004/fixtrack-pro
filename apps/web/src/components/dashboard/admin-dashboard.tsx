@@ -10,6 +10,7 @@ import { getBillingSummary } from "@/lib/api/billing";
 import { formatCurrency } from "@/lib/format/currency";
 import type { Session } from "@/lib/roles";
 import { lowStockAlerts } from "@/lib/dashboard/summary";
+import { BOGOTA_TIME_ZONE } from "@/lib/format/dates";
 import { KpiCard } from "./kpi-card";
 import { TechnicianPerformancePanel } from "./technician-performance-panel";
 import { OrdersByStatusPanel } from "./orders-by-status-panel";
@@ -22,6 +23,7 @@ function formatToday(): string {
     day: "numeric",
     month: "long",
     year: "numeric",
+    timeZone: BOGOTA_TIME_ZONE,
   }).format(new Date());
   return formatted.charAt(0).toUpperCase() + formatted.slice(1);
 }

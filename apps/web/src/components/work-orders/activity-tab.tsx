@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { ActivityLogEntry } from "@/lib/api/activity-log";
+import { bogotaDayKey, formatTime, BOGOTA_TIME_ZONE } from "@/lib/format/dates";
 
 /**
  * Bitácora de auditoría de la orden: registro de solo lectura, sin
@@ -12,28 +13,25 @@ interface ActivityTabProps {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-function dayKey(date: Date): string {
-  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
-}
-
+/**
+ * "Hoy"/"Ayer" se deciden por el día calendario en Colombia (ver
+ * bogotaDayKey), no por el día del entorno donde corre este componente —
+ * este es un Server Component (sin "use client"), así que corre en el
+ * servidor en UTC: sin esto, un evento registrado entre las 7pm y la
+ * medianoche hora de Bogotá caía en "mañana" (ya es el día siguiente en UTC).
+ */
 function dayHeader(date: Date): string {
   const today = new Date();
   const yesterday = new Date(today.getTime() - DAY_MS);
 
-  if (dayKey(date) === dayKey(today)) return "Hoy";
-  if (dayKey(date) === dayKey(yesterday)) return "Ayer";
+  if (bogotaDayKey(date) === bogotaDayKey(today)) return "Hoy";
+  if (bogotaDayKey(date) === bogotaDayKey(yesterday)) return "Ayer";
 
   return new Intl.DateTimeFormat("es-CO", {
     day: "2-digit",
     month: "long",
     year: "numeric",
-  }).format(date);
-}
-
-function formatTime(date: Date): string {
-  return new Intl.DateTimeFormat("es-CO", {
-    hour: "2-digit",
-    minute: "2-digit",
+    timeZone: BOGOTA_TIME_ZONE,
   }).format(date);
 }
 
@@ -49,7 +47,7 @@ function groupByDay(entries: ActivityLogEntry[]): DayGroup[] {
 
   for (const entry of entries) {
     const date = new Date(entry.createdAt);
-    const key = dayKey(date);
+    const key = bogotaDayKey(date);
     const currentGroup = groups[groups.length - 1];
 
     if (currentGroup && currentGroup.key === key) {

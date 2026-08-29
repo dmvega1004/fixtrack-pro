@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { saveBilledAtAction } from "@/app/(dashboard)/ordenes/[id]/actions";
+import { bogotaDayKey } from "@/lib/format/dates";
 
 interface BilledAtEditorProps {
   orderId: string;
@@ -30,7 +31,10 @@ function todayIso(): string {
 export function BilledAtEditor({ orderId, billedAt }: BilledAtEditorProps) {
   const router = useRouter();
   const inputId = useId();
-  const initialDate = billedAt.slice(0, 10);
+  // billedAt.slice(0, 10) leería el día calendario en UTC, no en Colombia
+  // — una orden cerrada después de las 7pm hora de Bogotá ya cayó en el
+  // día siguiente en UTC, y el campo prellenaría la fecha equivocada.
+  const initialDate = bogotaDayKey(new Date(billedAt));
   const [date, setDate] = useState(initialDate);
   const [isSaving, setIsSaving] = useState(false);
 

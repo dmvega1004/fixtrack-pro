@@ -10,6 +10,7 @@ import {
   getOverdueReceivables,
 } from "@/lib/api/billing";
 import { formatCurrency } from "@/lib/format/currency";
+import { BOGOTA_TIME_ZONE } from "@/lib/format/dates";
 import { BilledOrdersTable } from "@/components/billing/billed-orders-table";
 import { CollectedPaymentsTable } from "@/components/billing/collected-payments-table";
 import { ReceivableBreakdownTable } from "@/components/billing/receivable-breakdown-table";
@@ -22,9 +23,11 @@ function isIndicador(value: string): value is Indicador {
 }
 
 function currentMonthLabel(): string {
-  return new Intl.DateTimeFormat("es-CO", { month: "long", year: "numeric" }).format(
-    new Date(),
-  );
+  return new Intl.DateTimeFormat("es-CO", {
+    month: "long",
+    year: "numeric",
+    timeZone: BOGOTA_TIME_ZONE,
+  }).format(new Date());
 }
 
 interface CobrosIndicadorPageProps {

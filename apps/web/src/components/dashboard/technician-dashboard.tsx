@@ -7,7 +7,7 @@ import { WorkOrderCard } from "@/components/work-orders/work-order-card";
 import { StatusChip } from "@/components/shared/status-chip";
 import { formatOrderNumber } from "@/lib/format/order-number";
 import { formatEquipmentSummary } from "@/lib/format/equipment-summary";
-import { formatDate } from "@/lib/format/dates";
+import { formatDate, BOGOTA_TIME_ZONE } from "@/lib/format/dates";
 import type { Session } from "@/lib/roles";
 import {
   filterActiveOrders,
@@ -25,6 +25,7 @@ function formatToday(): string {
     weekday: "long",
     day: "numeric",
     month: "long",
+    timeZone: BOGOTA_TIME_ZONE,
   }).format(new Date());
   return formatted.charAt(0).toUpperCase() + formatted.slice(1);
 }
