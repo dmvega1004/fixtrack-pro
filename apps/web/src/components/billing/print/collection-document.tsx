@@ -15,6 +15,7 @@ import {
   PRINT_BRAND_BLUE as BRAND_BLUE,
 } from "@/components/work-orders/print/print-letterhead";
 import { SignatureLine } from "@/components/shared/signature-line";
+import { PrintDocumentFrame } from "@/components/shared/print-document-frame";
 
 const DEFAULT_FOOTNOTE =
   "Este documento constituye una solicitud de pago y no equivale a factura electrónica de venta.";
@@ -31,9 +32,9 @@ interface CollectionDocumentProps {
 
 function Box({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-neutral-200 p-4">
+    <div className="flex flex-col gap-2 rounded-lg border border-neutral-200 p-4 break-inside-avoid">
       <p
-        className="text-xs font-semibold tracking-wide uppercase"
+        className="break-after-avoid text-xs font-semibold tracking-wide uppercase"
         style={{ color: BRAND_BLUE }}
       >
         {title}
@@ -168,183 +169,181 @@ export function CollectionDocument({
 
   return (
     <div className="mx-auto w-full max-w-[210mm] bg-white p-6 text-neutral-900 sm:p-10 print:w-full print:max-w-none print:p-0">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <PrintLetterhead company={company} />
-        <div className="flex flex-col items-end text-right">
-          <p className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">
-            {company.collectionDocTitle}
+      <PrintDocumentFrame
+        footer={
+          <p className="pt-2 text-center text-[10px] text-neutral-400">
+            {printFooterText}
           </p>
-          <p className="text-3xl font-bold" style={{ color: BRAND_BLUE }}>
-            {formatCollectionNumber(order.collectionNumber!)}
-          </p>
-          <p className="mt-1 text-xs text-neutral-500">
-            Fecha de emisión: {formatDate(order.collectionIssuedAt!)}
-          </p>
-        </div>
-      </div>
-
-      <hr className="mt-4 border-t-4" style={{ borderColor: BRAND_BLUE }} />
-
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Box title="A cargo de">
-          <span className="font-medium">{client.name}</span>
-          {documentLabel && <span className="text-neutral-600">{documentLabel}</span>}
-          {client.address && <span className="text-neutral-600">{client.address}</span>}
-          {client.phone && <span className="text-neutral-600">{client.phone}</span>}
-        </Box>
-        <Box title="Debe a">
-          <span className="font-medium">{payeeName}</span>
-          {company.payeeDocument && (
-            <span className="text-neutral-600">{company.payeeDocument}</span>
-          )}
-        </Box>
-      </div>
-
-      <div
-        className="print-color-exact mt-6 rounded-md border-l-4 bg-blue-50 p-4"
-        style={{ borderColor: BRAND_BLUE }}
+        }
       >
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <MetaItem label="Orden de trabajo" value={formatOrderNumber(order.orderNumber)} />
-          <MetaItem
-            label="Fecha del servicio"
-            value={order.billedAt ? formatDate(order.billedAt) : "—"}
-          />
-          <MetaItem
-            label="Equipos intervenidos"
-            value={formatEquipmentSummary(equipments)}
-          />
-        </div>
-      </div>
-
-      <section className="mt-6 flex flex-col gap-2">
-        <p className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">
-          Por concepto de
-        </p>
-        <p className="text-sm break-words text-neutral-900">{order.description}</p>
-      </section>
-
-      <section className="mt-6">
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b border-neutral-400 text-left text-[11px] tracking-wide text-neutral-500 uppercase">
-              <th className="py-1.5 pr-2 font-medium">Concepto</th>
-              <th className="py-1.5 pr-2 text-right font-medium">Cantidad</th>
-              <th className="py-1.5 pr-2 text-right font-medium">Valor unitario</th>
-              <th className="py-1.5 text-right font-medium">Valor total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {valueRows.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="py-3 text-center text-neutral-500">
-                  Sin conceptos facturados.
-                </td>
-              </tr>
-            ) : (
-              valueRows.map((row, index) => (
-                <ValueRow key={index} {...row} currency={currency} />
-              ))
-            )}
-          </tbody>
-        </table>
-      </section>
-
-      <section className="mt-4 flex justify-end break-inside-avoid">
-        <table className="w-72 border-collapse text-sm">
-          <tbody>
-            {Number(billing.discountAmount) > 0 && (
-              <tr>
-                <td className="py-1 pr-2 text-neutral-700">Descuento</td>
-                <td className="py-1 text-right text-neutral-900">
-                  − {formatCurrency(billing.discountAmount, currency)}
-                </td>
-              </tr>
-            )}
-            <TotalRow label="Subtotal" value={billing.subtotal} currency={currency} />
-            {Number(billing.taxRate) > 0 && (
-              <TotalRow
-                label={`IVA (${Number(billing.taxRate)}%)`}
-                value={billing.taxAmount}
-                currency={currency}
-              />
-            )}
-            <TotalRow
-              label="Total del servicio"
-              value={billing.total}
-              currency={currency}
-              className="border-t border-neutral-300 font-semibold"
-            />
-            {Number(billing.paidAmount) > 0 && (
-              <tr>
-                <td className="py-1 pr-2 text-green-700">Abonos recibidos</td>
-                <td className="py-1 text-right text-green-700">
-                  − {formatCurrency(billing.paidAmount, currency)}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </section>
-
-      <section className="mt-2 flex justify-end break-inside-avoid">
-        <div className="print-color-exact flex w-72 items-center justify-between rounded-md bg-blue-600 px-4 py-3 text-white">
-          <span className="text-sm font-bold tracking-wide uppercase">Saldo a pagar</span>
-          <span className="text-lg font-bold">{formatCurrency(balance, currency)}</span>
-        </div>
-      </section>
-
-      <p className="mt-4 text-right text-xs font-medium text-neutral-600 italic">
-        {amountInWords(balance, currency)}
-      </p>
-
-      <footer className="mt-10 flex flex-col gap-6 break-inside-avoid">
-        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5 text-sm text-neutral-700">
-            <p className="text-xs font-semibold tracking-wide uppercase" style={{ color: BRAND_BLUE }}>
-              Información para pago
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <PrintLetterhead company={company} />
+          <div className="flex flex-col items-end text-right">
+            <p className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">
+              {company.collectionDocTitle}
             </p>
-            <span>Titular: {payeeName}</span>
-            {company.bankName && <span>Entidad: {company.bankName}</span>}
-            {company.bankAccount && <span>Cuenta: {company.bankAccount}</span>}
-            <span>Condiciones: pago a {client.paymentTermDays} días</span>
-            {dueDate && <span>Fecha de vencimiento: {formatDate(dueDate)}</span>}
+            <p className="text-3xl font-bold" style={{ color: BRAND_BLUE }}>
+              {formatCollectionNumber(order.collectionNumber!)}
+            </p>
+            <p className="mt-1 text-xs text-neutral-500">
+              Fecha de emisión: {formatDate(order.collectionIssuedAt!)}
+            </p>
+          </div>
+        </div>
+
+        <hr className="mt-4 border-t-4" style={{ borderColor: BRAND_BLUE }} />
+
+        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Box title="A cargo de">
+            <span className="font-medium">{client.name}</span>
+            {documentLabel && <span className="text-neutral-600">{documentLabel}</span>}
+            {client.address && <span className="text-neutral-600">{client.address}</span>}
+            {client.phone && <span className="text-neutral-600">{client.phone}</span>}
+          </Box>
+          <Box title="Debe a">
+            <span className="font-medium">{payeeName}</span>
+            {company.payeeDocument && (
+              <span className="text-neutral-600">{company.payeeDocument}</span>
+            )}
+          </Box>
+        </div>
+
+        <div
+          className="print-color-exact mt-6 rounded-md border-l-4 bg-blue-50 p-4 break-inside-avoid"
+          style={{ borderColor: BRAND_BLUE }}
+        >
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <MetaItem label="Orden de trabajo" value={formatOrderNumber(order.orderNumber)} />
+            <MetaItem
+              label="Fecha del servicio"
+              value={order.billedAt ? formatDate(order.billedAt) : "—"}
+            />
+            <MetaItem
+              label="Equipos intervenidos"
+              value={formatEquipmentSummary(equipments)}
+            />
+          </div>
+        </div>
+
+        <section className="mt-6 flex flex-col gap-2 break-inside-avoid">
+          <p className="break-after-avoid text-xs font-semibold tracking-wide text-neutral-500 uppercase">
+            Por concepto de
+          </p>
+          <p className="text-sm break-words text-neutral-900">{order.description}</p>
+        </section>
+
+        <section className="mt-6">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="break-after-avoid border-b border-neutral-400 text-left text-[11px] tracking-wide text-neutral-500 uppercase">
+                <th className="py-1.5 pr-2 font-medium">Concepto</th>
+                <th className="py-1.5 pr-2 text-right font-medium">Cantidad</th>
+                <th className="py-1.5 pr-2 text-right font-medium">Valor unitario</th>
+                <th className="py-1.5 text-right font-medium">Valor total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {valueRows.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="py-3 text-center text-neutral-500">
+                    Sin conceptos facturados.
+                  </td>
+                </tr>
+              ) : (
+                valueRows.map((row, index) => (
+                  <ValueRow key={index} {...row} currency={currency} />
+                ))
+              )}
+            </tbody>
+          </table>
+        </section>
+
+        <section className="mt-4 flex justify-end break-inside-avoid">
+          <table className="w-72 border-collapse text-sm">
+            <tbody>
+              {Number(billing.discountAmount) > 0 && (
+                <tr>
+                  <td className="py-1 pr-2 text-neutral-700">Descuento</td>
+                  <td className="py-1 text-right text-neutral-900">
+                    − {formatCurrency(billing.discountAmount, currency)}
+                  </td>
+                </tr>
+              )}
+              <TotalRow label="Subtotal" value={billing.subtotal} currency={currency} />
+              {Number(billing.taxRate) > 0 && (
+                <TotalRow
+                  label={`IVA (${Number(billing.taxRate)}%)`}
+                  value={billing.taxAmount}
+                  currency={currency}
+                />
+              )}
+              <TotalRow
+                label="Total del servicio"
+                value={billing.total}
+                currency={currency}
+                className="border-t border-neutral-300 font-semibold"
+              />
+              {Number(billing.paidAmount) > 0 && (
+                <tr>
+                  <td className="py-1 pr-2 text-green-700">Abonos recibidos</td>
+                  <td className="py-1 text-right text-green-700">
+                    − {formatCurrency(billing.paidAmount, currency)}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </section>
+
+        <section className="mt-2 flex justify-end break-inside-avoid">
+          <div className="print-color-exact flex w-72 items-center justify-between rounded-md bg-blue-600 px-4 py-3 text-white">
+            <span className="text-sm font-bold tracking-wide uppercase">Saldo a pagar</span>
+            <span className="text-lg font-bold">{formatCurrency(balance, currency)}</span>
+          </div>
+        </section>
+
+        <p className="mt-4 text-right text-xs font-medium text-neutral-600 italic">
+          {amountInWords(balance, currency)}
+        </p>
+
+        <footer className="mt-10 flex flex-col gap-6 break-inside-avoid">
+          <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
+            <div className="flex flex-col gap-1.5 text-sm text-neutral-700">
+              <p
+                className="break-after-avoid text-xs font-semibold tracking-wide uppercase"
+                style={{ color: BRAND_BLUE }}
+              >
+                Información para pago
+              </p>
+              <span>Titular: {payeeName}</span>
+              {company.bankName && <span>Entidad: {company.bankName}</span>}
+              {company.bankAccount && <span>Cuenta: {company.bankAccount}</span>}
+              <span>Condiciones: pago a {client.paymentTermDays} días</span>
+              {dueDate && <span>Fecha de vencimiento: {formatDate(dueDate)}</span>}
+            </div>
+
+            {company.signerName && (
+              <div className="flex flex-col gap-8">
+                <SignatureLine
+                  signatureImageUrl={
+                    company.signatureInCollection ? company.signatureImageUrl : null
+                  }
+                />
+                <div className="flex flex-col text-sm text-neutral-800">
+                  <span className="font-medium">{company.signerName}</span>
+                  {company.signerRole && (
+                    <span className="text-xs text-neutral-500">{company.signerRole}</span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
-          {company.signerName && (
-            <div className="flex flex-col gap-8">
-              <SignatureLine
-                signatureImageUrl={
-                  company.signatureInCollection ? company.signatureImageUrl : null
-                }
-              />
-              <div className="flex flex-col text-sm text-neutral-800">
-                <span className="font-medium">{company.signerName}</span>
-                {company.signerRole && (
-                  <span className="text-xs text-neutral-500">{company.signerRole}</span>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <p className="text-center text-xs text-neutral-500 italic">
-          {company.collectionDocFootnote ?? DEFAULT_FOOTNOTE}
-        </p>
-        {/* En pantalla se ve acá; al imprimir la reemplaza el pie fijo de
-            abajo, que se repite en TODAS las hojas (esta solo aparecería
-            en la última). */}
-        <p className="text-center text-[11px] text-neutral-400 print:hidden">
-          {printFooterText}
-        </p>
-      </footer>
-
-      {/* Pie fijo de impresión: position:fixed en contexto de impresión se
-          repite en cada hoja, dentro del margen inferior reservado por
-          @page (ver globals.css). */}
-      <p className="hidden bg-white py-2 text-center text-[10px] text-neutral-400 print:fixed print:inset-x-0 print:bottom-0 print:z-10 print:block">
-        {printFooterText}
-      </p>
+          <p className="text-center text-xs text-neutral-500 italic">
+            {company.collectionDocFootnote ?? DEFAULT_FOOTNOTE}
+          </p>
+        </footer>
+      </PrintDocumentFrame>
     </div>
   );
 }
