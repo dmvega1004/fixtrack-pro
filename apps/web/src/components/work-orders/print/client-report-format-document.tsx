@@ -94,6 +94,11 @@ function ReportSection({
  * (para que se vea como parte del formato del cliente, no como un injerto
  * del informe propio) seguida de la cuadrícula compartida de fotos (ver
  * PrintPhotoGrid) — con borde en cada fila, no en el contenedor completo.
+ * Empieza en hoja nueva (break-before-page): el texto ocupa las hojas
+ * anteriores completas y las fotos arrancan limpias en la siguiente, con
+ * esta franja de título arriba. Solo se renderiza si hay fotos (ver
+ * showPhotos en ClientReportFormatDocument), así que nunca deja una hoja
+ * en blanco cuando no las hay.
  */
 function PhotosSection({
   label,
@@ -105,7 +110,7 @@ function PhotosSection({
   accentColor: string;
 }) {
   return (
-    <section className="flex flex-col">
+    <section className="flex flex-col break-before-page">
       <div
         className="print-color-exact break-after-avoid px-3 py-1.5 text-xs font-semibold tracking-wide text-white uppercase"
         style={{ backgroundColor: accentColor }}

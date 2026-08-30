@@ -433,8 +433,14 @@ export function WorkOrderPrintDocument({
           </section>
         )}
 
+        {/* Salto de página antes del registro fotográfico: el texto del
+            servicio ocupa las hojas anteriores completas y las fotos
+            empiezan limpias en la siguiente, con su franja de título
+            arriba — sin huecos de media hoja. Solo se aplica cuando hay
+            fotos (este bloque no se renderiza en absoluto si no las hay),
+            así que nunca deja una hoja en blanco. */}
         {photos.length > 0 && (
-          <section className="mt-6 flex flex-col gap-3">
+          <section className="mt-6 flex flex-col gap-3 break-before-page">
             <SectionTitle>Archivo fotográfico</SectionTitle>
             <PrintPhotoGrid photos={photos} />
           </section>
