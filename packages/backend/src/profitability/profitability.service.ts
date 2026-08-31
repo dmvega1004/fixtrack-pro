@@ -3,11 +3,23 @@ import { OrderStatus, Prisma } from 'database';
 import { PrismaService } from '../prisma.service';
 import { calculateProfitability } from './profitability.util';
 
+/**
+ * netReceived (neto recibido) es una lectura DISTINTA de income/margin —
+ * cuánto entra a la cuenta, no cuánto se ganó. Va SIEMPRE junto a
+ * income/cost/margin, nunca los reemplaza ni se mezcla en su cálculo: una
+ * retención no es un costo, es un anticipo del impuesto de renta que se
+ * recupera al declarar — calcular el margen sobre el neto haría parecer
+ * todos los trabajos con retenciones menos rentables de lo que en
+ * realidad son, y sobre ese dato se tomarían decisiones de precio
+ * equivocadas (ver calculateProfitability en profitability.util.ts, que
+ * sigue sin tocar).
+ */
 export interface ProfitabilitySummary {
   income: string;
   cost: string;
   margin: string;
   marginPercent: number | null;
+  netReceived: string;
 }
 
 export interface ProfitabilityOrderView {
@@ -20,6 +32,7 @@ export interface ProfitabilityOrderView {
   cost: string;
   margin: string;
   marginPercent: number | null;
+  netReceived: string;
 }
 
 export interface ProfitabilityClientView {
@@ -29,6 +42,7 @@ export interface ProfitabilityClientView {
   cost: string;
   margin: string;
   marginPercent: number | null;
+  netReceived: string;
 }
 
 export interface ProfitabilityMonthPoint {
@@ -38,6 +52,7 @@ export interface ProfitabilityMonthPoint {
   cost: string;
   margin: string;
   marginPercent: number | null;
+  netReceived: string;
 }
 
 export type ProfitabilityOrderSortBy = 'margin' | 'marginPercent';
@@ -53,6 +68,7 @@ interface ComputedOrder {
   cost: Prisma.Decimal;
   margin: Prisma.Decimal;
   marginPercent: number | null;
+  netReceived: Prisma.Decimal;
 }
 
 const MONTHS_IN_TREND = 12;
@@ -182,6 +198,7 @@ export class ProfitabilityService {
         clientName: string;
         income: Prisma.Decimal;
         cost: Prisma.Decimal;
+        netReceived: Prisma.Decimal;
       }
     >();
     for (const o of orders) {
@@ -189,18 +206,20 @@ export class ProfitabilityService {
       if (existing) {
         existing.income = existing.income.add(o.income);
         existing.cost = existing.cost.add(o.cost);
+        existing.netReceived = existing.netReceived.add(o.netReceived);
       } else {
         byClient.set(o.clientId, {
           clientId: o.clientId,
           clientName: o.clientName,
           income: o.income,
           cost: o.cost,
+          netReceived: o.netReceived,
         });
       }
     }
 
     return Array.from(byClient.values())
-      .map(({ income, cost, ...rest }) => {
+      .map(({ income, cost, netReceived, ...rest }) => {
         const margin = income.sub(cost);
         const marginPercent = income.isZero()
           ? null
@@ -211,6 +230,7 @@ export class ProfitabilityService {
           cost: cost.toFixed(2),
           margin: margin.toFixed(2),
           marginPercent,
+          netReceived: netReceived.toFixed(2),
         };
       })
       .sort((a, b) => Number(b.margin) - Number(a.margin));
@@ -225,13 +245,14 @@ export class ProfitabilityService {
 
     const buckets = new Map<
       string,
-      { income: Prisma.Decimal; cost: Prisma.Decimal }
+      { income: Prisma.Decimal; cost: Prisma.Decimal; netReceived: Prisma.Decimal }
     >();
     for (let i = MONTHS_IN_TREND - 1; i >= 0; i--) {
       const { start: bucketStart } = monthRange(i);
       buckets.set(monthKey(bucketStart), {
         income: new Prisma.Decimal(0),
         cost: new Prisma.Decimal(0),
+        netReceived: new Prisma.Decimal(0),
       });
     }
 
@@ -240,21 +261,25 @@ export class ProfitabilityService {
       if (!bucket) continue; // fuera de la ventana por redondeo de horas — no debería pasar
       bucket.income = bucket.income.add(o.income);
       bucket.cost = bucket.cost.add(o.cost);
+      bucket.netReceived = bucket.netReceived.add(o.netReceived);
     }
 
-    return Array.from(buckets.entries()).map(([month, { income, cost }]) => {
-      const margin = income.sub(cost);
-      const marginPercent = income.isZero()
-        ? null
-        : margin.div(income).mul(100).toNumber();
-      return {
-        month,
-        income: income.toFixed(2),
-        cost: cost.toFixed(2),
-        margin: margin.toFixed(2),
-        marginPercent,
-      };
-    });
+    return Array.from(buckets.entries()).map(
+      ([month, { income, cost, netReceived }]) => {
+        const margin = income.sub(cost);
+        const marginPercent = income.isZero()
+          ? null
+          : margin.div(income).mul(100).toNumber();
+        return {
+          month,
+          income: income.toFixed(2),
+          cost: cost.toFixed(2),
+          margin: margin.toFixed(2),
+          marginPercent,
+          netReceived: netReceived.toFixed(2),
+        };
+      },
+    );
   }
 
   /**
@@ -300,6 +325,10 @@ export class ProfitabilityService {
         clientId: order.client.id,
         clientName: order.client.name,
         billedAt: order.billedAt!,
+        // netAmount = totalAmount cuando la orden no tiene retenciones (ver
+        // WorkOrder.netAmount) — el `?? order.totalAmount!` es solo un
+        // resguardo defensivo, no debería activarse nunca en la práctica.
+        netReceived: order.netAmount ?? order.totalAmount!,
         income,
         cost,
         margin,
@@ -319,6 +348,7 @@ export class ProfitabilityService {
       cost: o.cost.toFixed(2),
       margin: o.margin.toFixed(2),
       marginPercent: o.marginPercent,
+      netReceived: o.netReceived.toFixed(2),
     };
   }
 
@@ -332,6 +362,10 @@ export class ProfitabilityService {
       (acc, o) => acc.add(o.cost),
       new Prisma.Decimal(0),
     );
+    const netReceived = orders.reduce(
+      (acc, o) => acc.add(o.netReceived),
+      new Prisma.Decimal(0),
+    );
     const margin = income.sub(cost);
     const marginPercent = income.isZero()
       ? null
@@ -342,6 +376,7 @@ export class ProfitabilityService {
       cost: cost.toFixed(2),
       margin: margin.toFixed(2),
       marginPercent,
+      netReceived: netReceived.toFixed(2),
     };
   }
 }
