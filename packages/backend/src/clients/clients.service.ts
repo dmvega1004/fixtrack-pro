@@ -16,10 +16,31 @@ import { PrismaService } from '../prisma.service';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 
+/**
+ * Client + qué retenciones del catálogo aplica por defecto (ver
+ * ClientRetention) — visible para cualquier rol que pueda ver la ficha
+ * del cliente, igual que el resto de sus datos; solo ADMIN puede
+ * EDITARLo (ver ensureCanConfigureRetentions). Distinto del bloque de
+ * retenciones de la ORDEN (WorkOrderRetention), que sí es estrictamente
+ * ADMIN-only de punta a punta.
+ */
+export type ClientView = Client & { retentionIds: string[] };
+
+const CLIENT_RETENTIONS_INCLUDE = {
+  retentions: { select: { retentionId: true } },
+} as const;
+
+function toClientView(
+  client: Client & { retentions: { retentionId: string }[] },
+): ClientView {
+  const { retentions, ...rest } = client;
+  return { ...rest, retentionIds: retentions.map((r) => r.retentionId) };
+}
+
 /** findAll trae estos conteos agregados en SQL — reemplaza el fetch
  * completo de /equipments y /work-orders que hacía /clientes para contar
  * en JS (ver auditoría de rendimiento). */
-export type ClientListItem = Client & {
+export type ClientListItem = ClientView & {
   equipmentCount: number;
   orderCount: number;
 };
@@ -65,14 +86,24 @@ export class ClientsService {
     private readonly cloudinary: CloudinaryService,
   ) {}
 
-  create(user: AuthenticatedUser, dto: CreateClientDto): Promise<Client> {
+  async create(
+    user: AuthenticatedUser,
+    dto: CreateClientDto,
+  ): Promise<ClientView> {
     this.ensureCanConfigureReportFormat(user, dto);
     this.ensureReportFormatTitlePresent(
       dto.reportFormatEnabled ?? false,
       dto.reportFormatTitle,
     );
+    this.ensureCanConfigureRetentions(user, dto);
+    if (dto.retentionIds !== undefined) {
+      await this.ensureRetentionsBelongToCompany(
+        user.companyId,
+        dto.retentionIds,
+      );
+    }
 
-    return this.prisma.client.create({
+    const created = await this.prisma.client.create({
       data: {
         name: dto.name.trim(),
         email: dto.email?.toLowerCase().trim(),
@@ -84,8 +115,21 @@ export class ClientsService {
         paymentTermDays: dto.paymentTermDays,
         ...this.reportFormatData(dto),
         companyId: user.companyId, // candado: el cliente nace amarrado al tenant del token
+        ...(dto.retentionIds !== undefined && {
+          retentions: {
+            createMany: {
+              data: dto.retentionIds.map((retentionId) => ({
+                retentionId,
+                companyId: user.companyId, // candado
+              })),
+            },
+          },
+        }),
       },
+      include: CLIENT_RETENTIONS_INCLUDE,
     });
+
+    return toClientView(created);
   }
 
   async findAll(companyId: string): Promise<ClientListItem[]> {
@@ -93,12 +137,13 @@ export class ClientsService {
       where: { companyId }, // candado: solo clientes de MI empresa
       include: {
         _count: { select: { equipments: true, workOrders: true } },
+        ...CLIENT_RETENTIONS_INCLUDE,
       },
       orderBy: { createdAt: 'desc' },
     });
 
     return clients.map(({ _count, ...client }) => ({
-      ...client,
+      ...toClientView(client),
       equipmentCount: _count.equipments,
       orderCount: _count.workOrders,
     }));
@@ -109,23 +154,24 @@ export class ClientsService {
    * Un cliente de OTRA empresa devuelve 404 — para el atacante es
    * indistinguible de un cliente inexistente (no filtramos información).
    */
-  async findOne(companyId: string, id: string): Promise<Client> {
+  async findOne(companyId: string, id: string): Promise<ClientView> {
     const client = await this.prisma.client.findFirst({
       where: { id, companyId }, // candado
+      include: CLIENT_RETENTIONS_INCLUDE,
     });
 
     if (!client) {
       throw new NotFoundException(`Cliente ${id} no encontrado`);
     }
 
-    return client;
+    return toClientView(client);
   }
 
   async update(
     user: AuthenticatedUser,
     id: string,
     dto: UpdateClientDto,
-  ): Promise<Client> {
+  ): Promise<ClientView> {
     // Verifica pertenencia al tenant ANTES de tocar el registro (404 si es ajeno)
     const existing = await this.findOne(user.companyId, id);
 
@@ -141,8 +187,15 @@ export class ClientsService {
         ? dto.reportFormatTitle
         : existing.reportFormatTitle,
     );
+    this.ensureCanConfigureRetentions(user, dto);
+    if (dto.retentionIds !== undefined) {
+      await this.ensureRetentionsBelongToCompany(
+        user.companyId,
+        dto.retentionIds,
+      );
+    }
 
-    return this.prisma.client.update({
+    const updated = await this.prisma.client.update({
       where: { id },
       data: {
         name: dto.name?.trim(),
@@ -154,8 +207,25 @@ export class ClientsService {
         city: dto.city?.trim(),
         paymentTermDays: dto.paymentTermDays,
         ...this.reportFormatData(dto),
+        // Reemplazo completo (semántica PATCH), igual que equipmentIds en
+        // WorkOrder: borra las marcas actuales y crea las del array
+        // recibido. `undefined` (campo omitido) no toca nada.
+        ...(dto.retentionIds !== undefined && {
+          retentions: {
+            deleteMany: {},
+            createMany: {
+              data: dto.retentionIds.map((retentionId) => ({
+                retentionId,
+                companyId: user.companyId, // candado
+              })),
+            },
+          },
+        }),
       },
+      include: CLIENT_RETENTIONS_INCLUDE,
     });
+
+    return toClientView(updated);
   }
 
   /**
@@ -216,6 +286,43 @@ export class ClientsService {
       throw new ForbiddenException(
         `Solo ADMIN o COORDINATOR pueden configurar el formato de informe del cliente. ` +
           `Campos no permitidos: ${touched.join(', ')}`,
+      );
+    }
+  }
+
+  /**
+   * RBAC: qué retenciones aplica un cliente es configuración financiera —
+   * SOLO ADMIN, ni siquiera COORDINATOR (mismo criterio estricto que el
+   * bloque de retenciones en la orden, ver WorkOrdersService).
+   */
+  private ensureCanConfigureRetentions(
+    user: AuthenticatedUser,
+    dto: CreateClientDto | UpdateClientDto,
+  ): void {
+    if (user.role === Role.ADMIN) return;
+    if (dto.retentionIds !== undefined) {
+      throw new ForbiddenException(
+        'Solo ADMIN puede configurar las retenciones que aplica el cliente',
+      );
+    }
+  }
+
+  /** Validación cruzada multi-tenant: cada retención debe ser del catálogo de MI empresa. */
+  private async ensureRetentionsBelongToCompany(
+    companyId: string,
+    retentionIds: string[],
+  ): Promise<void> {
+    if (retentionIds.length === 0) return;
+
+    const found = await this.prisma.retention.findMany({
+      where: { id: { in: retentionIds }, companyId }, // candado
+      select: { id: true },
+    });
+    const foundIds = new Set(found.map((r) => r.id));
+    const missingIds = retentionIds.filter((id) => !foundIds.has(id));
+    if (missingIds.length > 0) {
+      throw new NotFoundException(
+        `Retención(es) no encontrada(s) en tu empresa: ${missingIds.join(', ')}`,
       );
     }
   }

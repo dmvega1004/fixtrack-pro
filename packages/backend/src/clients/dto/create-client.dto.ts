@@ -1,4 +1,6 @@
 import {
+  ArrayUnique,
+  IsArray,
   IsBoolean,
   IsEmail,
   IsIn,
@@ -6,6 +8,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsUUID,
   Matches,
   Max,
   MaxLength,
@@ -175,4 +178,22 @@ export class CreateClientDto {
   @IsString()
   @MaxLength(60)
   reportFormatPhotosLabel?: string;
+
+  /**
+   * Retenciones que este cliente aplica por defecto ("Retenciones que
+   * aplica" en la ficha): premarcan las casillas en sus órdenes nuevas
+   * (ver WorkOrdersService.create). Reemplazo completo del set actual,
+   * mismo patrón que equipmentIds en WorkOrder — un array vacío es válido
+   * y explícito (el cliente no aplica ninguna), `undefined` no toca nada.
+   * SOLO ADMIN (RBAC en el service): es configuración financiera del
+   * cliente, no un dato operativo que un técnico deba tocar en campo.
+   */
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique({ message: 'retentionIds no puede tener retenciones repetidas' })
+  @IsUUID('4', {
+    each: true,
+    message: 'Cada retentionId debe ser un UUID válido',
+  })
+  retentionIds?: string[];
 }

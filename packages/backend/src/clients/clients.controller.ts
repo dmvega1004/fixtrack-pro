@@ -17,7 +17,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { MAX_IMAGE_SIZE_BYTES } from '../cloudinary/image-upload.constants';
-import { ClientListItem, ClientsService } from './clients.service';
+import { ClientListItem, ClientsService, ClientView } from './clients.service';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 
@@ -39,7 +39,7 @@ export class ClientsController {
   create(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateClientDto,
-  ): Promise<Client> {
+  ): Promise<ClientView> {
     return this.clientsService.create(user, dto);
   }
 
@@ -56,20 +56,21 @@ export class ClientsController {
   findOne(
     @CurrentUser('companyId') companyId: string,
     @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<Client> {
+  ): Promise<ClientView> {
     return this.clientsService.findOne(companyId, id);
   }
 
   /**
    * PATCH /clients/:id — actualización parcial; el service rechaza con 403
-   * si un TECHNICIAN envía campos del formato de informe propio.
+   * si un TECHNICIAN envía campos del formato de informe propio o de
+   * retenciones (retentionIds).
    */
   @Patch(':id')
   update(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateClientDto,
-  ): Promise<Client> {
+  ): Promise<ClientView> {
     return this.clientsService.update(user, id, dto);
   }
 
