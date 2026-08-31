@@ -15,12 +15,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import type { Retention } from "@/lib/api/retentions";
 import {
   RETENTION_BASES,
   RETENTION_BASE_LABELS,
-  type Retention,
   type RetentionBase,
-} from "@/lib/api/retentions";
+} from "@/lib/retention-base";
 import {
   createRetentionAction,
   reorderRetentionsAction,

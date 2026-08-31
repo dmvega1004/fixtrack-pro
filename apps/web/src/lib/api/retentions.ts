@@ -1,14 +1,10 @@
 import { serverFetch } from "./server-fetch";
+import type { RetentionBase } from "@/lib/retention-base";
 
-export type RetentionBase = "SUBTOTAL" | "IVA" | "RETENTION";
-
-export const RETENTION_BASES: RetentionBase[] = ["SUBTOTAL", "IVA", "RETENTION"];
-
-export const RETENTION_BASE_LABELS: Record<RetentionBase, string> = {
-  SUBTOTAL: "Subtotal del servicio (antes de IVA)",
-  IVA: "IVA",
-  RETENTION: "Otra retención del catálogo",
-};
+// RETENTION_BASES/RETENTION_BASE_LABELS viven en lib/retention-base.ts
+// (sin dependencias de servidor) — ver ese archivo para el porqué.
+export { RETENTION_BASES, RETENTION_BASE_LABELS } from "@/lib/retention-base";
+export type { RetentionBase } from "@/lib/retention-base";
 
 // Debe reflejar exactamente el modelo Retention de packages/database/prisma/schema.prisma
 export interface Retention {
