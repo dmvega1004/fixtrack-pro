@@ -37,6 +37,18 @@ export interface WorkOrderConceptLine {
 }
 
 /**
+ * Retención aplicada a la orden — name/rate son fotografías congeladas al
+ * calcular (ver WorkOrderRetention en el backend).
+ */
+export interface WorkOrderRetentionLine {
+  id: string;
+  name: string;
+  /** Porcentaje con hasta 3 decimales (ej. "0.900"). */
+  rate: string;
+  amount: string;
+}
+
+/**
  * Cierre económico de la orden. Los montos son precios al cliente (no
  * costos): visibles para ADMIN/COORDINATOR; solo ADMIN puede editarlos.
  * Omitido por completo para TECHNICIAN (ver WorkOrderPartsSummary.billing).
@@ -57,6 +69,14 @@ export interface WorkOrderBilling {
   paymentStatus: PaymentStatus;
   /** Suma de abonos registrados contra la orden. */
   paidAmount: string;
+  /**
+   * Desglose de retenciones aplicadas — vacío si la orden no tiene
+   * ninguna. Visible para ADMIN/COORDINATOR igual que el resto del
+   * bloque; editar la selección (checkboxes) sigue siendo solo ADMIN.
+   */
+  retentions?: WorkOrderRetentionLine[];
+  /** total menos retenciones — lo que el cliente REALMENTE va a consignar. Igual a `total` sin retenciones. */
+  netAmount?: string;
 }
 
 export interface WorkOrderPartsSummary {

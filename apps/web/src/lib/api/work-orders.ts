@@ -83,6 +83,8 @@ export interface WorkOrder {
   /** Congelados al pasar la orden a COMPLETED; null mientras sigue abierta. */
   taxRateApplied?: string | null;
   totalAmount?: string | null;
+  /** totalAmount menos retenciones — igual a totalAmount si la orden no tiene ninguna. Omitido para TECHNICIAN. */
+  netAmount?: string | null;
   /**
    * Costo interno del trabajo, fuera de inventario (ver módulo de
    * Rentabilidad). Redactado por el backend para todo rol distinto de
