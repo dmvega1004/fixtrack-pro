@@ -114,18 +114,22 @@ function BillingRow({
 function SignatureBox({
   title,
   signatureImageUrl,
+  name,
+  document,
 }: {
   title: string;
-  /** Solo el lado de quien EMITE el documento pasa esto — el del cliente nunca. */
+  /** Firma PERSONAL capturada en sitio (Módulo de Firmas) — técnico o quien recibe. */
   signatureImageUrl?: string | null;
+  name?: string | null;
+  document?: string | null;
 }) {
   return (
     <div className="flex flex-col gap-8">
-      <SignatureLine signatureImageUrl={signatureImageUrl} />
+      <SignatureLine signatureImageUrl={signatureImageUrl} widthMm={40} heightMm={18} />
       <div className="flex flex-col gap-3 text-xs text-neutral-600">
         <span className="font-medium text-neutral-800">{title}</span>
-        <span>Nombre: ____________________________</span>
-        <span>Documento: ____________________________</span>
+        <span>Nombre: {name || "____________________________"}</span>
+        <span>Documento: {document || "____________________________"}</span>
       </div>
     </div>
   );
@@ -450,11 +454,16 @@ export function WorkOrderPrintDocument({
           <div className="grid grid-cols-1 gap-10 sm:grid-cols-2">
             <SignatureBox
               title="Técnico responsable"
-              signatureImageUrl={
-                company.signatureInWorkOrder ? company.signatureImageUrl : null
-              }
+              signatureImageUrl={order.technicianSignatureUrl}
+              name={order.technicianName}
+              document={order.technicianDocument}
             />
-            <SignatureBox title="Recibido por el cliente" />
+            <SignatureBox
+              title="Recibido por el cliente"
+              signatureImageUrl={order.receiverSignatureUrl}
+              name={order.receiverName}
+              document={order.receiverDocument}
+            />
           </div>
         </footer>
       </PrintDocumentFrame>

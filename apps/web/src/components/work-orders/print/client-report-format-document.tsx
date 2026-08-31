@@ -5,6 +5,7 @@ import { formatOrderNumber } from "@/lib/format/order-number";
 import { formatDate, formatTime, formatTimeOnly } from "@/lib/format/dates";
 import { PrintDocumentFrame } from "@/components/shared/print-document-frame";
 import { PrintPhotoGrid } from "@/components/shared/print-photo-grid";
+import { SignatureLine } from "@/components/shared/signature-line";
 
 /** Color de acento por defecto si el cliente no configuró uno (raro: el color picker siempre trae un valor). */
 const FALLBACK_ACCENT_COLOR = "#2563EB";
@@ -125,16 +126,24 @@ function PhotosSection({
 function SignatureColumn({
   title,
   companyValue,
+  signatureImageUrl,
+  name,
+  document,
 }: {
   title: string;
   companyValue: string;
+  /** Firma PERSONAL capturada en sitio (Módulo de Firmas) — técnico o quien recibe. */
+  signatureImageUrl?: string | null;
+  name?: string | null;
+  document?: string | null;
 }) {
   return (
     <div className="flex flex-col gap-8 break-inside-avoid">
-      <div className="h-10 border-b border-neutral-400" />
+      <SignatureLine signatureImageUrl={signatureImageUrl} widthMm={40} heightMm={18} />
       <div className="flex flex-col gap-2 text-xs text-neutral-700">
         <span className="text-sm font-semibold text-neutral-900">{title}</span>
-        <span>Nombre: ____________________________</span>
+        <span>Nombre: {name || "____________________________"}</span>
+        <span>Documento: {document || "____________________________"}</span>
         <span>Cargo: ____________________________</span>
         <span>
           Empresa: {companyValue ? companyValue : "____________________________"}
@@ -289,8 +298,17 @@ export function ClientReportFormatDocument({
             <SignatureColumn
               title="ENTREGA"
               companyValue={client.reportFormatIssuer ?? ""}
+              signatureImageUrl={order.technicianSignatureUrl}
+              name={order.technicianName}
+              document={order.technicianDocument}
             />
-            <SignatureColumn title="RECIBE" companyValue="" />
+            <SignatureColumn
+              title="RECIBE"
+              companyValue=""
+              signatureImageUrl={order.receiverSignatureUrl}
+              name={order.receiverName}
+              document={order.receiverDocument}
+            />
           </div>
         </div>
       </PrintDocumentFrame>
