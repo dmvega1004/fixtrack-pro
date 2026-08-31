@@ -337,6 +337,32 @@ export async function deletePaymentAction(
   );
 }
 
+export interface SaveSignaturesInput {
+  technicianSignatureUrl?: string;
+  receiverName?: string;
+  receiverDocument?: string;
+  receiverSignatureUrl?: string;
+}
+
+/**
+ * PATCH /work-orders/:orderId/signatures — bloque "Firmas" (pestaña
+ * Detalles). Los tres roles pueden llamarlo (sin RBAC de rol, ver
+ * WorkOrderSignaturesController). Cada campo es individualmente opcional:
+ * el llamador solo manda el lado que está capturando de nuevo (frozen se
+ * queda tal cual, sin reenviarlo).
+ */
+export async function saveSignaturesAction(
+  orderId: string,
+  dto: SaveSignaturesInput,
+): Promise<ActionResult> {
+  return runMutation(orderId, () =>
+    serverFetch(`/work-orders/${orderId}/signatures`, {
+      method: "PATCH",
+      body: dto,
+    }),
+  );
+}
+
 export async function removePhotoAction(
   orderId: string,
   photoId: string,

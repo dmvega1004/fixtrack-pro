@@ -1,5 +1,5 @@
 import type { WorkOrder } from "@/lib/api/work-orders";
-import type { Technician } from "@/lib/api/users";
+import type { Technician, MyProfile } from "@/lib/api/users";
 import { DescriptionEditor } from "./description-editor";
 import { DiagnosisEditor } from "./diagnosis-editor";
 import { ObservationsEditor } from "./observations-editor";
@@ -8,6 +8,7 @@ import { ServiceLocationEditor } from "./service-location-editor";
 import { ReassignTechnician } from "./reassign-technician";
 import { PriorityEditor } from "./priority-editor";
 import { ServiceTypeEditor } from "./service-type-editor";
+import { SignaturesSection } from "./signatures-section";
 import { DeleteOrderButton } from "./delete-order-button";
 
 interface DetailsTabProps {
@@ -16,6 +17,7 @@ interface DetailsTabProps {
   isAdmin: boolean;
   technicians: Technician[];
   isTerminal: boolean;
+  myProfile: MyProfile;
 }
 
 export function DetailsTab({
@@ -24,6 +26,7 @@ export function DetailsTab({
   isAdmin,
   technicians,
   isTerminal,
+  myProfile,
 }: DetailsTabProps) {
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6">
@@ -56,6 +59,13 @@ export function DetailsTab({
         initialEndClientName={order.endClientName}
         initialServiceCity={order.serviceCity}
         initialServiceTime={order.serviceTime}
+        isTerminal={isTerminal}
+      />
+
+      <SignaturesSection
+        orderId={order.id}
+        order={order}
+        myProfile={myProfile}
         isTerminal={isTerminal}
       />
 
