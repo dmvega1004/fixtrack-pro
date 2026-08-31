@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DOCUMENT_TYPES, DOCUMENT_TYPE_LABELS, type DocumentType } from "@/lib/document-type";
 import type { Client } from "@/lib/api/clients";
+import type { Retention } from "@/lib/api/retentions";
 import {
   REPORT_FORMAT_SOURCES,
   REPORT_FORMAT_SOURCE_LABELS,
@@ -75,6 +76,14 @@ interface ClientFormProps {
    * necesita un clientId existente).
    */
   canConfigureReportFormat?: boolean;
+  /**
+   * ADMIN: único rol que puede configurar qué retenciones aplica el
+   * cliente (RBAC replicado del backend — ver
+   * ClientsService.ensureCanConfigureRetentions). Por defecto false.
+   */
+  canConfigureRetentions?: boolean;
+  /** Catálogo de retenciones de la empresa — solo se pide si canConfigureRetentions. */
+  retentionCatalog?: Retention[];
 }
 
 export function ClientForm({
@@ -82,6 +91,8 @@ export function ClientForm({
   clientId,
   initial,
   canConfigureReportFormat = false,
+  canConfigureRetentions = false,
+  retentionCatalog = [],
 }: ClientFormProps) {
   const router = useRouter();
 
@@ -108,6 +119,21 @@ export function ClientForm({
   const [logoUrl, setLogoUrl] = useState(initial?.reportFormatLogoUrl ?? null);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
+
+  const [retentionIds, setRetentionIds] = useState<string[]>(
+    initial?.retentionIds ?? [],
+  );
+  function toggleRetention(id: string) {
+    setRetentionIds((current) =>
+      current.includes(id) ? current.filter((r) => r !== id) : [...current, id],
+    );
+  }
+  // Una retención desactivada no se ofrece para marcarla de nuevo, pero si
+  // este cliente YA la tenía marcada (se desactivó después), sigue
+  // apareciendo — mismo criterio que el bloque de retenciones de la orden.
+  const availableRetentions = retentionCatalog.filter(
+    (r) => r.active || retentionIds.includes(r.id),
+  );
 
   function updateReportFormat<K extends keyof ReportFormatFormState>(
     field: K,
@@ -219,6 +245,7 @@ export function ClientForm({
         reportFormatIncludePhotos: reportFormat.includePhotos,
         reportFormatPhotosLabel: reportFormat.photosLabel.trim() || undefined,
       }),
+      ...(canConfigureRetentions && { retentionIds }),
     };
 
     const result =
@@ -608,6 +635,56 @@ export function ClientForm({
                   )}
                 </div>
               </>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {canConfigureRetentions && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Retenciones que aplica</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <p className="text-xs text-muted-foreground">
+              Lo que marques acá viene premarcado en las órdenes nuevas de
+              este cliente — evita marcar las mismas casillas en cada orden
+              de un cliente que siempre aplica las mismas. Sigue siendo
+              editable en cada orden.
+            </p>
+
+            {availableRetentions.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Todavía no has configurado ninguna retención en{" "}
+                <span className="font-medium">Mi empresa</span>.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {availableRetentions.map((retention) => (
+                  <div
+                    key={retention.id}
+                    className="flex items-start gap-2 rounded-lg border border-border p-3"
+                  >
+                    <input
+                      id={`retention-${retention.id}`}
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={retentionIds.includes(retention.id)}
+                      onChange={() => toggleRetention(retention.id)}
+                    />
+                    <Label
+                      htmlFor={`retention-${retention.id}`}
+                      className="flex-1 font-normal"
+                    >
+                      {retention.name}{" "}
+                      <span className="text-muted-foreground">
+                        ({Number(retention.rate)}%)
+                        {!retention.active && " · desactivada"}
+                      </span>
+                    </Label>
+                  </div>
+                ))}
+              </div>
             )}
           </CardContent>
         </Card>

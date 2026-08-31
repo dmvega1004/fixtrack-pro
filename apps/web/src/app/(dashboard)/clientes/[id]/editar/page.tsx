@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { getClient } from "@/lib/api/clients";
+import { getRetentions, type Retention } from "@/lib/api/retentions";
 import { HttpError } from "@/lib/api/http";
 import { ClientForm } from "@/components/client/client-form";
 import { DeleteClientButton } from "@/components/client/delete-client-button";
@@ -12,10 +13,17 @@ interface EditarClientePageProps {
 export default async function EditarClientePage({ params }: EditarClientePageProps) {
   const { id } = await params;
   const session = await getSession();
+  const canConfigureRetentions = session?.role === "ADMIN";
 
   let client;
+  let retentionCatalog: Retention[];
   try {
-    client = await getClient(id);
+    // En paralelo: getRetentions() es ADMIN-only en el backend, solo se
+    // pide si el rol efectivamente puede configurarlas.
+    [client, retentionCatalog] = await Promise.all([
+      getClient(id),
+      canConfigureRetentions ? getRetentions() : Promise.resolve([]),
+    ]);
   } catch (error) {
     if (error instanceof HttpError && (error.status === 404 || error.status === 400)) {
       notFound();
@@ -36,6 +44,8 @@ export default async function EditarClientePage({ params }: EditarClientePagePro
         canConfigureReportFormat={
           session?.role === "ADMIN" || session?.role === "COORDINATOR"
         }
+        canConfigureRetentions={canConfigureRetentions}
+        retentionCatalog={retentionCatalog}
       />
 
       {session?.role === "ADMIN" && (
