@@ -77,7 +77,7 @@ export class PaymentsService {
       );
     }
 
-    if (order.totalAmount === null) {
+    if (order.netAmount === null || order.netAmount === undefined) {
       throw new ConflictException(
         'La orden no tiene un total congelado: valorízala y ciérrala antes de registrar pagos',
       );
@@ -95,7 +95,10 @@ export class PaymentsService {
         _sum: { amount: true },
       });
       const alreadyPaid = paidAgg._sum.amount ?? new Prisma.Decimal(0);
-      const balance = order.totalAmount!.sub(alreadyPaid);
+      // netAmount, NUNCA totalAmount: es lo que el cliente REALMENTE va a
+      // consignar (total menos retenciones) — si se usara totalAmount, una
+      // orden con retenciones jamás llegaría a saldo cero.
+      const balance = order.netAmount!.sub(alreadyPaid);
 
       if (amount.gt(balance)) {
         throw new ConflictException(
@@ -121,7 +124,7 @@ export class PaymentsService {
         where: { id: workOrderId },
         data: {
           paymentStatus: derivePaymentStatus(
-            order.totalAmount!,
+            order.netAmount!,
             alreadyPaid.add(amount),
           ),
         },
@@ -179,7 +182,7 @@ export class PaymentsService {
     const [order, company] = await Promise.all([
       this.prisma.workOrder.findUniqueOrThrow({
         where: { id: payment.workOrderId },
-        select: { totalAmount: true },
+        select: { netAmount: true },
       }),
       this.prisma.company.findUniqueOrThrow({
         where: { id: user.companyId },
@@ -199,8 +202,8 @@ export class PaymentsService {
       await tx.workOrder.update({
         where: { id: payment.workOrderId },
         data: {
-          paymentStatus: order.totalAmount
-            ? derivePaymentStatus(order.totalAmount, remaining)
+          paymentStatus: order.netAmount
+            ? derivePaymentStatus(order.netAmount, remaining)
             : PaymentStatus.PENDING, // sin total congelado no hay forma de derivar: vuelve al default
         },
       });
