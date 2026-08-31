@@ -11,6 +11,7 @@ import { getEquipments } from "@/lib/api/equipments";
 import { getPhotos } from "@/lib/api/attachments";
 import { getCompany } from "@/lib/api/company";
 import { getWorkOrderPayments } from "@/lib/api/payments";
+import { getRetentions } from "@/lib/api/retentions";
 import { getActivityLog } from "@/lib/api/activity-log";
 import { HttpError } from "@/lib/api/http";
 import { StatusChip } from "@/components/shared/status-chip";
@@ -68,6 +69,7 @@ export default async function OrdenDetallePage({
     clientEquipments,
     payments,
     activityLog,
+    retentionCatalog,
   ] = await Promise.all([
     getWorkOrderParts(id),
     canManage ? getTechnicians() : Promise.resolve([]),
@@ -78,6 +80,9 @@ export default async function OrdenDetallePage({
     canManage ? getEquipments({ clientId: order.clientId }) : Promise.resolve([]),
     isAdmin && isClosed ? getWorkOrderPayments(id) : Promise.resolve([]),
     getActivityLog(id),
+    // getRetentions() es ADMIN-only en el backend — solo se pide si el rol
+    // efectivamente puede editar el bloque de retenciones (ver RetentionsSection).
+    isAdmin ? getRetentions() : Promise.resolve([]),
   ]);
 
   return (
@@ -160,6 +165,7 @@ export default async function OrdenDetallePage({
             isClosed={isClosed}
             payments={payments}
             collectionNumber={order.collectionNumber}
+            retentionCatalog={retentionCatalog}
           />
         }
         fotos={

@@ -2,10 +2,12 @@ import { formatCurrency } from "@/lib/format/currency";
 import type { WorkOrderPartsSummary } from "@/lib/api/work-order-parts";
 import type { SparePart } from "@/lib/api/spare-parts";
 import type { Payment } from "@/lib/api/payments";
+import type { Retention } from "@/lib/api/retentions";
 import { RemovePartButton } from "./remove-part-button";
 import { AddPartPanel } from "./add-part-panel";
 import { BillingSection } from "./billing-section";
 import { ConceptsSection } from "./concepts-section";
+import { RetentionsSection } from "./retentions-section";
 import { DirectCostSection } from "./direct-cost-section";
 import { PaymentsPanel } from "./payments-panel";
 
@@ -21,6 +23,8 @@ interface PartsTabProps {
   payments: Payment[];
   /** Consecutivo de la cuenta de cobro emitida sobre esta orden; null hasta que se genera. Ausente para TECHNICIAN. */
   collectionNumber?: number | null;
+  /** Catálogo de retenciones de la empresa — vacío si el rol no es ADMIN. */
+  retentionCatalog: Retention[];
 }
 
 export function PartsTab({
@@ -33,6 +37,7 @@ export function PartsTab({
   isClosed,
   payments,
   collectionNumber,
+  retentionCatalog,
 }: PartsTabProps) {
   const {
     items,
@@ -51,8 +56,12 @@ export function PartsTab({
     (sum, concept) => sum + Number(concept.quantity) * Number(concept.unitPrice),
     0,
   );
+  // netAmount, NUNCA total: es lo que el cliente REALMENTE va a consignar
+  // (total menos retenciones) — con retenciones, el saldo mostrado acá
+  // debe coincidir con el que valida PaymentsService al registrar un pago.
+  // Sin retenciones, netAmount llega igual a total.
   const balance = billing
-    ? (Number(billing.total) - Number(billing.paidAmount)).toFixed(2)
+    ? (Number(billing.netAmount ?? billing.total) - Number(billing.paidAmount)).toFixed(2)
     : "0";
   const margin =
     totalCost !== undefined && totalSale !== undefined
@@ -209,6 +218,17 @@ export function PartsTab({
           isAdmin={isAdmin}
           isTerminal={isTerminal}
           collectionNumber={collectionNumber}
+        />
+      )}
+
+      {billing !== undefined && (
+        <RetentionsSection
+          orderId={orderId}
+          billing={billing}
+          retentionCatalog={retentionCatalog}
+          isAdmin={isAdmin}
+          isTerminal={isTerminal}
+          currency={currency}
         />
       )}
 

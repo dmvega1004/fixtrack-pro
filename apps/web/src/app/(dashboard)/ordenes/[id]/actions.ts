@@ -235,6 +235,26 @@ export async function saveBilledAtAction(
   );
 }
 
+/**
+ * PATCH /work-orders/:id con `retentionIds` — reemplaza el set COMPLETO de
+ * retenciones aplicadas (no es un delta, mismo criterio que
+ * saveConceptsAction). Funciona tanto con la orden abierta como ya
+ * cerrada (ver isBillingOnlyEdit en el backend): en ambos casos el
+ * backend recalcula el desglose y netAmount. SOLO ADMIN (403 del backend
+ * para el resto).
+ */
+export async function saveRetentionsAction(
+  orderId: string,
+  retentionIds: string[],
+): Promise<ActionResult> {
+  return runMutation(orderId, () =>
+    serverFetch(`/work-orders/${orderId}`, {
+      method: "PATCH",
+      body: { retentionIds },
+    }),
+  );
+}
+
 export interface SaveDirectCostInput {
   directCostAmount: number;
   directCostDescription: string;
