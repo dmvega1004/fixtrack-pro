@@ -170,6 +170,9 @@ model Company {
   quotes                Quote[]
   quoteItems            QuoteItem[]
   quoteEquipment        QuoteEquipment[]
+  retentions            Retention[]
+  clientRetentions      ClientRetention[]
+  workOrderRetentions   WorkOrderRetention[]
 }
 
 model User {
@@ -205,7 +208,7 @@ model User {
 }
 
 model Client {
-  id              String      @id @default(uuid())
+  id              String  @id @default(uuid())
   name            String
   email           String?
   phone           String?
@@ -216,7 +219,7 @@ model Client {
   address         String?
   city            String?
   /// Días de crédito acordados con el cliente (ej. 30 = "pago a 30 días").
-  paymentTermDays Int         @default(30)
+  paymentTermDays Int     @default(30)
 
   /// Formato de informe propio del cliente (Módulo de Formatos): cuando este
   /// cliente exige que las órdenes se entreguen en SU formato corporativo
@@ -224,30 +227,30 @@ model Client {
   /// gestión de calidad). GENÉRICO a propósito — no se programa "el formato
   /// de Fire Energy", se configuran estos campos por cliente. Ver
   /// /ordenes/[id]/formato-cliente en el frontend.
-  reportFormatEnabled     Boolean @default(false)
+  reportFormatEnabled       Boolean @default(false)
   /// Obligatorio si reportFormatEnabled=true (validado en el DTO). Ej. "ORDEN DE SERVICIO".
-  reportFormatTitle       String?
-  reportFormatCode        String?
-  reportFormatVersion     String?
+  reportFormatTitle         String?
+  reportFormatCode          String?
+  reportFormatVersion       String?
   /// Texto libre (ej. "28/09/2019"): es la fecha de la VERSIÓN del formato
   /// impreso, no una fecha operativa — se muestra tal cual la escribe quien
   /// configura, sin parsear ni validar como fecha real.
-  reportFormatDate        String?
-  reportFormatLogoUrl     String?
+  reportFormatDate          String?
+  reportFormatLogoUrl       String?
   /// Color hexadecimal de las franjas de sección del documento.
-  reportFormatAccentColor String?
-  reportFormatFooter      String?
+  reportFormatAccentColor   String?
+  reportFormatFooter        String?
   /// Empresa que figura como quien ENTREGA el informe en el bloque de firmas.
-  reportFormatIssuer      String?
+  reportFormatIssuer        String?
   /// Tres secciones configurables: etiqueta + de qué campo de la orden se
   /// alimenta (DESCRIPTION | DIAGNOSIS | OBSERVATIONS | EMPTY — validado en
   /// el DTO, no enum de BD por el mismo motivo que documentType).
-  reportFormatS1Label     String?
-  reportFormatS1Source    String?
-  reportFormatS2Label     String?
-  reportFormatS2Source    String?
-  reportFormatS3Label     String?
-  reportFormatS3Source    String?
+  reportFormatS1Label       String?
+  reportFormatS1Source      String?
+  reportFormatS2Label       String?
+  reportFormatS2Source      String?
+  reportFormatS3Label       String?
+  reportFormatS3Source      String?
   /// No todos los formatos corporativos admiten fotos — el cliente decide.
   reportFormatIncludePhotos Boolean @default(true)
   /// Etiqueta de la franja del bloque fotográfico. Vacía = "Registro
@@ -255,13 +258,16 @@ model Client {
   /// las etiquetas de este bloque).
   reportFormatPhotosLabel   String?
 
-  companyId       String
-  company         Company     @relation(fields: [companyId], references: [id])
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
-  equipments      Equipment[]
-  workOrders      WorkOrder[]
-  quotes          Quote[]
+  companyId  String
+  company    Company           @relation(fields: [companyId], references: [id])
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  equipments Equipment[]
+  workOrders WorkOrder[]
+  quotes     Quote[]
+  /// Retenciones que este cliente aplica por defecto — premarcan las
+  /// casillas en sus órdenes nuevas (ver WorkOrdersService.create).
+  retentions ClientRetention[]
 
   @@index([companyId])
   @@index([companyId, documentNumber])
@@ -347,6 +353,13 @@ model WorkOrder {
   /// unitPrice en WorkOrderPart.
   taxRateApplied        Decimal?             @db.Decimal(5, 2)
   totalAmount           Decimal?             @db.Decimal(12, 2)
+  /// totalAmount congelado MENOS la suma de WorkOrderRetention.amount — lo
+  /// que el cliente realmente va a consignar (ver caso de retenciones en
+  /// billing.util.calculateBilling). Igual a totalAmount cuando la orden no
+  /// tiene retenciones aplicadas. Es la base del saldo por cobrar en
+  /// Cobros/cartera — NUNCA totalAmount, o una orden con retención jamás
+  /// llegaría a saldo cero.
+  netAmount             Decimal?             @db.Decimal(12, 2)
   /// Costo del trabajo que NO proviene del inventario: torno, materiales
   /// comprados para la obra, subcontratos, consumibles. NUNCA se le cobra
   /// al cliente ni entra en ningún total facturado — existe solo para
@@ -402,6 +415,8 @@ model WorkOrder {
   /// un proyecto de adecuación sobre 5 portones cotizado como una sola OT).
   equipmentLinks        WorkOrderEquipment[]
   activityLogs          ActivityLog[]
+  /// Retenciones aplicadas a esta orden — ver modelo WorkOrderRetention.
+  retentions            WorkOrderRetention[]
 
   @@unique([companyId, orderNumber])
   @@unique([companyId, collectionNumber])
@@ -483,6 +498,100 @@ model WorkOrderItem {
   description String
   quantity    Decimal   @db.Decimal(12, 2)
   unitPrice   Decimal   @db.Decimal(12, 2)
+
+  @@index([companyId])
+  @@index([workOrderId])
+}
+
+/// Catálogo de retenciones que la empresa puede aplicar en sus órdenes
+/// (retefuente, reteICA, avisos y tableros, tasa bomberil, etc.) —
+/// configurado en "Mi empresa" (tarjeta "Retenciones"). Los clientes
+/// corporativos practican estas retenciones al pagar: sobre un servicio de
+/// 500.000 el cliente retiene y consigna menos — sin esto, esas órdenes
+/// nunca llegarían a saldo cero (ver WorkOrder.netAmount).
+model Retention {
+  id              String   @id @default(uuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id])
+  name            String
+  /// Admite tres decimales: hay retenciones como el 0,9 % (ReteICA) que
+  /// con dos decimales se redondearían mal.
+  rate            Decimal  @db.Decimal(6, 3)
+  /// SUBTOTAL | IVA | RETENTION — validado en el DTO, no enum de BD (mismo
+  /// criterio que Client.documentType). SUBTOTAL es el valor DESPUÉS del
+  /// descuento y ANTES de IVA (retefuente/reteICA se calculan sobre el
+  /// servicio, no sobre el total facturado). IVA es el valor del impuesto
+  /// — sin uso hoy (no hay ninguna retención que lo use en el caso real),
+  /// pero la reteIVA existe en Colombia y agregarla después costaría una
+  /// migración; incluirla ahora no cuesta nada. RETENTION es el monto de
+  /// OTRA retención de este mismo catálogo (ver baseRetentionId) — el caso
+  /// de Avisos y tableros / Tasa bomberil, que se calculan sobre el
+  /// ReteICA, no sobre el servicio.
+  base            String
+  /// Solo cuando base = RETENTION: a qué otra retención de este catálogo
+  /// se le aplica el porcentaje. Referencia SUELTA (sin FK relacional) a
+  /// propósito, igual que Quote.sourceWorkOrderId — una relación propia
+  /// permitiría cadenas que Prisma no puede validar por sí solo; el
+  /// rechazo de referencias circulares (directas o indirectas) vive en
+  /// RetentionsService al guardar.
+  baseRetentionId String?
+  /// Orden de despliegue en la lista editable de "Mi empresa" y en el
+  /// desglose del documento.
+  position        Int
+  /// Desactivar NO afecta las órdenes que ya la tienen aplicada — las
+  /// líneas de WorkOrderRetention son fotografías independientes (ver ese
+  /// modelo) — solo deja de ofrecerse para selecciones nuevas.
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  clientLinks    ClientRetention[]
+  workOrderLines WorkOrderRetention[]
+
+  @@index([companyId])
+  @@index([companyId, position])
+}
+
+/// Qué retenciones del catálogo aplica un cliente por defecto — premarca
+/// las casillas de "Retenciones" en las órdenes NUEVAS de ese cliente (ver
+/// WorkOrdersService.create). Configurable en la ficha del cliente
+/// ("Retenciones que aplica"); evita marcar las mismas casillas en cada
+/// orden de un cliente que siempre aplica las mismas.
+model ClientRetention {
+  id          String    @id @default(uuid())
+  clientId    String
+  client      Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  retentionId String
+  retention   Retention @relation(fields: [retentionId], references: [id], onDelete: Cascade)
+  companyId   String
+  company     Company   @relation(fields: [companyId], references: [id])
+  createdAt   DateTime  @default(now())
+
+  @@unique([clientId, retentionId])
+  @@index([companyId])
+  @@index([clientId])
+}
+
+/// Retención efectivamente aplicada a UNA orden de trabajo —
+/// name/rate/amount son FOTOGRAFÍAS congeladas al calcular, mismo criterio
+/// que unitCost/unitPrice de WorkOrderPart y taxRateApplied de WorkOrder:
+/// si mañana cambia el porcentaje en el catálogo (o se desactiva), las
+/// órdenes que ya la aplicaron conservan la suya. `retentionId` es solo
+/// referencia — se conserva la línea (con su fotografía intacta) si se
+/// borra la retención del catálogo.
+model WorkOrderRetention {
+  id          String     @id @default(uuid())
+  workOrderId String
+  workOrder   WorkOrder  @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  companyId   String
+  company     Company    @relation(fields: [companyId], references: [id])
+  retentionId String?
+  retention   Retention? @relation(fields: [retentionId], references: [id], onDelete: SetNull)
+  name        String
+  rate        Decimal    @db.Decimal(6, 3)
+  amount      Decimal    @db.Decimal(12, 2)
+  /// Orden de despliegue en el desglose del documento.
+  position    Int
 
   @@index([companyId])
   @@index([workOrderId])
