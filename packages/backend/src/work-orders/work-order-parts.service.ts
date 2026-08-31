@@ -17,7 +17,11 @@ import { activityAuthorName } from '../activity/activity-labels';
 import { ActivityService } from '../activity/activity.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { PrismaService } from '../prisma.service';
-import { calculateBilling } from './billing.util';
+import {
+  buildRetentionLineInputs,
+  calculateBilling,
+  calculateRetentions,
+} from './billing.util';
 import { AddWorkOrderPartDto } from './dto/add-work-order-part.dto';
 import { WorkOrdersService } from './work-orders.service';
 
@@ -25,6 +29,17 @@ const TERMINAL_STATUSES: OrderStatus[] = [
   OrderStatus.DELIVERED,
   OrderStatus.CANCELLED,
 ];
+
+/**
+ * Fila de WorkOrderRetention con la base/baseRetentionId ACTUAL de su
+ * retención en el catálogo — necesaria para recalcular en vivo (esos dos
+ * campos no son fotografía, ver WorkOrderRetention en el schema).
+ */
+type RetentionRowForBilling = Prisma.WorkOrderRetentionGetPayload<{
+  include: {
+    retention: { select: { base: true; baseRetentionId: true } };
+  };
+}>;
 
 const PART_SUMMARY = {
   sparePart: {
@@ -52,6 +67,13 @@ export type WorkOrderPartView = Omit<
  * /work-orders/:id). TECHNICIAN no recibe este bloque en absoluto (ver
  * WorkOrderPartsService.listParts).
  */
+export interface WorkOrderRetentionLineView {
+  id: string;
+  name: string;
+  rate: string;
+  amount: string;
+}
+
 export interface WorkOrderBilling {
   laborAmount: string;
   additionalAmount: string;
@@ -72,6 +94,15 @@ export interface WorkOrderBilling {
    * para mostrar el saldo pendiente en el documento impreso.
    */
   paidAmount: string;
+  /**
+   * Desglose de retenciones aplicadas y neto a recibir — SOLO ADMIN (ni
+   * siquiera Coordinador, ver WorkOrdersService.toView). Si la orden ya
+   * está congelada (isFrozen), son los valores guardados en
+   * WorkOrderRetention, nunca recalculados; si no, se calculan en vivo
+   * contra el subtotal actual (ver WorkOrdersService.buildBilling).
+   */
+  retentions?: WorkOrderRetentionLineView[];
+  netAmount?: string;
 }
 
 export interface WorkOrderPartsSummary {
@@ -271,25 +302,38 @@ export class WorkOrderPartsService {
     // Visibilidad + candado (404 si la orden es ajena o de otro técnico)
     const order = await this.workOrdersService.findOne(user, workOrderId);
 
-    const [lines, concepts, company, paidAgg] = await Promise.all([
-      this.prisma.workOrderPart.findMany({
-        where: { workOrderId, companyId: user.companyId }, // candado
-        include: PART_SUMMARY,
-        orderBy: { createdAt: 'asc' },
-      }),
-      this.prisma.workOrderItem.findMany({
-        where: { workOrderId, companyId: user.companyId }, // candado
-        orderBy: { position: 'asc' },
-      }),
-      this.prisma.company.findUniqueOrThrow({
-        where: { id: user.companyId },
-        select: { taxRate: true },
-      }),
-      this.prisma.payment.aggregate({
-        where: { workOrderId, companyId: user.companyId }, // candado
-        _sum: { amount: true },
-      }),
-    ]);
+    const [lines, concepts, company, paidAgg, retentionRows] =
+      await Promise.all([
+        this.prisma.workOrderPart.findMany({
+          where: { workOrderId, companyId: user.companyId }, // candado
+          include: PART_SUMMARY,
+          orderBy: { createdAt: 'asc' },
+        }),
+        this.prisma.workOrderItem.findMany({
+          where: { workOrderId, companyId: user.companyId }, // candado
+          orderBy: { position: 'asc' },
+        }),
+        this.prisma.company.findUniqueOrThrow({
+          where: { id: user.companyId },
+          select: { taxRate: true },
+        }),
+        this.prisma.payment.aggregate({
+          where: { workOrderId, companyId: user.companyId }, // candado
+          _sum: { amount: true },
+        }),
+        // RBAC financiero: retenciones es ADMIN-only (ni siquiera
+        // Coordinador, ver WorkOrdersService.toView) — no vale la pena la
+        // consulta ni el join al catálogo para otro rol.
+        user.role === Role.ADMIN
+          ? this.prisma.workOrderRetention.findMany({
+              where: { workOrderId, companyId: user.companyId }, // candado
+              include: {
+                retention: { select: { base: true, baseRetentionId: true } },
+              },
+              orderBy: { position: 'asc' },
+            })
+          : Promise.resolve([]),
+      ]);
 
     const totalSale = lines.reduce(
       (acc, l) => acc.add(l.unitPrice.mul(l.quantity)),
@@ -321,6 +365,7 @@ export class WorkOrderPartsService {
           | 'additionalDescription'
           | 'discountAmount'
           | 'totalAmount'
+          | 'netAmount'
           | 'taxRateApplied'
           | 'billedAt'
           | 'paymentStatus'
@@ -329,6 +374,8 @@ export class WorkOrderPartsService {
         itemsTotal,
         company.taxRate,
         paidAmount,
+        retentionRows,
+        user.role,
       );
     }
 
@@ -355,6 +402,9 @@ export class WorkOrderPartsService {
    * recalcula, ni con el IVA actual de la empresa ni si cambian los
    * repuestos después del cierre; subtotal/impuesto se recomputan con la
    * tasa congelada solo para mostrar el desglose, no para derivar el total.
+   * Mismo criterio para retenciones/netAmount, que además son ADMIN-only:
+   * `retentionRows` llega vacío para cualquier otro rol (ver listParts), y
+   * en ese caso el resultado simplemente no trae esos campos.
    */
   private buildBilling(
     order: Pick<
@@ -367,11 +417,16 @@ export class WorkOrderPartsService {
       | 'taxRateApplied'
       | 'billedAt'
       | 'paymentStatus'
-    >,
+    > & {
+      /** Ausente para cualquier rol distinto de ADMIN (ver WorkOrdersService.toView). */
+      netAmount?: WorkOrder['netAmount'];
+    },
     partsTotal: Prisma.Decimal,
     itemsTotal: Prisma.Decimal,
     companyTaxRate: Prisma.Decimal,
     paidAmount: Prisma.Decimal,
+    retentionRows: RetentionRowForBilling[],
+    role: Role,
   ): WorkOrderBilling {
     const isFrozen = order.totalAmount !== null;
     const taxRate = isFrozen ? order.taxRateApplied! : companyTaxRate;
@@ -385,7 +440,7 @@ export class WorkOrderPartsService {
       taxRate,
     });
 
-    return {
+    const base: WorkOrderBilling = {
       laborAmount: order.laborAmount.toFixed(2),
       additionalAmount: order.additionalAmount.toFixed(2),
       additionalDescription: order.additionalDescription,
@@ -398,6 +453,62 @@ export class WorkOrderPartsService {
       billedAt: order.billedAt ? order.billedAt.toISOString() : null,
       paymentStatus: order.paymentStatus,
       paidAmount: paidAmount.toFixed(2),
+    };
+
+    if (role !== Role.ADMIN) return base;
+
+    let retentionResults: { id: string; name: string; rate: Prisma.Decimal; amount: Prisma.Decimal }[];
+    let netAmount: Prisma.Decimal;
+
+    if (isFrozen) {
+      // Congelada: usa las líneas guardadas tal cual — nunca se
+      // recalculan (mismo criterio que `total`, arriba).
+      retentionResults = retentionRows.map((r) => ({
+        id: r.retentionId ?? r.id,
+        name: r.name,
+        rate: r.rate,
+        amount: r.amount,
+      }));
+      // netAmount siempre se congela junto con totalAmount (ver
+      // WorkOrdersService) — el `?? total` es solo un resguardo defensivo.
+      netAmount = order.netAmount ?? total;
+    } else {
+      // Abierta: se recalcula en vivo, igual que subtotal/impuesto/total.
+      // Lo guardado en WorkOrderRetention.amount es solo un placeholder
+      // (ver WorkOrdersService.update) — nunca se usa para mostrar nada.
+      const lineInputs = buildRetentionLineInputs(
+        retentionRows.map((r) => ({
+          retentionId: r.retentionId ?? r.id,
+          name: r.name,
+          rate: r.rate,
+        })),
+        new Map(
+          retentionRows.map((r) => [
+            r.retentionId ?? r.id,
+            {
+              base: r.retention?.base ?? 'SUBTOTAL',
+              baseRetentionId: r.retention?.baseRetentionId ?? null,
+            },
+          ]),
+        ),
+      );
+      retentionResults = calculateRetentions(lineInputs, subtotal, taxAmount);
+      const retentionsTotal = retentionResults.reduce(
+        (acc, r) => acc.add(r.amount),
+        new Prisma.Decimal(0),
+      );
+      netAmount = total.sub(retentionsTotal);
+    }
+
+    return {
+      ...base,
+      retentions: retentionResults.map((r) => ({
+        id: r.id,
+        name: r.name,
+        rate: r.rate.toFixed(3),
+        amount: r.amount.toFixed(2),
+      })),
+      netAmount: netAmount.toFixed(2),
     };
   }
 
