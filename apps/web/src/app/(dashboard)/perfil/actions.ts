@@ -1,7 +1,9 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { serverFetch } from "@/lib/api/server-fetch";
 import { HttpError, toFriendlyActionMessage } from "@/lib/api/http";
+import { updateMyProfile } from "@/lib/api/users";
 
 export interface ChangePasswordInput {
   currentPassword: string;
@@ -51,5 +53,28 @@ export async function changePasswordAction(
     throw error;
   }
 
+  return { ok: true };
+}
+
+export interface SaveDocumentNumberResult {
+  ok: boolean;
+  message?: string;
+}
+
+/** PATCH /users/me — Perfil → "Mi firma": número de documento. */
+export async function saveDocumentNumberAction(
+  documentNumber: string,
+): Promise<SaveDocumentNumberResult> {
+  try {
+    await updateMyProfile({ documentNumber });
+  } catch (error) {
+    const message = toFriendlyActionMessage(error);
+    if (message) {
+      return { ok: false, message };
+    }
+    throw error;
+  }
+
+  revalidatePath("/perfil");
   return { ok: true };
 }

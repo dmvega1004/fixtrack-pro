@@ -1,11 +1,15 @@
 import { getSession, ROLE_LABELS } from "@/lib/session";
+import { getMyProfile } from "@/lib/api/users";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LogoutButton } from "@/components/shared/logout-button";
 import { ChangePasswordForm } from "@/components/profile/change-password-form";
+import { MySignatureCard } from "@/components/profile/my-signature-card";
 
 export default async function PerfilPage() {
   const session = await getSession();
   if (!session) return null;
+
+  const profile = await getMyProfile();
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
@@ -27,6 +31,18 @@ export default async function PerfilPage() {
         </CardHeader>
         <CardContent>
           <ChangePasswordForm />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Mi firma</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <MySignatureCard
+            initialDocumentNumber={profile.documentNumber}
+            initialSignatureUrl={profile.signatureImageUrl}
+          />
         </CardContent>
       </Card>
     </div>

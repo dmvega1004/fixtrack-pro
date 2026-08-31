@@ -1,0 +1,46 @@
+import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
+import { SESSION_COOKIE_NAME } from "@/lib/session";
+
+const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:3000";
+
+interface BackendErrorBody {
+  message?: string | string[];
+}
+
+/**
+ * Reenvía el multipart al backend con el Bearer de la cookie httpOnly —
+ * mismo patrón que /api/upload/signature (firma de empresa), pero hacia
+ * POST /users/me/signature: la rúbrica PERSONAL de Perfil → "Mi firma",
+ * los tres roles (sin RBAC de rol que repetir acá).
+ */
+export async function POST(request: Request) {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+
+  if (!token) {
+    return NextResponse.json({ message: "No autenticado" }, { status: 401 });
+  }
+
+  const formData = await request.formData();
+
+  const response = await fetch(`${BACKEND_URL}/users/me/signature`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+
+  const data: unknown = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const errorBody = (data ?? {}) as BackendErrorBody;
+    const rawMessage = errorBody.message;
+    const message = Array.isArray(rawMessage)
+      ? rawMessage.join("; ")
+      : (rawMessage ?? "No se pudo subir la firma");
+
+    return NextResponse.json({ message }, { status: response.status });
+  }
+
+  return NextResponse.json(data, { status: response.status });
+}

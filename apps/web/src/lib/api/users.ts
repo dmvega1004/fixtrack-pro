@@ -59,3 +59,36 @@ export function updateUser(id: string, dto: UpdateEmployeeInput): Promise<Employ
 export function deleteUser(id: string): Promise<Employee> {
   return serverFetch<Employee>(`/users/${id}`, { method: "DELETE" });
 }
+
+/**
+ * Perfil propio (Perfil → "Mi firma") — a diferencia de Employee (lo que
+ * ADMIN/COORDINATOR ven de OTROS usuarios en la nómina), sí incluye
+ * documentNumber/signatureImageUrl. Debe reflejar exactamente MyProfile en
+ * packages/backend/src/users/users.service.ts.
+ */
+export interface MyProfile {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  companyId: string;
+  createdAt: string;
+  updatedAt: string;
+  documentNumber: string | null;
+  /** Rúbrica dibujada una sola vez — se reutiliza al firmar cualquier orden. */
+  signatureImageUrl: string | null;
+}
+
+export interface UpdateMyProfileInput {
+  documentNumber?: string;
+}
+
+/** GET /users/me. Los tres roles: el administrador y el coordinador también firman órdenes. */
+export function getMyProfile(): Promise<MyProfile> {
+  return serverFetch<MyProfile>("/users/me");
+}
+
+/** PATCH /users/me. Los tres roles editan SU PROPIO documentNumber. */
+export function updateMyProfile(dto: UpdateMyProfileInput): Promise<MyProfile> {
+  return serverFetch<MyProfile>("/users/me", { method: "PATCH", body: dto });
+}
