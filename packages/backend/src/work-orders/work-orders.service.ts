@@ -92,6 +92,7 @@ type WorkOrderFinancialFields =
   | 'discountAmount'
   | 'taxRateApplied'
   | 'totalAmount'
+  | 'netAmount'
   | 'paymentStatus'
   | 'collectionNumber'
   | 'collectionIssuedAt';
@@ -107,28 +108,28 @@ type WorkOrderFinancialFields =
  */
 export type WorkOrderView = Omit<
   WorkOrder,
-  | 'directCostAmount'
-  | 'directCostDescription'
-  | 'netAmount'
-  | WorkOrderFinancialFields
+  'directCostAmount' | 'directCostDescription' | WorkOrderFinancialFields
 > & {
   directCostAmount?: WorkOrder['directCostAmount'];
   directCostDescription?: WorkOrder['directCostDescription'];
-  /**
-   * total congelado menos retenciones. ADMIN-only (mismo grupo que
-   * directCostAmount, no el de laborAmount/totalAmount que sí ve
-   * COORDINATOR) — decisión propia: el encargo solo es explícito en que
-   * TECHNICIAN no recibe nada de retenciones; se trata el bloque completo
-   * (incluido netAmount) con el mismo criterio estricto de directCostAmount
-   * por ser información financiera de la misma naturaleza.
-   */
-  netAmount?: WorkOrder['netAmount'];
   laborAmount?: WorkOrder['laborAmount'];
   additionalAmount?: WorkOrder['additionalAmount'];
   additionalDescription?: WorkOrder['additionalDescription'];
   discountAmount?: WorkOrder['discountAmount'];
   taxRateApplied?: WorkOrder['taxRateApplied'];
   totalAmount?: WorkOrder['totalAmount'];
+  /**
+   * total congelado menos retenciones — mismo grupo RBAC que totalAmount
+   * (ADMIN + COORDINATOR, nunca TECHNICIAN; ver también
+   * WorkOrderBilling.retentions/netAmount en WorkOrderPartsService, con el
+   * mismo criterio). Decisión propia: el encargo solo es explícito en que
+   * TECHNICIAN no recibe nada de retenciones. EDITAR la selección
+   * (retentionIds) sigue siendo solo ADMIN — eso es un chequeo aparte en
+   * update(), no tiene que ver con esta visibilidad de lectura — pero la
+   * cuenta de cobro (que también genera/ve COORDINATOR) necesita poder
+   * mostrar el desglose completo cuando la orden tiene retenciones.
+   */
+  netAmount?: WorkOrder['netAmount'];
   paymentStatus?: WorkOrder['paymentStatus'];
   collectionNumber?: WorkOrder['collectionNumber'];
   collectionIssuedAt?: WorkOrder['collectionIssuedAt'];
@@ -2232,11 +2233,7 @@ export class WorkOrdersService {
     return {
       ...rest,
       equipments: equipmentLinks.map((link) => link.equipment),
-      ...(role === Role.ADMIN && {
-        directCostAmount,
-        directCostDescription,
-        netAmount,
-      }),
+      ...(role === Role.ADMIN && { directCostAmount, directCostDescription }),
       ...(role !== Role.TECHNICIAN && {
         laborAmount,
         additionalAmount,
@@ -2244,6 +2241,7 @@ export class WorkOrdersService {
         discountAmount,
         taxRateApplied,
         totalAmount,
+        netAmount,
         paymentStatus,
         collectionNumber,
         collectionIssuedAt,

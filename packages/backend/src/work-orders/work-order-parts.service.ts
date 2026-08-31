@@ -95,10 +95,14 @@ export interface WorkOrderBilling {
    */
   paidAmount: string;
   /**
-   * Desglose de retenciones aplicadas y neto a recibir — SOLO ADMIN (ni
-   * siquiera Coordinador, ver WorkOrdersService.toView). Si la orden ya
-   * está congelada (isFrozen), son los valores guardados en
-   * WorkOrderRetention, nunca recalculados; si no, se calculan en vivo
+   * Desglose de retenciones aplicadas y neto a recibir — mismo criterio
+   * RBAC que el resto de este bloque: ADMIN y COORDINATOR, nunca
+   * TECHNICIAN (ver WorkOrdersService.toView; la cuenta de cobro que
+   * también ve COORDINATOR necesita mostrarlo). EDITAR la selección
+   * (retentionIds) sigue siendo solo ADMIN — eso vive en
+   * WorkOrdersService.update, no acá. Si la orden ya está congelada
+   * (isFrozen), son los valores guardados en WorkOrderRetention, nunca
+   * recalculados; si no, se calculan en vivo
    * contra el subtotal actual (ver WorkOrdersService.buildBilling).
    */
   retentions?: WorkOrderRetentionLineView[];
@@ -321,10 +325,12 @@ export class WorkOrderPartsService {
           where: { workOrderId, companyId: user.companyId }, // candado
           _sum: { amount: true },
         }),
-        // RBAC financiero: retenciones es ADMIN-only (ni siquiera
-        // Coordinador, ver WorkOrdersService.toView) — no vale la pena la
-        // consulta ni el join al catálogo para otro rol.
-        user.role === Role.ADMIN
+        // RBAC financiero: retenciones se ve igual que el resto del bloque
+        // financiero (ADMIN + COORDINATOR, nunca TECHNICIAN, ver
+        // WorkOrdersService.toView) — la cuenta de cobro que también
+        // genera/ve COORDINATOR necesita el desglose. No vale la pena la
+        // consulta ni el join al catálogo para TECHNICIAN.
+        user.role !== Role.TECHNICIAN
           ? this.prisma.workOrderRetention.findMany({
               where: { workOrderId, companyId: user.companyId }, // candado
               include: {
@@ -402,9 +408,9 @@ export class WorkOrderPartsService {
    * recalcula, ni con el IVA actual de la empresa ni si cambian los
    * repuestos después del cierre; subtotal/impuesto se recomputan con la
    * tasa congelada solo para mostrar el desglose, no para derivar el total.
-   * Mismo criterio para retenciones/netAmount, que además son ADMIN-only:
-   * `retentionRows` llega vacío para cualquier otro rol (ver listParts), y
-   * en ese caso el resultado simplemente no trae esos campos.
+   * Mismo criterio para retenciones/netAmount, que además se omiten para
+   * TECHNICIAN: `retentionRows` llega vacío para ese rol (ver listParts),
+   * y en ese caso el resultado simplemente no trae esos campos.
    */
   private buildBilling(
     order: Pick<
@@ -455,7 +461,7 @@ export class WorkOrderPartsService {
       paidAmount: paidAmount.toFixed(2),
     };
 
-    if (role !== Role.ADMIN) return base;
+    if (role === Role.TECHNICIAN) return base;
 
     let retentionResults: { id: string; name: string; rate: Prisma.Decimal; amount: Prisma.Decimal }[];
     let netAmount: Prisma.Decimal;
