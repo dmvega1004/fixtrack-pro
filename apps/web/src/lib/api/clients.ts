@@ -46,6 +46,13 @@ export interface Client {
   /** Solo presentes en la respuesta de getClients() (findAll), agregados en SQL. */
   equipmentCount?: number;
   orderCount?: number;
+  /**
+   * Retenciones que este cliente aplica por defecto (ids del catálogo,
+   * ver /lib/api/retentions) — premarcan las casillas en sus órdenes
+   * nuevas. Visible para cualquier rol que pueda ver la ficha; solo ADMIN
+   * puede editarlo.
+   */
+  retentionIds: string[];
 }
 
 export interface ReportFormatInput {
@@ -76,6 +83,8 @@ export interface CreateClientInput extends ReportFormatInput {
   address?: string;
   city?: string;
   paymentTermDays?: number;
+  /** Solo ADMIN (403 del backend para el resto) — reemplazo completo. */
+  retentionIds?: string[];
 }
 
 export interface UpdateClientInput extends ReportFormatInput {
@@ -87,6 +96,8 @@ export interface UpdateClientInput extends ReportFormatInput {
   address?: string;
   city?: string;
   paymentTermDays?: number;
+  /** Solo ADMIN (403 del backend para el resto) — reemplazo completo. */
+  retentionIds?: string[];
 }
 
 /** GET /clients. Cualquier rol autenticado ve los clientes de su empresa. */

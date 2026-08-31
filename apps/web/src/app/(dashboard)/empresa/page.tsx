@@ -1,8 +1,14 @@
 import { getCompany } from "@/lib/api/company";
+import { getRetentions } from "@/lib/api/retentions";
 import { CompanyForm } from "@/components/company/company-form";
+import { RetentionsCard } from "@/components/company/retentions-card";
 
 export default async function EmpresaPage() {
-  const company = await getCompany();
+  // En paralelo: ninguna depende de la otra.
+  const [company, retentions] = await Promise.all([
+    getCompany(),
+    getRetentions(),
+  ]);
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 p-4 md:p-6">
@@ -14,6 +20,7 @@ export default async function EmpresaPage() {
         </p>
       </div>
       <CompanyForm company={company} />
+      <RetentionsCard initialRetentions={retentions} />
     </div>
   );
 }
