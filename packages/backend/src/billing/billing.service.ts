@@ -36,6 +36,7 @@ export interface ReceivableView {
   clientId: string;
   clientName: string;
   description: string;
+  /** netAmount de la orden (total congelado menos retenciones) — nunca totalAmount, ver getReceivables. */
   total: string;
   paid: string;
   balance: string;
@@ -273,12 +274,21 @@ export class BillingService {
       .toFixed(2);
   }
 
-  /** GET /billing/receivables — de más antigua a más reciente (billedAt asc). */
+  /**
+   * GET /billing/receivables — de más antigua a más reciente (billedAt asc).
+   *
+   * `total`/`balance` se calculan sobre netAmount, NUNCA totalAmount: es lo
+   * que el cliente REALMENTE va a consignar (total menos retenciones). Si
+   * se usara totalAmount, una orden con retenciones (el cliente retiene y
+   * consigna menos) jamás llegaría a saldo cero y quedaría en la cartera
+   * para siempre. Sin retenciones, netAmount = totalAmount, así que nada
+   * cambia para esas órdenes.
+   */
   async getReceivables(companyId: string): Promise<ReceivableView[]> {
     const orders = await this.prisma.workOrder.findMany({
       where: {
         companyId, // candado
-        totalAmount: { not: null },
+        netAmount: { not: null },
         paymentStatus: { in: [PaymentStatus.PENDING, PaymentStatus.PARTIAL] },
       },
       include: {
@@ -300,7 +310,7 @@ export class BillingService {
           (acc, payment) => acc.add(payment.amount),
           new Prisma.Decimal(0),
         );
-        const balance = order.totalAmount!.sub(paid);
+        const balance = order.netAmount!.sub(paid);
         const daysSinceBilled = Math.floor(
           (now - order.billedAt!.getTime()) / DAY_MS,
         );
@@ -313,7 +323,7 @@ export class BillingService {
           clientId: order.client.id,
           clientName: order.client.name,
           description: order.description,
-          total: order.totalAmount!.toFixed(2),
+          total: order.netAmount!.toFixed(2),
           paid: paid.toFixed(2),
           balance: balance.toFixed(2),
           billedAt: order.billedAt!.toISOString(),
