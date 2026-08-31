@@ -100,11 +100,17 @@ async function main() {
         await tx.activityLog.deleteMany({ where: { companyId: DEMO_COMPANY_ID } });
         await tx.workOrderEquipment.deleteMany({ where: { companyId: DEMO_COMPANY_ID } });
         await tx.workOrderPart.deleteMany({ where: { companyId: DEMO_COMPANY_ID } });
+        await tx.workOrderRetention.deleteMany({ where: { companyId: DEMO_COMPANY_ID } });
         await tx.workOrder.deleteMany({ where: { companyId: DEMO_COMPANY_ID } });
         await tx.equipment.deleteMany({ where: { companyId: DEMO_COMPANY_ID } });
+        await tx.clientRetention.deleteMany({ where: { companyId: DEMO_COMPANY_ID } });
         await tx.client.deleteMany({ where: { companyId: DEMO_COMPANY_ID } });
         await tx.sparePart.deleteMany({ where: { companyId: DEMO_COMPANY_ID } });
         await tx.user.deleteMany({ where: { companyId: DEMO_COMPANY_ID } });
+        // Retention no tiene onDelete: Cascade hacia Company (a propósito, mismo
+        // criterio que el resto del catálogo del tenant): hay que vaciarla
+        // explícito antes de poder borrar la empresa.
+        await tx.retention.deleteMany({ where: { companyId: DEMO_COMPANY_ID } });
         await tx.company.deleteMany({ where: { id: DEMO_COMPANY_ID } });
 
         // --- 2. Empresa ficticia, con IVA y datos de cuenta de cobro ---
