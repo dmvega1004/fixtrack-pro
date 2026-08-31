@@ -35,7 +35,13 @@ import {
 import { EquipmentsService } from '../equipments/equipments.service';
 import { PrismaService } from '../prisma.service';
 import { QuotesService } from '../quotes/quotes.service';
-import { calculateBilling, derivePaymentStatus } from './billing.util';
+import {
+  buildRetentionLineInputs,
+  calculateBilling,
+  derivePaymentStatus,
+  type RetentionLineInput,
+  type RetentionLineResult,
+} from './billing.util';
 import { CreateWorkOrderDto } from './dto/create-work-order.dto';
 import { UpdateWorkOrderDto } from './dto/update-work-order.dto';
 
@@ -101,10 +107,22 @@ type WorkOrderFinancialFields =
  */
 export type WorkOrderView = Omit<
   WorkOrder,
-  'directCostAmount' | 'directCostDescription' | WorkOrderFinancialFields
+  | 'directCostAmount'
+  | 'directCostDescription'
+  | 'netAmount'
+  | WorkOrderFinancialFields
 > & {
   directCostAmount?: WorkOrder['directCostAmount'];
   directCostDescription?: WorkOrder['directCostDescription'];
+  /**
+   * total congelado menos retenciones. ADMIN-only (mismo grupo que
+   * directCostAmount, no el de laborAmount/totalAmount que sí ve
+   * COORDINATOR) — decisión propia: el encargo solo es explícito en que
+   * TECHNICIAN no recibe nada de retenciones; se trata el bloque completo
+   * (incluido netAmount) con el mismo criterio estricto de directCostAmount
+   * por ser información financiera de la misma naturaleza.
+   */
+  netAmount?: WorkOrder['netAmount'];
   laborAmount?: WorkOrder['laborAmount'];
   additionalAmount?: WorkOrder['additionalAmount'];
   additionalDescription?: WorkOrder['additionalDescription'];
@@ -307,6 +325,39 @@ export class WorkOrdersService {
           },
           tx,
         );
+      }
+
+      // Premarca las retenciones que el cliente aplica por defecto (ver
+      // ClientRetention) — evita marcar las mismas casillas en cada orden
+      // de un cliente que siempre aplica las mismas. Solo las ACTIVAS del
+      // catálogo (una desactivada no debe ofrecerse ni en una orden que
+      // recién nace). amount=0: nada se ha valorizado todavía, así que no
+      // hay sobre qué calcular — se recalcula la primera vez que se guarde
+      // algo en la pestaña «Valores».
+      const clientRetentions = await tx.clientRetention.findMany({
+        where: {
+          clientId: dto.clientId,
+          companyId: user.companyId, // candado
+          retention: { active: true },
+        },
+        include: { retention: { select: { id: true, name: true, rate: true, position: true } } },
+      });
+
+      if (clientRetentions.length > 0) {
+        const sorted = clientRetentions.sort(
+          (a, b) => a.retention.position - b.retention.position,
+        );
+        await tx.workOrderRetention.createMany({
+          data: sorted.map((cr, index) => ({
+            workOrderId: workOrder.id,
+            companyId: user.companyId, // candado
+            retentionId: cr.retention.id,
+            name: cr.retention.name,
+            rate: cr.retention.rate,
+            amount: new Prisma.Decimal(0),
+            position: index,
+          })),
+        });
       }
 
       return workOrder;
@@ -758,7 +809,8 @@ export class WorkOrdersService {
         dto.additionalAmount !== undefined ||
         dto.additionalDescription !== undefined ||
         dto.discountAmount !== undefined ||
-        dto.items !== undefined) &&
+        dto.items !== undefined ||
+        dto.retentionIds !== undefined) &&
       Object.entries(dto).every(
         ([key, value]) =>
           key === 'laborAmount' ||
@@ -766,6 +818,7 @@ export class WorkOrdersService {
           key === 'additionalDescription' ||
           key === 'discountAmount' ||
           key === 'items' ||
+          key === 'retentionIds' ||
           value === undefined,
       );
 
@@ -781,7 +834,14 @@ export class WorkOrdersService {
         select: { currency: true },
       });
 
-      const [parts, existingItems] = await Promise.all([
+      if (dto.retentionIds !== undefined) {
+        await this.ensureRetentionsBelongToCompany(
+          user.companyId,
+          dto.retentionIds,
+        );
+      }
+
+      const [parts, existingItems, existingRetentions] = await Promise.all([
         this.prisma.workOrderPart.findMany({
           where: { workOrderId: id, companyId: user.companyId },
           select: { unitPrice: true, quantity: true },
@@ -790,7 +850,15 @@ export class WorkOrdersService {
           where: { workOrderId: id, companyId: user.companyId },
           orderBy: { position: 'asc' },
         }),
+        this.prisma.workOrderRetention.findMany({
+          where: { workOrderId: id, companyId: user.companyId },
+          orderBy: { position: 'asc' },
+        }),
       ]);
+      const oldRetentionsTotal = existingRetentions.reduce(
+        (acc, r) => acc.add(r.amount),
+        new Prisma.Decimal(0),
+      );
       const partsTotal = parts.reduce(
         (acc, p) => acc.add(p.unitPrice.mul(p.quantity)),
         new Prisma.Decimal(0),
@@ -824,16 +892,37 @@ export class WorkOrdersService {
           ? new Prisma.Decimal(dto.discountAmount)
           : workOrder.discountAmount;
 
+      // Selección de retenciones: si dto.retentionIds no vino, se conserva
+      // la que ya tenía la orden (ni se toca ni se re-fotografía); una que
+      // ya estaba conserva su name/rate congelados, una nueva se
+      // fotografía ahora. base/baseRetentionId de cada una se leen del
+      // catálogo VIGENTE (no son fotografía) para poder resolver el
+      // desglose.
+      const retentionSelection = await this.resolveRetentionSelection(
+        user.companyId,
+        dto.retentionIds,
+        existingRetentions,
+      );
+      const retentionLineInputs = await this.resolveRetentionLineInputs(
+        user.companyId,
+        retentionSelection,
+      );
+
       // IVA CONGELADO de esta orden (taxRateApplied), NUNCA el vigente de
       // la empresa: editar un cierre económico viejo no puede heredar el
       // IVA de hoy solo porque la tarifa de la empresa cambió después.
-      const { total: newTotal } = calculateBilling({
+      const {
+        total: newTotal,
+        netAmount: newNetAmount,
+        retentions: retentionResults,
+      } = calculateBilling({
         laborAmount: newLaborAmount,
         partsTotal,
         itemsTotal: newItemsTotal,
         additionalAmount: newAdditionalAmount,
         discountAmount: newDiscountAmount,
         taxRate: workOrder.taxRateApplied!,
+        retentions: retentionLineInputs,
       });
 
       const paidAgg = await this.prisma.payment.aggregate({
@@ -842,16 +931,17 @@ export class WorkOrdersService {
       });
       const paidAmount = paidAgg._sum.amount ?? new Prisma.Decimal(0);
 
-      // Un saldo negativo no significa nada y descuadra la cartera: si el
-      // nuevo total queda por debajo de lo ya abonado, hay que corregir los
-      // pagos primero (eliminarlos o ajustarlos), no forzar el total.
-      if (newTotal.lessThan(paidAmount)) {
+      // Un saldo negativo no significa nada y descuadra la cartera: si lo
+      // que la orden va a cobrar de verdad (netAmount, no el total bruto)
+      // queda por debajo de lo ya abonado, hay que corregir los pagos
+      // primero (eliminarlos o ajustarlos), no forzar el total.
+      if (newNetAmount.lessThan(paidAmount)) {
         throw new ConflictException(
-          `El nuevo total (${formatActivityCurrency(newTotal, company.currency)}) no puede quedar por debajo de lo ya abonado (${formatActivityCurrency(paidAmount, company.currency)}). Corrige primero los pagos registrados.`,
+          `El nuevo neto a recibir (${formatActivityCurrency(newNetAmount, company.currency)}) no puede quedar por debajo de lo ya abonado (${formatActivityCurrency(paidAmount, company.currency)}). Corrige primero los pagos registrados.`,
         );
       }
 
-      const newPaymentStatus = derivePaymentStatus(newTotal, paidAmount);
+      const newPaymentStatus = derivePaymentStatus(newNetAmount, paidAmount);
       const actorName = activityAuthorName(user);
 
       const updated = await this.prisma.$transaction(async (tx) => {
@@ -863,6 +953,7 @@ export class WorkOrdersService {
             additionalDescription: dto.additionalDescription?.trim(),
             discountAmount: dto.discountAmount,
             totalAmount: newTotal,
+            netAmount: newNetAmount,
             paymentStatus: newPaymentStatus,
             // Reemplazo completo (semántica PATCH), igual que equipmentIds:
             // borra los conceptos actuales y crea los del array recibido.
@@ -880,6 +971,22 @@ export class WorkOrdersService {
                 },
               },
             }),
+            // Retenciones: reemplazo completo con el desglose recién
+            // calculado — congela name/rate/amount de cada línea (mismo
+            // criterio que unitCost/unitPrice de WorkOrderPart).
+            retentions: {
+              deleteMany: {},
+              createMany: {
+                data: retentionResults.map((r, index) => ({
+                  companyId: user.companyId, // candado
+                  retentionId: r.id,
+                  name: r.name,
+                  rate: r.rate,
+                  amount: r.amount,
+                  position: index,
+                })),
+              },
+            },
           },
           include: WORK_ORDER_INCLUDE,
         });
@@ -982,6 +1089,32 @@ export class WorkOrdersService {
           tx,
         );
 
+        // Retenciones: mismo criterio que "Conceptos" arriba — un evento
+        // agregado (suma retenida), no uno por línea.
+        await this.activityService.recordFieldChange(
+          {
+            companyId: user.companyId,
+            workOrderId: id,
+            userId: user.userId,
+            userName: actorName,
+            action: ActivityAction.BILLING_UPDATED,
+            field: 'Retenciones (orden cerrada)',
+            oldValue: formatActivityCurrency(
+              oldRetentionsTotal,
+              company.currency,
+            ),
+            newValue: formatActivityCurrency(
+              retentionResults.reduce(
+                (acc, r) => acc.add(r.amount),
+                new Prisma.Decimal(0),
+              ),
+              company.currency,
+            ),
+            isFinancial: true,
+          },
+          tx,
+        );
+
         // Total: consecuencia de los campos de arriba, no un campo que el
         // usuario haya tocado directamente — pero es el número que de
         // verdad le importa a Cobros, así que queda su propio evento.
@@ -999,6 +1132,30 @@ export class WorkOrdersService {
             ),
             newValue: formatActivityCurrency(
               result.totalAmount!,
+              company.currency,
+            ),
+            isFinancial: true,
+          },
+          tx,
+        );
+
+        // Neto a recibir: lo que el cliente REALMENTE va a consignar
+        // (total menos retenciones) — el número que de verdad importa a
+        // Cobros/cartera cuando la orden tiene retenciones aplicadas.
+        await this.activityService.recordFieldChange(
+          {
+            companyId: user.companyId,
+            workOrderId: id,
+            userId: user.userId,
+            userName: actorName,
+            action: ActivityAction.BILLING_UPDATED,
+            field: 'Neto a recibir (orden cerrada)',
+            oldValue: formatActivityCurrency(
+              workOrder.netAmount!,
+              company.currency,
+            ),
+            newValue: formatActivityCurrency(
+              result.netAmount!,
               company.currency,
             ),
             isFinancial: true,
@@ -1047,6 +1204,8 @@ export class WorkOrdersService {
       if (dto.discountAmount !== undefined)
         forbiddenFields.push('discountAmount');
       if (dto.items !== undefined) forbiddenFields.push('items');
+      if (dto.retentionIds !== undefined)
+        forbiddenFields.push('retentionIds');
       // billedAt no aparece acá: si llegó hasta este punto ya no está
       // presente en el dto (el bloque de arriba lo maneja o lo rechaza).
 
@@ -1071,6 +1230,8 @@ export class WorkOrdersService {
       if (dto.discountAmount !== undefined)
         forbiddenBillingFields.push('discountAmount');
       if (dto.items !== undefined) forbiddenBillingFields.push('items');
+      if (dto.retentionIds !== undefined)
+        forbiddenBillingFields.push('retentionIds');
       // billedAt: mismo caso que arriba, ya no puede estar presente acá.
 
       if (forbiddenBillingFields.length > 0) {
@@ -1111,6 +1272,8 @@ export class WorkOrdersService {
       | {
           taxRateApplied: Prisma.Decimal;
           totalAmount: Prisma.Decimal;
+          netAmount: Prisma.Decimal;
+          retentions: RetentionLineResult[];
           billedAt: Date;
         }
       | undefined;
@@ -1123,30 +1286,43 @@ export class WorkOrdersService {
       dto.additionalAmount !== undefined ||
       dto.additionalDescription !== undefined ||
       dto.discountAmount !== undefined ||
-      dto.items !== undefined;
+      dto.items !== undefined ||
+      dto.retentionIds !== undefined;
+
+    if (dto.retentionIds !== undefined) {
+      await this.ensureRetentionsBelongToCompany(
+        user.companyId,
+        dto.retentionIds,
+      );
+    }
 
     let currency: string | undefined;
 
     if (dto.status === OrderStatus.COMPLETED) {
-      const [company, parts, existingItems] = await Promise.all([
-        this.prisma.company.findUniqueOrThrow({
-          where: { id: user.companyId },
-          select: { taxRate: true, currency: true },
-        }),
-        this.prisma.workOrderPart.findMany({
-          where: { workOrderId: id, companyId: user.companyId },
-          select: { unitPrice: true, quantity: true },
-        }),
-        // Solo hace falta si el dto no trae conceptos propios (si los
-        // trae, esos son los que van a quedar guardados y sobre esos se
-        // congela el total).
-        dto.items === undefined
-          ? this.prisma.workOrderItem.findMany({
-              where: { workOrderId: id, companyId: user.companyId },
-              select: { unitPrice: true, quantity: true },
-            })
-          : Promise.resolve([]),
-      ]);
+      const [company, parts, existingItems, existingRetentions] =
+        await Promise.all([
+          this.prisma.company.findUniqueOrThrow({
+            where: { id: user.companyId },
+            select: { taxRate: true, currency: true },
+          }),
+          this.prisma.workOrderPart.findMany({
+            where: { workOrderId: id, companyId: user.companyId },
+            select: { unitPrice: true, quantity: true },
+          }),
+          // Solo hace falta si el dto no trae conceptos propios (si los
+          // trae, esos son los que van a quedar guardados y sobre esos se
+          // congela el total).
+          dto.items === undefined
+            ? this.prisma.workOrderItem.findMany({
+                where: { workOrderId: id, companyId: user.companyId },
+                select: { unitPrice: true, quantity: true },
+              })
+            : Promise.resolve([]),
+          this.prisma.workOrderRetention.findMany({
+            where: { workOrderId: id, companyId: user.companyId },
+            orderBy: { position: 'asc' },
+          }),
+        ]);
       currency = company.currency;
 
       const partsTotal = parts.reduce(
@@ -1165,7 +1341,25 @@ export class WorkOrdersService {
               new Prisma.Decimal(0),
             );
 
-      const { total } = calculateBilling({
+      // Retenciones: al (re)congelar SIEMPRE se recalcula el desglose con
+      // los valores vigentes (selección + base/baseRetentionId del
+      // catálogo) contra el subtotal final de ESTE congelamiento — mismo
+      // criterio "vigentes en ESTE update" que el resto del cierre.
+      const retentionSelection = await this.resolveRetentionSelection(
+        user.companyId,
+        dto.retentionIds,
+        existingRetentions,
+      );
+      const retentionLineInputs = await this.resolveRetentionLineInputs(
+        user.companyId,
+        retentionSelection,
+      );
+
+      const {
+        total,
+        netAmount,
+        retentions: retentionResults,
+      } = calculateBilling({
         laborAmount:
           dto.laborAmount !== undefined
             ? new Prisma.Decimal(dto.laborAmount)
@@ -1181,11 +1375,14 @@ export class WorkOrdersService {
             ? new Prisma.Decimal(dto.discountAmount)
             : workOrder.discountAmount,
         taxRate: company.taxRate,
+        retentions: retentionLineInputs,
       });
 
       freeze = {
         taxRateApplied: company.taxRate,
         totalAmount: total,
+        netAmount,
+        retentions: retentionResults,
         billedAt: new Date(),
       };
     } else if (billingFieldsTouched) {
@@ -1194,6 +1391,41 @@ export class WorkOrdersService {
         select: { currency: true },
       });
       currency = company.currency;
+    }
+
+    // Retenciones a escribir en esta pasada, si corresponde. Si `freeze`
+    // ya las calculó (la orden se está (re)completando), se usa ese
+    // desglose YA hecho contra el subtotal final. Si la orden sigue
+    // ABIERTA y solo se tocó la selección (dto.retentionIds), se guarda
+    // con amount=0 de momento — mientras la orden no esté cerrada, el
+    // monto real siempre se recalcula en vivo al leer la valorización
+    // (ver WorkOrderPartsService.listParts), así que lo guardado acá no
+    // se usa para mostrar nada: solo registra QUÉ está marcado.
+    let retentionsToWrite:
+      | { retentionId: string; name: string; rate: Prisma.Decimal; amount: Prisma.Decimal }[]
+      | undefined;
+
+    if (freeze) {
+      retentionsToWrite = freeze.retentions.map((r) => ({
+        retentionId: r.id,
+        name: r.name,
+        rate: r.rate,
+        amount: r.amount,
+      }));
+    } else if (dto.retentionIds !== undefined) {
+      const existingRetentions = await this.prisma.workOrderRetention.findMany({
+        where: { workOrderId: id, companyId: user.companyId },
+        orderBy: { position: 'asc' },
+      });
+      const selection = await this.resolveRetentionSelection(
+        user.companyId,
+        dto.retentionIds,
+        existingRetentions,
+      );
+      retentionsToWrite = selection.map((s) => ({
+        ...s,
+        amount: new Prisma.Decimal(0),
+      }));
     }
 
     // Mantenimiento preventivo: solo en la TRANSICIÓN a COMPLETED (no en un
@@ -1279,7 +1511,24 @@ export class WorkOrdersService {
           ...(freeze && {
             taxRateApplied: freeze.taxRateApplied,
             totalAmount: freeze.totalAmount,
+            netAmount: freeze.netAmount,
             billedAt: freeze.billedAt,
+          }),
+          // Retenciones: reemplazo completo, mismo patrón que items arriba.
+          ...(retentionsToWrite && {
+            retentions: {
+              deleteMany: {},
+              createMany: {
+                data: retentionsToWrite.map((r, index) => ({
+                  companyId: user.companyId, // candado
+                  retentionId: r.retentionId,
+                  name: r.name,
+                  rate: r.rate,
+                  amount: r.amount,
+                  position: index,
+                })),
+              },
+            },
           }),
         },
         include: WORK_ORDER_INCLUDE,
@@ -1828,6 +2077,116 @@ export class WorkOrdersService {
     }
   }
 
+  /** Validación cruzada multi-tenant: cada retención debe ser del catálogo de MI empresa. */
+  private async ensureRetentionsBelongToCompany(
+    companyId: string,
+    retentionIds: string[],
+  ): Promise<void> {
+    if (retentionIds.length === 0) return;
+
+    const found = await this.prisma.retention.findMany({
+      where: { id: { in: retentionIds }, companyId }, // candado
+      select: { id: true },
+    });
+    const foundIds = new Set(found.map((r) => r.id));
+    const missingIds = retentionIds.filter((id) => !foundIds.has(id));
+    if (missingIds.length > 0) {
+      throw new NotFoundException(
+        `Retención(es) no encontrada(s) en tu empresa: ${missingIds.join(', ')}`,
+      );
+    }
+  }
+
+  /**
+   * Resuelve la selección de retenciones a aplicar, para cualquiera de los
+   * tres momentos en que se (re)calcula la valorización de una orden:
+   * edición abierta, edición de una orden ya cerrada, o el congelamiento
+   * al pasar a COMPLETED.
+   *
+   * - Si `retentionIds` viene (dto.retentionIds !== undefined), esa es la
+   *   nueva selección — reemplaza la anterior por completo. Un id YA
+   *   presente en `existingLines` conserva su name/rate CONGELADOS
+   *   (fotografía, igual que unitCost/unitPrice de WorkOrderPart); uno
+   *   NUEVO se fotografía ahora, desde el catálogo vigente.
+   * - Si no viene, se conserva `existingLines` tal cual — ni se toca la
+   *   selección ni se re-fotografía nada.
+   */
+  private async resolveRetentionSelection(
+    companyId: string,
+    retentionIds: string[] | undefined,
+    existingLines: {
+      retentionId: string | null;
+      name: string;
+      rate: Prisma.Decimal;
+    }[],
+  ): Promise<{ retentionId: string; name: string; rate: Prisma.Decimal }[]> {
+    const existingByRetentionId = new Map(
+      existingLines
+        .filter(
+          (
+            line,
+          ): line is {
+            retentionId: string;
+            name: string;
+            rate: Prisma.Decimal;
+          } => line.retentionId !== null,
+        )
+        .map((line) => [line.retentionId, line]),
+    );
+
+    if (retentionIds === undefined) {
+      return Array.from(existingByRetentionId.values());
+    }
+    if (retentionIds.length === 0) return [];
+
+    const newIds = retentionIds.filter(
+      (retentionId) => !existingByRetentionId.has(retentionId),
+    );
+    const freshCatalog =
+      newIds.length > 0
+        ? await this.prisma.retention.findMany({
+            where: { id: { in: newIds }, companyId }, // candado
+            select: { id: true, name: true, rate: true },
+          })
+        : [];
+    const freshById = new Map(freshCatalog.map((r) => [r.id, r]));
+
+    const missing = newIds.filter((retentionId) => !freshById.has(retentionId));
+    if (missing.length > 0) {
+      throw new NotFoundException(
+        `Retención(es) no encontrada(s) en tu empresa: ${missing.join(', ')}`,
+      );
+    }
+
+    return retentionIds.map((retentionId) => {
+      const existing = existingByRetentionId.get(retentionId);
+      if (existing) return existing;
+      const fresh = freshById.get(retentionId)!;
+      return { retentionId: fresh.id, name: fresh.name, rate: fresh.rate };
+    });
+  }
+
+  /**
+   * base/baseRetentionId de cada retención NO son fotografía (solo
+   * name/rate lo son, ver WorkOrderRetention en el schema) — siempre se
+   * leen del catálogo VIGENTE para poder resolver el desglose, incluso al
+   * recalcular una orden ya cerrada.
+   */
+  private async resolveRetentionLineInputs(
+    companyId: string,
+    selection: { retentionId: string; name: string; rate: Prisma.Decimal }[],
+  ): Promise<RetentionLineInput[]> {
+    if (selection.length === 0) return [];
+
+    const catalogRows = await this.prisma.retention.findMany({
+      where: { id: { in: selection.map((s) => s.retentionId) }, companyId }, // candado
+      select: { id: true, base: true, baseRetentionId: true },
+    });
+    const catalogBases = new Map(catalogRows.map((r) => [r.id, r]));
+
+    return buildRetentionLineInputs(selection, catalogBases);
+  }
+
   /** "Marca Modelo — Ubicación" para los eventos de bitácora de equipos vinculados/desvinculados. */
   private formatEquipmentLabel(equipment: {
     brand: string;
@@ -1858,6 +2217,7 @@ export class WorkOrdersService {
       equipmentLinks,
       directCostAmount,
       directCostDescription,
+      netAmount,
       laborAmount,
       additionalAmount,
       additionalDescription,
@@ -1872,7 +2232,11 @@ export class WorkOrdersService {
     return {
       ...rest,
       equipments: equipmentLinks.map((link) => link.equipment),
-      ...(role === Role.ADMIN && { directCostAmount, directCostDescription }),
+      ...(role === Role.ADMIN && {
+        directCostAmount,
+        directCostDescription,
+        netAmount,
+      }),
       ...(role !== Role.TECHNICIAN && {
         laborAmount,
         additionalAmount,

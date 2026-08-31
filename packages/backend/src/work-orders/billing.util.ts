@@ -45,6 +45,34 @@ export interface RetentionLineResult {
 }
 
 /**
+ * Arma RetentionLineInput[] a partir de la selección aplicada a una orden
+ * (name/rate — fotografías congeladas, ver WorkOrderRetention en el
+ * schema) y la base/baseRetentionId ACTUAL de cada una en el catálogo:
+ * qué se calcula sobre qué NO es una fotografía (solo name/rate lo son),
+ * así que siempre se lee en vivo del catálogo al recalcular.
+ *
+ * Si una línea ya no tiene retención en el catálogo (retentionId null —
+ * en la práctica no ocurre hoy: el catálogo no expone borrado, solo
+ * desactivar), cae a SUBTOTAL como resguardo defensivo: no hay forma de
+ * saber su base real, pero el cálculo no debe reventar por eso.
+ */
+export function buildRetentionLineInputs(
+  lines: { retentionId: string; name: string; rate: Prisma.Decimal }[],
+  catalogBases: Map<string, { base: string; baseRetentionId: string | null }>,
+): RetentionLineInput[] {
+  return lines.map((line) => {
+    const info = catalogBases.get(line.retentionId);
+    return {
+      id: line.retentionId,
+      name: line.name,
+      rate: line.rate,
+      base: (info?.base as RetentionBase | undefined) ?? 'SUBTOTAL',
+      baseRetentionId: info?.baseRetentionId ?? null,
+    };
+  });
+}
+
+/**
  * Resuelve el desglose de retenciones respetando dependencias — una
  * retención con base RETENTION (ej. Avisos y tableros sobre ReteICA) se
  * calcula DESPUÉS de la retención de la que depende, sin importar el

@@ -2,12 +2,14 @@ import { PartialType } from '@nestjs/mapped-types';
 import { OrderStatus } from 'database';
 import { Type } from 'class-transformer';
 import {
+  ArrayUnique,
   IsArray,
   IsDateString,
   IsEnum,
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
   Min,
   ValidateNested,
@@ -118,4 +120,21 @@ export class UpdateWorkOrderDto extends PartialType(CreateWorkOrderDto) {
   @IsString()
   @MaxLength(300)
   directCostDescription?: string;
+
+  /**
+   * Retenciones aplicadas a la orden (bloque "Retenciones", pestaña
+   * Valores): reemplazo completo del set actual, mismo patrón que
+   * equipmentIds/items — un array vacío es válido y explícito (deja la
+   * orden sin retenciones), `undefined` no toca nada. SOLO ADMIN (RBAC en
+   * el service), ni siquiera COORDINATOR — mismo criterio estricto que
+   * directCostAmount.
+   */
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique({ message: 'retentionIds no puede tener retenciones repetidas' })
+  @IsUUID('4', {
+    each: true,
+    message: 'Cada retentionId debe ser un UUID válido',
+  })
+  retentionIds?: string[];
 }
