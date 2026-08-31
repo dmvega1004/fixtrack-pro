@@ -20,6 +20,7 @@ import { QuotesModule } from './quotes/quotes.module';
 import { RetentionsModule } from './retentions/retentions.module';
 import { SparePartsModule } from './spare-parts/spare-parts.module';
 import { UsersModule } from './users/users.module';
+import { WorkOrderSignaturesModule } from './work-order-signatures/work-order-signatures.module';
 import { WorkOrdersModule } from './work-orders/work-orders.module';
 
 @Module({
@@ -41,6 +42,7 @@ import { WorkOrdersModule } from './work-orders/work-orders.module';
     QuotesModule,
     RetentionsModule,
     WorkOrdersModule,
+    WorkOrderSignaturesModule,
     SparePartsModule,
     UsersModule,
   ],

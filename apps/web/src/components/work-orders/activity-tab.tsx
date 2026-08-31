@@ -192,6 +192,13 @@ function describeEvent({
           {newValue ? <>: {newValue}</> : null}
         </>
       );
+    case "SIGNATURES_CAPTURED":
+      return (
+        <>
+          {userName} capturó la{newValue?.includes(" y ") ? "s" : ""} firma
+          {newValue ? <> de {newValue}</> : null}
+        </>
+      );
     default:
       return <>{userName} realizó un cambio en la orden</>;
   }

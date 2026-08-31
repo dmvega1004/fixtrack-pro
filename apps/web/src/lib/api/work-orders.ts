@@ -62,6 +62,20 @@ export interface WorkOrder {
    * como respaldo.
    */
   serviceTime: string | null;
+  /**
+   * Firmas en sitio (Módulo de Firmas) — visibles para los TRES roles (no
+   * son datos financieros). technicianName/technicianDocument son
+   * FOTOGRAFÍAS tomadas de User.name/documentNumber al capturar, nunca se
+   * leen del usuario al imprimir. receiverName/receiverDocument son
+   * siempre texto libre.
+   */
+  technicianSignatureUrl: string | null;
+  technicianName: string | null;
+  technicianDocument: string | null;
+  receiverSignatureUrl: string | null;
+  receiverName: string | null;
+  receiverDocument: string | null;
+  signedAt: string | null;
   status: OrderStatus;
   priority: Priority;
   /** CORRECTIVE por defecto. El técnico no puede cambiarlo tras la creación. */
