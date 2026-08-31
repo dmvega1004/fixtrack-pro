@@ -2,16 +2,27 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  InternalServerErrorException,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { Prisma, Role, User } from 'database';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
+import {
+  cloudinaryRootFolder,
+  CloudinaryService,
+} from '../cloudinary/cloudinary.service';
+import { validateImageFile } from '../cloudinary/validate-image-file';
 import { PrismaService } from '../prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateMyProfileDto } from './dto/update-my-profile.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
 const BCRYPT_SALT_ROUNDS = 12;
+
+/** Lado máximo de la firma: suficiente para verse nítida impresa a ~40mm de ancho, sin guardar un escaneo gigante. */
+const MAX_SIGNATURE_DIMENSION = 1000;
 
 /** Proyección pública: el hash de la contraseña JAMÁS sale del servicio. */
 const PUBLIC_USER_SELECT = {
@@ -30,6 +41,31 @@ export type PublicUser = Pick<
 >;
 
 /**
+ * Proyección de "mi perfil" (GET/PATCH /users/me) — a diferencia de
+ * PublicUser (lo que ADMIN/COORDINATOR ven de OTROS usuarios), sí incluye
+ * documentNumber/signatureImageUrl: son datos que cada quien gestiona de
+ * sí mismo, no algo que exponer en el listado de nómina.
+ */
+const MY_PROFILE_SELECT = {
+  ...PUBLIC_USER_SELECT,
+  documentNumber: true,
+  signatureImageUrl: true,
+} as const;
+
+export type MyProfile = Pick<
+  User,
+  | 'id'
+  | 'name'
+  | 'email'
+  | 'role'
+  | 'companyId'
+  | 'createdAt'
+  | 'updatedAt'
+  | 'documentNumber'
+  | 'signatureImageUrl'
+>;
+
+/**
  * Módulo 12 — Gestión de usuarios de la empresa.
  * Reglas anti-bloqueo (lockout):
  * - Nadie puede eliminarse a sí mismo ni cambiar su propio rol.
@@ -38,7 +74,86 @@ export type PublicUser = Pick<
  */
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(UsersService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cloudinary: CloudinaryService,
+  ) {}
+
+  /** GET /users/me — los tres roles: su propio perfil, incluida su firma. */
+  findMe(user: AuthenticatedUser): Promise<MyProfile> {
+    return this.prisma.user.findUniqueOrThrow({
+      where: { id: user.userId },
+      select: MY_PROFILE_SELECT,
+    });
+  }
+
+  /** PATCH /users/me — los tres roles: hoy solo documentNumber (ver UpdateMyProfileDto). */
+  updateMe(
+    user: AuthenticatedUser,
+    dto: UpdateMyProfileDto,
+  ): Promise<MyProfile> {
+    return this.prisma.user.update({
+      where: { id: user.userId },
+      data: { documentNumber: dto.documentNumber?.trim() },
+      select: MY_PROFILE_SELECT,
+    });
+  }
+
+  /**
+   * POST /users/me/signature — sube la rúbrica a Cloudinary y actualiza
+   * User.signatureImageUrl. Mismo patrón que CompanyService.updateSignature
+   * (borrado best-effort de la anterior); solo PNG, igual que la firma de
+   * empresa — la firma manuscrita necesita fondo transparente real.
+   */
+  async updateMySignature(
+    user: AuthenticatedUser,
+    file: Express.Multer.File | undefined,
+  ): Promise<MyProfile> {
+    validateImageFile(file, ['image/png']);
+
+    const current = await this.prisma.user.findUniqueOrThrow({
+      where: { id: user.userId },
+      select: { signatureImageUrl: true },
+    });
+
+    let uploaded;
+    try {
+      uploaded = await this.cloudinary.uploadBuffer(file.buffer, {
+        folder: `${cloudinaryRootFolder()}/${user.companyId}/users/${user.userId}`,
+        maxDimension: MAX_SIGNATURE_DIMENSION,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Fallo al subir la firma de perfil a Cloudinary (usuario ${user.userId}): ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new InternalServerErrorException(
+        'No se pudo subir la firma a nuestro proveedor de imágenes. ' +
+          'Intenta de nuevo en unos minutos.',
+      );
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: user.userId },
+      data: { signatureImageUrl: uploaded.secure_url },
+      select: MY_PROFILE_SELECT,
+    });
+
+    if (current.signatureImageUrl) {
+      const oldPublicId = this.cloudinary.extractPublicId(
+        current.signatureImageUrl,
+      );
+      if (oldPublicId) {
+        await this.cloudinary.destroy(oldPublicId);
+      }
+    }
+
+    return updated;
+  }
 
   async create(
     user: AuthenticatedUser,
