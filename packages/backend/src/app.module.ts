@@ -17,6 +17,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { PrismaModule } from './prisma.module';
 import { ProfitabilityModule } from './profitability/profitability.module';
 import { QuotesModule } from './quotes/quotes.module';
+import { RetentionsModule } from './retentions/retentions.module';
 import { SparePartsModule } from './spare-parts/spare-parts.module';
 import { UsersModule } from './users/users.module';
 import { WorkOrdersModule } from './work-orders/work-orders.module';
@@ -38,6 +39,7 @@ import { WorkOrdersModule } from './work-orders/work-orders.module';
     PaymentsModule,
     ProfitabilityModule,
     QuotesModule,
+    RetentionsModule,
     WorkOrdersModule,
     SparePartsModule,
     UsersModule,
