@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, DollarSign, Wallet, TrendingUp, Percent } from "lucide-react";
+import { ArrowLeft, DollarSign, Wallet, TrendingUp, Percent, PiggyBank } from "lucide-react";
 import { getCompany } from "@/lib/api/company";
 import {
   getProfitabilitySummary,
@@ -85,7 +85,7 @@ export default async function RentabilidadPage({ searchParams }: RentabilidadPag
 
       <ProfitabilityPeriodSelector from={from} to={to} />
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         <KpiCard
           label="Ingreso (sin IVA)"
           value={formatCurrency(summary.income, company.currency)}
@@ -107,7 +107,18 @@ export default async function RentabilidadPage({ searchParams }: RentabilidadPag
           value={formatMarginPercent(summary.marginPercent)}
           icon={Percent}
         />
+        <KpiCard
+          label="Neto recibido"
+          value={formatCurrency(summary.netReceived, company.currency)}
+          icon={PiggyBank}
+        />
       </div>
+      <p className="-mt-2 text-xs text-muted-foreground">
+        El margen se calcula sobre lo facturado, no sobre el neto: una
+        retención no es un costo, es un anticipo del impuesto de renta que
+        se recupera al declarar. &quot;Neto recibido&quot; es una lectura
+        aparte — cuánto entró a la cuenta, no cuánto se ganó.
+      </p>
 
       <ProfitabilityOrdersTable
         items={orders}

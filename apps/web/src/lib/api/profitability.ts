@@ -7,6 +7,13 @@ export interface ProfitabilityRange {
   to: string;
 }
 
+/**
+ * netReceived es una lectura DISTINTA de income/margin — cuánto entró a
+ * la cuenta, no cuánto se ganó. El margen sigue calculándose sobre
+ * income (derivado del valor FACTURADO, sin IVA), nunca sobre netReceived:
+ * una retención no es un costo, es un anticipo del impuesto de renta que
+ * se recupera al declarar.
+ */
 // Debe reflejar exactamente ProfitabilitySummary en
 // packages/backend/src/profitability/profitability.service.ts
 export interface ProfitabilitySummary {
@@ -15,6 +22,7 @@ export interface ProfitabilitySummary {
   margin: string;
   /** Porcentaje 0-100; null si income es 0 (nunca dividir por cero). */
   marginPercent: number | null;
+  netReceived: string;
 }
 
 // Debe reflejar exactamente ProfitabilityOrderView
@@ -28,6 +36,7 @@ export interface ProfitabilityOrder {
   cost: string;
   margin: string;
   marginPercent: number | null;
+  netReceived: string;
 }
 
 // Debe reflejar exactamente ProfitabilityClientView
@@ -38,6 +47,7 @@ export interface ProfitabilityClient {
   cost: string;
   margin: string;
   marginPercent: number | null;
+  netReceived: string;
 }
 
 // Debe reflejar exactamente ProfitabilityMonthPoint
@@ -48,6 +58,7 @@ export interface ProfitabilityMonthPoint {
   cost: string;
   margin: string;
   marginPercent: number | null;
+  netReceived: string;
 }
 
 export type ProfitabilityOrderSortBy = "margin" | "marginPercent";

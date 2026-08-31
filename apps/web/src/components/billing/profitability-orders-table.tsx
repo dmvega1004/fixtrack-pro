@@ -111,6 +111,12 @@ export function ProfitabilityOrdersTable({
                   align="right"
                 />
               </th>
+              <th
+                className="border-l border-border px-4 py-3 text-right font-medium"
+                title="Cuánto entró a la cuenta (total menos retenciones) — distinto de cuánto se ganó."
+              >
+                Neto recibido
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -156,6 +162,14 @@ export function ProfitabilityOrdersTable({
                       <MarginChip marginPercent={item.marginPercent} />
                     </Link>
                   </td>
+                  <td className="border-l border-border p-0">
+                    <Link
+                      href={href}
+                      className="block px-4 py-3 text-right tabular-nums text-muted-foreground"
+                    >
+                      {formatCurrency(item.netReceived, currency)}
+                    </Link>
+                  </td>
                 </tr>
               );
             })}
@@ -191,6 +205,10 @@ export function ProfitabilityOrdersTable({
               <span className="font-semibold tabular-nums">
                 {formatCurrency(item.margin, currency)}
               </span>
+            </div>
+            <div className="flex justify-between border-t border-border pt-1 text-sm">
+              <span className="text-muted-foreground">Neto recibido</span>
+              <span className="tabular-nums">{formatCurrency(item.netReceived, currency)}</span>
             </div>
           </Link>
         ))}
