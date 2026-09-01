@@ -68,6 +68,8 @@ export function SignaturesSection({
   const [isRedrawingReceiver, setIsRedrawingReceiver] = useState(false);
   const [receiverName, setReceiverName] = useState("");
   const [receiverDocument, setReceiverDocument] = useState("");
+  const [receiverRole, setReceiverRole] = useState("");
+  const [receiverCompany, setReceiverCompany] = useState("");
   const [receiverDrawnUrl, setReceiverDrawnUrl] = useState<string | null>(null);
 
   const [isSaving, setIsSaving] = useState(false);
@@ -135,6 +137,8 @@ export function SignaturesSection({
     if (!receiverFrozen) {
       dto.receiverName = receiverName.trim();
       dto.receiverDocument = receiverDocument.trim();
+      dto.receiverRole = receiverRole.trim();
+      dto.receiverCompany = receiverCompany.trim();
       dto.receiverSignatureUrl = receiverDrawnUrl!;
     }
 
@@ -154,6 +158,8 @@ export function SignaturesSection({
     setReceiverDrawnUrl(null);
     setReceiverName("");
     setReceiverDocument("");
+    setReceiverRole("");
+    setReceiverCompany("");
     router.refresh();
   }
 
@@ -181,6 +187,7 @@ export function SignaturesSection({
               <div className="text-xs text-muted-foreground">
                 <p>{order.technicianName}</p>
                 <p>{order.technicianDocument}</p>
+                <p>{order.technicianRole}</p>
               </div>
               {!isTerminal && (
                 <Button
@@ -258,6 +265,8 @@ export function SignaturesSection({
               <div className="text-xs text-muted-foreground">
                 <p>{order.receiverName}</p>
                 <p>{order.receiverDocument}</p>
+                <p>{order.receiverRole}</p>
+                <p>{order.receiverCompany}</p>
               </div>
               {!isTerminal && (
                 <Button
@@ -291,6 +300,26 @@ export function SignaturesSection({
                     value={receiverDocument}
                     onChange={(event: ChangeEvent<HTMLInputElement>) =>
                       setReceiverDocument(event.target.value)
+                    }
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="receiverRole">Cargo (opcional)</Label>
+                  <Input
+                    id="receiverRole"
+                    value={receiverRole}
+                    onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                      setReceiverRole(event.target.value)
+                    }
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="receiverCompany">Empresa (opcional)</Label>
+                  <Input
+                    id="receiverCompany"
+                    value={receiverCompany}
+                    onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                      setReceiverCompany(event.target.value)
                     }
                   />
                 </div>

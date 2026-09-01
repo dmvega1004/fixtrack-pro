@@ -64,17 +64,21 @@ export interface WorkOrder {
   serviceTime: string | null;
   /**
    * Firmas en sitio (Módulo de Firmas) — visibles para los TRES roles (no
-   * son datos financieros). technicianName/technicianDocument son
-   * FOTOGRAFÍAS tomadas de User.name/documentNumber al capturar, nunca se
-   * leen del usuario al imprimir. receiverName/receiverDocument son
-   * siempre texto libre.
+   * son datos financieros). technicianName/technicianDocument/
+   * technicianRole son FOTOGRAFÍAS tomadas de User.name/documentNumber y
+   * del rol de quien firma al capturar, nunca se leen del usuario al
+   * imprimir. receiverName/receiverDocument/receiverRole/receiverCompany
+   * son siempre texto libre (quien recibe no tiene cuenta en el sistema).
    */
   technicianSignatureUrl: string | null;
   technicianName: string | null;
   technicianDocument: string | null;
+  technicianRole: string | null;
   receiverSignatureUrl: string | null;
   receiverName: string | null;
   receiverDocument: string | null;
+  receiverRole: string | null;
+  receiverCompany: string | null;
   signedAt: string | null;
   status: OrderStatus;
   priority: Priority;

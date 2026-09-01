@@ -341,6 +341,8 @@ export interface SaveSignaturesInput {
   technicianSignatureUrl?: string;
   receiverName?: string;
   receiverDocument?: string;
+  receiverRole?: string;
+  receiverCompany?: string;
   receiverSignatureUrl?: string;
 }
 
