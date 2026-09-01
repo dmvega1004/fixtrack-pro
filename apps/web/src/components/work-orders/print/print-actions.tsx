@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowLeft, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { printDocument } from "@/lib/native-print";
 
 interface PrintActionsProps {
   orderId: string;
@@ -20,7 +21,7 @@ export function PrintActions({ orderId }: PrintActionsProps) {
       </Link>
       <Button
         type="button"
-        onClick={() => window.print()}
+        onClick={() => void printDocument()}
         className="max-w-64 flex-1 gap-1.5"
       >
         <Printer className="size-4" />
