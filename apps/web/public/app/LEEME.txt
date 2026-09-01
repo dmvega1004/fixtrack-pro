@@ -1,0 +1,13 @@
+Este archivo es un marcador — el APK real todavía no está publicado.
+
+Cuando tengas el APK firmado (ver "Publicar en fixtrackpro.com/app" en
+apps/mobile/README.md), colócalo en esta misma carpeta con el nombre:
+
+    fixtrackpro.apk
+
+y borra este LEEME.txt. La página /app ya está lista para servirlo con
+el tipo de contenido correcto (ver next.config.ts, headers() para
+/app/*.apk) — no hace falta tocar nada más ahí.
+
+No olvides también actualizar la versión y la fecha en
+apps/web/src/lib/app-release.ts.

@@ -172,6 +172,51 @@ versionName "1.0.0"   // el número que ve el usuario; súbelo como prefieras (1
 - `versionName` es el texto que ve la gente (en Ajustes → Apps, por
   ejemplo). Súbelo con el criterio que prefieras (semver, fecha, etc.).
 
+## Publicar en fixtrackpro.com/app (el enlace directo)
+
+Antes de tener la ficha en Google Play lista, la forma de instalar la app
+es esta página pública: `fixtrackpro.com/app`, en el repo de la web
+(`apps/web`, no en este). Reemplaza el envío del APK por WhatsApp — el
+enlace se manda una vez y cada instalación baja la versión que esté
+publicada ahí en ese momento.
+
+Publicar una versión nueva son dos pasos, siempre los dos:
+
+1. **Sube el archivo.** Genera el APK de release (sección de arriba) y
+   cópialo a `apps/web/public/app/`, con este nombre exacto:
+
+   ```bash
+   cp apps/mobile/android/app/build/outputs/apk/release/app-release.apk \
+      apps/web/public/app/fixtrackpro.apk
+   ```
+
+   El nombre no cambia de una versión a otra — así el enlace que ya
+   compartiste (o el que quedó guardado en el QR de la propia página)
+   sigue funcionando sin que tengas que volver a mandarlo.
+
+2. **Actualiza la versión en la página.** Edita
+   `apps/web/src/lib/app-release.ts` con el `version` y el `releaseDate`
+   (`YYYY-MM-DD`) de este build — es el texto que se ve debajo del botón
+   de descarga ("Versión 1.0.0 · 01 de sept de 2026"), la única forma
+   que tiene quien instala de saber si le falta actualizar.
+
+   ```ts
+   export const APP_RELEASE = {
+     version: "1.0.1",
+     releaseDate: "2026-09-15",
+     fileName: "fixtrackpro.apk",
+   } as const;
+   ```
+
+Comitea ambos cambios juntos (el `.apk` nuevo y el `app-release.ts`
+editado) y despliega la web como siempre — no hace falta tocar nada de
+`apps/mobile` para esto más allá de generar el APK.
+
+⚠️ El archivo que subas ahí tiene que ser el **release firmado**
+(`app-release.apk`), no el de debug — es el que se instala en el
+celular de un cliente real, y solo se puede actualizar más adelante
+(sin desinstalar) si sigue firmado con la misma llave.
+
 ## Publicar en Google Play
 
 Cuando llegue el momento, el proceso es distinto al de distribuir un APK
