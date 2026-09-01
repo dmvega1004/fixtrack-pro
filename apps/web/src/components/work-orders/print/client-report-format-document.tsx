@@ -3,6 +3,7 @@ import type { Client, ReportFormatSource } from "@/lib/api/clients";
 import type { Attachment } from "@/lib/api/attachments";
 import { formatOrderNumber } from "@/lib/format/order-number";
 import { formatDate, formatTime, formatTimeOnly } from "@/lib/format/dates";
+import { cn } from "@/lib/utils";
 import { PrintDocumentFrame } from "@/components/shared/print-document-frame";
 import { PrintKeepTogether } from "@/components/shared/print-keep-together";
 import { PrintPhotoGrid } from "@/components/shared/print-photo-grid";
@@ -66,15 +67,21 @@ function ReportSection({
   label,
   content,
   accentColor,
+  className,
 }: {
   label: string;
   content: string;
   accentColor: string;
+  className?: string;
 }) {
   const isEmpty = content.trim() === "";
 
   return (
-    <section className="flex flex-col">
+    // Flujo de bloque normal, no flex: la franja de título y su contenido
+    // deben sobrevivir juntos a un salto de hoja (break-inside-avoid), y
+    // Chrome ignora esa instrucción en los hijos de un contenedor flex al
+    // imprimir — ver el comentario en ClientReportFormatDocument.
+    <section className={cn("break-inside-avoid", className)}>
       <div
         className="print-color-exact break-after-avoid px-3 py-1.5 text-xs font-semibold tracking-wide text-white uppercase"
         style={{ backgroundColor: accentColor }}
@@ -106,13 +113,18 @@ function PhotosSection({
   label,
   photos,
   accentColor,
+  className,
 }: {
   label: string;
   photos: Attachment[];
   accentColor: string;
+  className?: string;
 }) {
+  // Flujo de bloque normal, no flex: la franja de título y la cuadrícula de
+  // fotos son hijos directos de este <section>, y un contenedor flex les
+  // impide fragmentar de forma fiable — mismo motivo que ReportSection.
   return (
-    <section className="flex flex-col break-before-page">
+    <section className={cn("break-before-page", className)}>
       <div
         className="print-color-exact break-after-avoid px-3 py-1.5 text-xs font-semibold tracking-wide text-white uppercase"
         style={{ backgroundColor: accentColor }}
@@ -141,15 +153,21 @@ function SignatureColumn({
   /** Cargo: technicianRole (congelado del rol) del lado ENTREGA, receiverRole (texto libre) del lado RECIBE. */
   role?: string | null;
 }) {
+  // Flujo de bloque normal, no flex: aunque esta columna vive dentro de la
+  // fila de tabla atómica de PrintKeepTogether (que ya garantiza que todo
+  // el bloque de firmas viaja junto), un flex-col acá adentro es la misma
+  // trampa que en el resto del documento — el margen reemplaza al gap.
   return (
-    <div className="flex flex-col gap-8">
+    <div>
       <SignatureLine signatureImageUrl={signatureImageUrl} widthMm={40} heightMm={18} />
-      <div className="flex flex-col gap-2 text-xs text-neutral-700">
-        <span className="text-sm font-semibold text-neutral-900">{title}</span>
-        <span>Nombre: {name || "____________________________"}</span>
-        <span>Documento: {document || "____________________________"}</span>
-        <span>Cargo: {role || "____________________________"}</span>
-        <span>
+      <div className="mt-8 text-xs text-neutral-700">
+        <span className="block text-sm font-semibold text-neutral-900">{title}</span>
+        <span className="mt-2 block">Nombre: {name || "____________________________"}</span>
+        <span className="mt-2 block">
+          Documento: {document || "____________________________"}
+        </span>
+        <span className="mt-2 block">Cargo: {role || "____________________________"}</span>
+        <span className="mt-2 block">
           Empresa: {companyValue ? companyValue : "____________________________"}
         </span>
       </div>
@@ -228,7 +246,16 @@ export function ClientReportFormatDocument({
           ) : null
         }
       >
-        <div className="flex flex-col gap-5">
+        {/* Flujo de bloque normal, NO flex: Chrome no fragmenta de forma
+            fiable el contenido de un contenedor flexible al imprimir —
+            ignora break-inside-avoid en los hijos de un flex, así que
+            hasta las filas de PrintKeepTogether bien construidas se
+            partían entre hojas por estar anidadas acá adentro. El
+            espaciado entre secciones pasa de gap (flex) a margen (mt-*)
+            entre hermanos — ver el mismo criterio en work-order-print-
+            document.tsx y collection-document.tsx, que nunca tuvieron
+            este envoltorio y por eso no fallan. */}
+        <div>
           {/* 1. Encabezado: logo | título centrado | código/versión/fecha */}
           <header className="grid grid-cols-3 items-center gap-4 rounded-lg border border-neutral-300 p-4">
             <div className="flex items-center justify-start">
@@ -266,25 +293,26 @@ export function ClientReportFormatDocument({
           </header>
 
           {/* 2. Fila de datos */}
-          <div className="flex flex-col gap-2 break-inside-avoid">
+          <div className="mt-5 break-inside-avoid">
             <div className="grid grid-cols-2 gap-2">
               <DataCell label="Fecha" value={dateValue} accentColor={accentColor} />
               <DataCell label="Ciudad" value={cityValue} accentColor={accentColor} />
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="mt-2 grid grid-cols-2 gap-2">
               <DataCell label="Cliente" value={endClientValue} accentColor={accentColor} />
               <DataCell label="Hora" value={timeValue} accentColor={accentColor} />
             </div>
           </div>
 
           {/* 3. Las tres secciones */}
-          <div className="flex flex-col gap-4">
+          <div className="mt-5">
             {sections.map((section, index) => (
               <ReportSection
                 key={index}
                 label={section.label}
                 content={section.content}
                 accentColor={accentColor}
+                className={index > 0 ? "mt-4" : undefined}
               />
             ))}
           </div>
@@ -294,13 +322,18 @@ export function ClientReportFormatDocument({
               (ni la franja) si el cliente desactivó las fotos o la orden no
               tiene ninguna. */}
           {showPhotos && (
-            <PhotosSection label={photosLabel} photos={photos} accentColor={accentColor} />
+            <PhotosSection
+              label={photosLabel}
+              photos={photos}
+              accentColor={accentColor}
+              className="mt-5"
+            />
           )}
 
           {/* 4. Bloque de firmas: fila de tabla propia (ver
               PrintKeepTogether) — no se parte entre hojas, y el pt-16/pb-10
               (padding, no margin) sobrevive aunque el bloque abra hoja
-              nueva, a diferencia del mt-4 anterior. */}
+              nueva, a diferencia de un margin. */}
           <PrintKeepTogether className="pt-16 pb-10">
             <div className="grid grid-cols-1 gap-10 sm:grid-cols-2">
               <SignatureColumn
