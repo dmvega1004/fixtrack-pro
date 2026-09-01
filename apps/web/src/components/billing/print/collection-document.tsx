@@ -120,15 +120,14 @@ export function CollectionDocument({
 
   const payeeName = company.payeeName || company.name;
 
-  // Retenciones (Bloque de retenciones): cuando la orden las tiene, el
-  // documento las desglosa después del total y cierra con el neto a
-  // pagar — netAmount, nunca total, es la base del saldo. Sin
-  // retenciones, netAmount llega igual a total (ver WorkOrder.netAmount
-  // en el backend), así que el documento se ve exactamente como antes.
-  const hasRetentions = (billing.retentions?.length ?? 0) > 0;
-  const netAmount = billing.netAmount ?? billing.total;
-
-  const balance = Math.max(Number(netAmount) - Number(billing.paidAmount), 0);
+  // La cuenta de cobro solicita el valor del servicio completo
+  // (billing.total, equivalente a WorkOrder.totalAmount) — nunca el neto.
+  // La retención la practica el CLIENTE al pagar, en calidad de agente
+  // retenedor; mostrarla acá descontaría por adelantado algo que el
+  // cliente ya va a descontar por su cuenta. netAmount/retentions siguen
+  // existiendo para el control contable interno (pestaña Valores,
+  // Rentabilidad, saldo de cartera) — este documento no los usa.
+  const balance = Math.max(Number(billing.total) - Number(billing.paidAmount), 0);
 
   const dueDate = order.billedAt
     ? new Date(new Date(order.billedAt).getTime() + client.paymentTermDays * DAY_MS)
@@ -299,25 +298,6 @@ export function CollectionDocument({
                   currency={currency}
                   className="border-t border-neutral-300 font-semibold"
                 />
-                {hasRetentions &&
-                  billing.retentions!.map((retention) => (
-                    <tr key={retention.id} className="border-b border-neutral-200">
-                      <td className="py-1 pr-2 text-neutral-700">
-                        − {retention.name} ({Number(retention.rate)}%)
-                      </td>
-                      <td className="py-1 text-right text-neutral-900">
-                        − {formatCurrency(retention.amount, currency)}
-                      </td>
-                    </tr>
-                  ))}
-                {hasRetentions && (
-                  <TotalRow
-                    label="Neto a recibir"
-                    value={netAmount}
-                    currency={currency}
-                    className="border-t border-neutral-300 font-semibold"
-                  />
-                )}
                 {Number(billing.paidAmount) > 0 && (
                   <tr>
                     <td className="py-1 pr-2 text-green-700">Abonos recibidos</td>
