@@ -1,0 +1,9 @@
+# Copia este archivo como "key.properties" (mismo directorio) y completa
+# los valores reales. "key.properties" esta en .gitignore: nunca se sube
+# a git. Ver apps/mobile/README.md para el procedimiento completo de
+# generar la llave.
+
+storeFile=/ruta/absoluta/a/fixtrackpro-release.jks
+storePassword=
+keyAlias=fixtrackpro
+keyPassword=
