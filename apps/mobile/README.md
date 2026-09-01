@@ -255,6 +255,32 @@ los archivos empaquetados en el APK (no desde internet), así que funciona
 exactamente en el escenario en que tiene que funcionar. Después de
 editarla hay que correr `pnpm sync` para que se copie al proyecto Android.
 
+## Impresión de documentos
+
+La `WebView` de Android **no implementa `window.print()`**: la llamada
+no hace nada — no abre ningún diálogo, no lanza ningún error, el botón
+"Imprimir" simplemente parece muerto. Es una limitación de esa vista web
+como plataforma, no un defecto del código de `fixtrackpro.com` (que en
+computador y en celular por navegador imprime bien, porque ahí sí corre
+sobre un navegador real).
+
+Por eso el informe técnico, la cotización y la cuenta de cobro imprimen
+por dos caminos distintos, según dónde corre la misma build de la web
+(`apps/web/src/lib/native-print.ts`):
+
+- **Navegador**: `window.print()`, como siempre.
+- **Dentro del APK**: el plugin nativo `Print`
+  (`android/app/src/main/java/com/taelco/fixtrackpro/PrintPlugin.java`),
+  que usa `WebView.createPrintDocumentAdapter()` + `PrintManager` — ambos
+  parte del SDK de Android, sin ninguna librería de terceros — para abrir
+  el diálogo nativo de impresión/guardar PDF con el contenido actual de
+  la página.
+
+La detección (`Capacitor.isNativePlatform()`) es segura si el plugin no
+existe: sin el bridge nativo de Android inyectado en `window`, siempre da
+`false` y cae a `window.print()` sin que haga falta ningún chequeo
+adicional — la misma build de la web sirve para navegador y para el APK.
+
 ## Qué probar en un celular real
 
 Esto no se puede verificar desde acá — instala `app-debug.apk` en un
@@ -269,6 +295,11 @@ celular Android real y prueba:
       opción de tomarla con la cámara, y la foto sube correctamente.
 - [ ] **Foto desde galería**: el mismo flujo también permite elegir una
       foto ya existente del celular.
+- [ ] **Imprimir**: desde el informe técnico, la cotización y la cuenta de
+      cobro, el botón "Imprimir / Guardar PDF" abre el diálogo nativo de
+      impresión de Android (con la opción de guardar como PDF) — no se
+      queda sin hacer nada. El nombre sugerido del archivo debe ser el
+      título de la página (el mismo que usaría el navegador al guardar).
 - [ ] **Inicio de sesión**: login normal, cookies/sesión persisten al
       cerrar y volver a abrir la app.
 - [ ] **Botón atrás físico**: navega hacia atrás dentro de la app
