@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">FixTrack Pro</string>
+    <string name="title_activity_main">FixTrack Pro</string>
+    <string name="package_name">com.taelco.fixtrackpro</string>
+    <string name="custom_url_scheme">com.taelco.fixtrackpro</string>
+</resources>

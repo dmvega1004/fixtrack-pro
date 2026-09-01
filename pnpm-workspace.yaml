@@ -9,3 +9,7 @@ allowBuilds:
   prisma: true
   sharp: true
   unrs-resolver: true
+minimumReleaseAgeExclude:
+  - '@capacitor/android@8.5.1'
+  - '@capacitor/cli@8.5.1'
+  - '@capacitor/core@8.5.1'

@@ -1,0 +1,20 @@
+{
+  "name": "mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cascara nativa Android (Capacitor) para FixTrack Pro. Carga https://fixtrackpro.com; no empaqueta la app web.",
+  "scripts": {
+    "sync": "cap sync android",
+    "android:open": "cap open android",
+    "android:build:debug": "cd android && ./gradlew assembleDebug",
+    "android:build:release": "cd android && ./gradlew assembleRelease",
+    "android:clean": "cd android && ./gradlew clean"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.1",
+    "@capacitor/core": "^8.5.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.1"
+  }
+}
