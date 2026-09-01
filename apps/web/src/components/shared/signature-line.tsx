@@ -1,4 +1,12 @@
 import { cloudinaryUrl } from "@/lib/image/cloudinary-url";
+import { cn } from "@/lib/utils";
+
+/**
+ * Separación entre el borde inferior de la rúbrica y el renglón: la
+ * imagen NUNCA toca ni cruza la línea, siempre queda un margen mínimo por
+ * encima.
+ */
+const SIGNATURE_LINE_GAP_MM = 1;
 
 interface SignatureLineProps {
   /**
@@ -24,9 +32,13 @@ interface SignatureLineProps {
  * DEBAJO, como hermano de este componente en cada documento — nunca
  * cambian.
  *
- * La imagen se ancla al fondo de la línea, por ENCIMA de ella (position
- * absolute, fuera del flujo): el trazo queda "sobre" el renglón como una
- * firma real, sin empujar el nombre/cargo que sigue.
+ * La imagen se ancla al fondo de su propia caja (object-bottom), y esa
+ * caja se posiciona `SIGNATURE_LINE_GAP_MM` por ENCIMA del renglón (nunca
+ * tocándolo ni cruzándolo). El contenedor reserva exactamente esa altura
+ * — heightMm + el margen — así que, sin importar qué tan ancha o alta sea
+ * la rúbrica real, la caja de la imagen queda contenida por completo
+ * dentro del espacio reservado: no invade el contenido de arriba ni el
+ * nombre/cargo que sigue debajo.
  */
 export function SignatureLine({
   signatureImageUrl,
@@ -34,11 +46,25 @@ export function SignatureLine({
   heightMm = 22,
 }: SignatureLineProps) {
   return (
-    <div className="relative h-10 border-b border-neutral-400">
+    <div
+      className={cn(
+        "relative border-b border-neutral-400",
+        !signatureImageUrl && "h-10",
+      )}
+      style={
+        signatureImageUrl
+          ? { height: `${heightMm + SIGNATURE_LINE_GAP_MM}mm` }
+          : undefined
+      }
+    >
       {signatureImageUrl && (
         <div
-          className="pointer-events-none absolute bottom-0 left-0"
-          style={{ width: `${widthMm}mm`, height: `${heightMm}mm` }}
+          className="pointer-events-none absolute left-0"
+          style={{
+            width: `${widthMm}mm`,
+            height: `${heightMm}mm`,
+            bottom: `${SIGNATURE_LINE_GAP_MM}mm`,
+          }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element -- firma remota en Cloudinary, sin dominio fijo que declarar */}
           <img
