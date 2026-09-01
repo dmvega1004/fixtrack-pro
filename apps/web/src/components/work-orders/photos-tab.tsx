@@ -200,18 +200,21 @@ export function PhotosTab({
   }
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const fileList = event.target.files;
+    // event.target.files es un FileList VIVO, ligado al input: hay que
+    // copiarlo a un array ANTES de limpiar target.value, o la limpieza
+    // vacía esta misma lista y la función no ve ningún archivo.
+    const files = Array.from(event.target.files ?? []);
     event.target.value = ""; // permite volver a elegir el mismo archivo después
-    if (!fileList || fileList.length === 0) return;
+    if (files.length === 0) return;
 
-    if (fileList.length > MAX_BATCH_SIZE) {
+    if (files.length > MAX_BATCH_SIZE) {
       toast.error(
-        `Elegiste ${fileList.length} fotos; el máximo por tanda es ${MAX_BATCH_SIZE}. Selecciona menos e inténtalo de nuevo.`,
+        `Elegiste ${files.length} fotos; el máximo por tanda es ${MAX_BATCH_SIZE}. Selecciona menos e inténtalo de nuevo.`,
       );
       return;
     }
 
-    const queue: QueuedPhoto[] = Array.from(fileList).map((file) => ({
+    const queue: QueuedPhoto[] = files.map((file) => ({
       id: makeQueueId(),
       file,
     }));
