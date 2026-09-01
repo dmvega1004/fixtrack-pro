@@ -5,7 +5,10 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ActivityAction, OrderStatus } from 'database';
-import { ACTIVITY_ROLE_LABELS, activityAuthorName } from '../activity/activity-labels';
+import {
+  ACTIVITY_ROLE_LABELS,
+  activityAuthorName,
+} from '../activity/activity-labels';
 import { ActivityService } from '../activity/activity.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import {
