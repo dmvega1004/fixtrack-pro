@@ -8,6 +8,11 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // PrintPlugin es un plugin local (no viene de un paquete npm), asi
+        // que Capacitor no lo descubre solo: hay que registrarlo antes de
+        // super.onCreate(), que es donde se arma el bridge.
+        registerPlugin(PrintPlugin.class);
+
         super.onCreate(savedInstanceState);
 
         // El boton fisico de "atras" debe navegar dentro del historial de
