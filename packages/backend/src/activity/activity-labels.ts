@@ -1,4 +1,4 @@
-import { OrderStatus, PaymentMethod, Prisma, Priority } from 'database';
+import { OrderStatus, PaymentMethod, Prisma, Priority, Role } from 'database';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 
 /**
@@ -39,6 +39,17 @@ export const ACTIVITY_PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   CHECK: 'Cheque',
   CARD: 'Tarjeta',
   OTHER: 'Otro',
+};
+
+/**
+ * "Cargo" que se congela en WorkOrder.technicianRole al capturar una firma
+ * (ver WorkOrderSignaturesService.save) — debe reflejar exactamente
+ * ROLE_LABELS de apps/web/src/lib/roles.ts.
+ */
+export const ACTIVITY_ROLE_LABELS: Record<Role, string> = {
+  ADMIN: 'Administrador',
+  COORDINATOR: 'Coordinador',
+  TECHNICIAN: 'Técnico',
 };
 
 /** "Ana Gómez" o, si no tiene nombre cargado, su correo. Mismo autor en todos los eventos de la orden. */

@@ -5,7 +5,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ActivityAction, OrderStatus } from 'database';
-import { activityAuthorName } from '../activity/activity-labels';
+import { ACTIVITY_ROLE_LABELS, activityAuthorName } from '../activity/activity-labels';
 import { ActivityService } from '../activity/activity.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import {
@@ -87,11 +87,11 @@ export class WorkOrderSignaturesService {
 
   /**
    * PATCH /work-orders/:orderId/signatures — congela el bloque de firmas.
-   * technicianName/technicianDocument SIEMPRE se copian de el PERFIL del
-   * usuario autenticado en ESTE momento (nunca del dto): es la persona que
-   * está firmando ahora mismo como técnico, no necesariamente
-   * WorkOrder.userId — el enunciado es explícito en que ADMIN/COORDINATOR
-   * también ejecutan y firman trabajo.
+   * technicianName/technicianDocument/technicianRole SIEMPRE se copian del
+   * PERFIL y el rol del usuario autenticado en ESTE momento (nunca del
+   * dto): es la persona que está firmando ahora mismo como técnico, no
+   * necesariamente WorkOrder.userId — el enunciado es explícito en que
+   * ADMIN/COORDINATOR también ejecutan y firman trabajo.
    */
   async save(
     user: AuthenticatedUser,
@@ -120,12 +120,19 @@ export class WorkOrderSignaturesService {
             technicianSignatureUrl: dto.technicianSignatureUrl,
             technicianName: activityAuthorName(user),
             technicianDocument: actor.documentNumber,
+            technicianRole: ACTIVITY_ROLE_LABELS[user.role],
           }),
           ...(dto.receiverName !== undefined && {
             receiverName: dto.receiverName.trim(),
           }),
           ...(dto.receiverDocument !== undefined && {
             receiverDocument: dto.receiverDocument.trim(),
+          }),
+          ...(dto.receiverRole !== undefined && {
+            receiverRole: dto.receiverRole.trim(),
+          }),
+          ...(dto.receiverCompany !== undefined && {
+            receiverCompany: dto.receiverCompany.trim(),
           }),
           ...(dto.receiverSignatureUrl !== undefined && {
             receiverSignatureUrl: dto.receiverSignatureUrl,
