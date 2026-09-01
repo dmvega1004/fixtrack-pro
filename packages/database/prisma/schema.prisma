@@ -417,9 +417,18 @@ model WorkOrder {
   technicianSignatureUrl String?
   technicianName         String?
   technicianDocument     String?
+  /// FOTOGRAFÍA de la etiqueta del rol (Administrador/Coordinador/Técnico)
+  /// de quien firma, tomada AL CAPTURAR — mismo criterio que
+  /// technicianName/technicianDocument.
+  technicianRole         String?
   receiverSignatureUrl   String?
   receiverName           String?
   receiverDocument       String?
+  /// Cargo y empresa de quien recibe — siempre texto libre, igual que
+  /// receiverName/receiverDocument (quien recibe no tiene cuenta en el
+  /// sistema, así que no hay nada que "congelar" de un perfil).
+  receiverRole           String?
+  receiverCompany        String?
   /// Momento de la última captura (o recaptura) del bloque de firmas.
   signedAt               DateTime?
   /// Cliente dueño de la orden — vínculo principal. Toda orden pertenece a
