@@ -16,6 +16,7 @@ import {
 } from "@/components/work-orders/print/print-letterhead";
 import { SignatureLine } from "@/components/shared/signature-line";
 import { PrintDocumentFrame } from "@/components/shared/print-document-frame";
+import { PrintKeepTogether } from "@/components/shared/print-keep-together";
 
 const DEFAULT_FOOTNOTE =
   "Este documento constituye una solicitud de pago y no equivale a factura electrónica de venta.";
@@ -266,110 +267,123 @@ export function CollectionDocument({
           </table>
         </section>
 
-        <section className="mt-4 flex justify-end break-inside-avoid">
-          <table className="w-72 border-collapse text-sm">
-            <tbody>
-              {Number(billing.discountAmount) > 0 && (
-                <tr>
-                  <td className="py-1 pr-2 text-neutral-700">Descuento</td>
-                  <td className="py-1 text-right text-neutral-900">
-                    − {formatCurrency(billing.discountAmount, currency)}
-                  </td>
-                </tr>
-              )}
-              <TotalRow label="Subtotal" value={billing.subtotal} currency={currency} />
-              {Number(billing.taxRate) > 0 && (
-                <TotalRow
-                  label={`IVA (${Number(billing.taxRate)}%)`}
-                  value={billing.taxAmount}
-                  currency={currency}
-                />
-              )}
-              <TotalRow
-                label="Total del servicio"
-                value={billing.total}
-                currency={currency}
-                className="border-t border-neutral-300 font-semibold"
-              />
-              {hasRetentions &&
-                billing.retentions!.map((retention) => (
-                  <tr key={retention.id} className="break-inside-avoid border-b border-neutral-200">
-                    <td className="py-1 pr-2 text-neutral-700">
-                      − {retention.name} ({Number(retention.rate)}%)
-                    </td>
+        {/* Fila de tabla propia (ver PrintKeepTogether): la tabla de
+            totales, la barra de "Saldo a pagar" y el monto en letras son
+            un solo cierre económico — si no caben en lo que resta de la
+            hoja, se mueven completos a la siguiente, nunca partidos entre
+            sí. pt-6 es padding, no margin: no se pierde si el bloque abre
+            hoja nueva. */}
+        <PrintKeepTogether className="pt-6">
+          <section className="flex justify-end">
+            <table className="w-72 border-collapse text-sm">
+              <tbody>
+                {Number(billing.discountAmount) > 0 && (
+                  <tr>
+                    <td className="py-1 pr-2 text-neutral-700">Descuento</td>
                     <td className="py-1 text-right text-neutral-900">
-                      − {formatCurrency(retention.amount, currency)}
+                      − {formatCurrency(billing.discountAmount, currency)}
                     </td>
                   </tr>
-                ))}
-              {hasRetentions && (
+                )}
+                <TotalRow label="Subtotal" value={billing.subtotal} currency={currency} />
+                {Number(billing.taxRate) > 0 && (
+                  <TotalRow
+                    label={`IVA (${Number(billing.taxRate)}%)`}
+                    value={billing.taxAmount}
+                    currency={currency}
+                  />
+                )}
                 <TotalRow
-                  label="Neto a recibir"
-                  value={netAmount}
+                  label="Total del servicio"
+                  value={billing.total}
                   currency={currency}
                   className="border-t border-neutral-300 font-semibold"
                 />
+                {hasRetentions &&
+                  billing.retentions!.map((retention) => (
+                    <tr key={retention.id} className="border-b border-neutral-200">
+                      <td className="py-1 pr-2 text-neutral-700">
+                        − {retention.name} ({Number(retention.rate)}%)
+                      </td>
+                      <td className="py-1 text-right text-neutral-900">
+                        − {formatCurrency(retention.amount, currency)}
+                      </td>
+                    </tr>
+                  ))}
+                {hasRetentions && (
+                  <TotalRow
+                    label="Neto a recibir"
+                    value={netAmount}
+                    currency={currency}
+                    className="border-t border-neutral-300 font-semibold"
+                  />
+                )}
+                {Number(billing.paidAmount) > 0 && (
+                  <tr>
+                    <td className="py-1 pr-2 text-green-700">Abonos recibidos</td>
+                    <td className="py-1 text-right text-green-700">
+                      − {formatCurrency(billing.paidAmount, currency)}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </section>
+
+          <section className="mt-2 flex justify-end">
+            <div className="print-color-exact flex w-72 items-center justify-between rounded-md bg-blue-600 px-4 py-3 text-white">
+              <span className="text-sm font-bold tracking-wide uppercase">Saldo a pagar</span>
+              <span className="text-lg font-bold">{formatCurrency(balance, currency)}</span>
+            </div>
+          </section>
+
+          <p className="mt-4 text-right text-xs font-medium text-neutral-600 italic">
+            {amountInWords(balance, currency)}
+          </p>
+        </PrintKeepTogether>
+
+        {/* Fila de tabla propia: información de pago + firma institucional
+            no se parten entre hojas, y no quedan pegadas al borde superior
+            si el bloque completo abre hoja nueva (pt-16 es padding). */}
+        <PrintKeepTogether className="pt-16 pb-6">
+          <footer className="flex flex-col gap-6">
+            <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
+              <div className="flex flex-col gap-1.5 text-sm text-neutral-700">
+                <p
+                  className="break-after-avoid text-xs font-semibold tracking-wide uppercase"
+                  style={{ color: BRAND_BLUE }}
+                >
+                  Información para pago
+                </p>
+                <span>Titular: {payeeName}</span>
+                {company.bankName && <span>Entidad: {company.bankName}</span>}
+                {company.bankAccount && <span>Cuenta: {company.bankAccount}</span>}
+                <span>Condiciones: pago a {client.paymentTermDays} días</span>
+                {dueDate && <span>Fecha de vencimiento: {formatDate(dueDate)}</span>}
+              </div>
+
+              {company.signerName && (
+                <div className="flex flex-col gap-8">
+                  <SignatureLine
+                    signatureImageUrl={
+                      company.signatureInCollection ? company.signatureImageUrl : null
+                    }
+                  />
+                  <div className="flex flex-col text-sm text-neutral-800">
+                    <span className="font-medium">{company.signerName}</span>
+                    {company.signerRole && (
+                      <span className="text-xs text-neutral-500">{company.signerRole}</span>
+                    )}
+                  </div>
+                </div>
               )}
-              {Number(billing.paidAmount) > 0 && (
-                <tr>
-                  <td className="py-1 pr-2 text-green-700">Abonos recibidos</td>
-                  <td className="py-1 text-right text-green-700">
-                    − {formatCurrency(billing.paidAmount, currency)}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </section>
-
-        <section className="mt-2 flex justify-end break-inside-avoid">
-          <div className="print-color-exact flex w-72 items-center justify-between rounded-md bg-blue-600 px-4 py-3 text-white">
-            <span className="text-sm font-bold tracking-wide uppercase">Saldo a pagar</span>
-            <span className="text-lg font-bold">{formatCurrency(balance, currency)}</span>
-          </div>
-        </section>
-
-        <p className="mt-4 text-right text-xs font-medium text-neutral-600 italic">
-          {amountInWords(balance, currency)}
-        </p>
-
-        <footer className="mt-10 flex flex-col gap-6 break-inside-avoid">
-          <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
-            <div className="flex flex-col gap-1.5 text-sm text-neutral-700">
-              <p
-                className="break-after-avoid text-xs font-semibold tracking-wide uppercase"
-                style={{ color: BRAND_BLUE }}
-              >
-                Información para pago
-              </p>
-              <span>Titular: {payeeName}</span>
-              {company.bankName && <span>Entidad: {company.bankName}</span>}
-              {company.bankAccount && <span>Cuenta: {company.bankAccount}</span>}
-              <span>Condiciones: pago a {client.paymentTermDays} días</span>
-              {dueDate && <span>Fecha de vencimiento: {formatDate(dueDate)}</span>}
             </div>
 
-            {company.signerName && (
-              <div className="flex flex-col gap-8">
-                <SignatureLine
-                  signatureImageUrl={
-                    company.signatureInCollection ? company.signatureImageUrl : null
-                  }
-                />
-                <div className="flex flex-col text-sm text-neutral-800">
-                  <span className="font-medium">{company.signerName}</span>
-                  {company.signerRole && (
-                    <span className="text-xs text-neutral-500">{company.signerRole}</span>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <p className="text-center text-xs text-neutral-500 italic">
-            {company.collectionDocFootnote ?? DEFAULT_FOOTNOTE}
-          </p>
-        </footer>
+            <p className="text-center text-xs text-neutral-500 italic">
+              {company.collectionDocFootnote ?? DEFAULT_FOOTNOTE}
+            </p>
+          </footer>
+        </PrintKeepTogether>
       </PrintDocumentFrame>
     </div>
   );
