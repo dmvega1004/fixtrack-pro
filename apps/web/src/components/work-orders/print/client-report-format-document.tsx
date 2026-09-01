@@ -4,6 +4,7 @@ import type { Attachment } from "@/lib/api/attachments";
 import { formatOrderNumber } from "@/lib/format/order-number";
 import { formatDate, formatTime, formatTimeOnly } from "@/lib/format/dates";
 import { PrintDocumentFrame } from "@/components/shared/print-document-frame";
+import { PrintKeepTogether } from "@/components/shared/print-keep-together";
 import { PrintPhotoGrid } from "@/components/shared/print-photo-grid";
 import { SignatureLine } from "@/components/shared/signature-line";
 
@@ -129,6 +130,7 @@ function SignatureColumn({
   signatureImageUrl,
   name,
   document,
+  role,
 }: {
   title: string;
   companyValue: string;
@@ -136,15 +138,17 @@ function SignatureColumn({
   signatureImageUrl?: string | null;
   name?: string | null;
   document?: string | null;
+  /** Cargo: technicianRole (congelado del rol) del lado ENTREGA, receiverRole (texto libre) del lado RECIBE. */
+  role?: string | null;
 }) {
   return (
-    <div className="flex flex-col gap-8 break-inside-avoid">
+    <div className="flex flex-col gap-8">
       <SignatureLine signatureImageUrl={signatureImageUrl} widthMm={40} heightMm={18} />
       <div className="flex flex-col gap-2 text-xs text-neutral-700">
         <span className="text-sm font-semibold text-neutral-900">{title}</span>
         <span>Nombre: {name || "____________________________"}</span>
         <span>Documento: {document || "____________________________"}</span>
-        <span>Cargo: ____________________________</span>
+        <span>Cargo: {role || "____________________________"}</span>
         <span>
           Empresa: {companyValue ? companyValue : "____________________________"}
         </span>
@@ -293,23 +297,30 @@ export function ClientReportFormatDocument({
             <PhotosSection label={photosLabel} photos={photos} accentColor={accentColor} />
           )}
 
-          {/* 4. Bloque de firmas */}
-          <div className="mt-4 grid grid-cols-1 gap-10 break-inside-avoid sm:grid-cols-2">
-            <SignatureColumn
-              title="ENTREGA"
-              companyValue={client.reportFormatIssuer ?? ""}
-              signatureImageUrl={order.technicianSignatureUrl}
-              name={order.technicianName}
-              document={order.technicianDocument}
-            />
-            <SignatureColumn
-              title="RECIBE"
-              companyValue=""
-              signatureImageUrl={order.receiverSignatureUrl}
-              name={order.receiverName}
-              document={order.receiverDocument}
-            />
-          </div>
+          {/* 4. Bloque de firmas: fila de tabla propia (ver
+              PrintKeepTogether) — no se parte entre hojas, y el pt-16/pb-10
+              (padding, no margin) sobrevive aunque el bloque abra hoja
+              nueva, a diferencia del mt-4 anterior. */}
+          <PrintKeepTogether className="pt-16 pb-10">
+            <div className="grid grid-cols-1 gap-10 sm:grid-cols-2">
+              <SignatureColumn
+                title="ENTREGA"
+                companyValue={client.reportFormatIssuer ?? ""}
+                signatureImageUrl={order.technicianSignatureUrl}
+                name={order.technicianName}
+                document={order.technicianDocument}
+                role={order.technicianRole}
+              />
+              <SignatureColumn
+                title="RECIBE"
+                companyValue={order.receiverCompany ?? ""}
+                signatureImageUrl={order.receiverSignatureUrl}
+                name={order.receiverName}
+                document={order.receiverDocument}
+                role={order.receiverRole}
+              />
+            </div>
+          </PrintKeepTogether>
         </div>
       </PrintDocumentFrame>
     </div>
