@@ -10,6 +10,11 @@ const config: CapacitorConfig = {
   server: {
     url: 'https://fixtrackpro.com',
     androidScheme: 'https',
+    // Si falla la carga de la pagina principal (sin red, DNS, etc.), la
+    // vista web muestra esta pagina local en vez del error del navegador.
+    // Se sirve desde los assets empaquetados (www/offline.html), no desde
+    // fixtrackpro.com, asi que funciona exactamente cuando no hay conexion.
+    errorPath: 'offline.html',
   },
 };
 

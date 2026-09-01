@@ -38,4 +38,15 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
+      Camara: la necesita el escaner de codigos QR y la captura de fotos
+      desde la web. No basta con este permiso: la vista web tambien debe
+      conceder la solicitud (ver BridgeWebChromeClient, ya incluido por
+      Capacitor). android:required="false" en el uses-feature evita que
+      Google Play bloquee la instalacion en equipos sin camara.
+    -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 </manifest>
