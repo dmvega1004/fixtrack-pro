@@ -13,6 +13,7 @@ import { formatCurrency } from "@/lib/format/currency";
 import { cn } from "@/lib/utils";
 import { SignatureLine } from "@/components/shared/signature-line";
 import { PrintDocumentFrame } from "@/components/shared/print-document-frame";
+import { PrintKeepTogether } from "@/components/shared/print-keep-together";
 import { PrintPhotoGrid } from "@/components/shared/print-photo-grid";
 import { PrintLetterhead, PRINT_BRAND_BLUE as BRAND_BLUE } from "./print-letterhead";
 
@@ -116,12 +117,18 @@ function SignatureBox({
   signatureImageUrl,
   name,
   document,
+  role,
+  company,
 }: {
   title: string;
   /** Firma PERSONAL capturada en sitio (Módulo de Firmas) — técnico o quien recibe. */
   signatureImageUrl?: string | null;
   name?: string | null;
   document?: string | null;
+  /** Cargo: technicianRole (congelado del rol) o receiverRole (texto libre). */
+  role?: string | null;
+  /** Solo el lado de quien recibe la trae (receiverCompany) — el técnico no tiene "empresa" en este documento, ya lleva el membrete de la propia. */
+  company?: string | null;
 }) {
   return (
     <div className="flex flex-col gap-8">
@@ -130,6 +137,10 @@ function SignatureBox({
         <span className="font-medium text-neutral-800">{title}</span>
         <span>Nombre: {name || "____________________________"}</span>
         <span>Documento: {document || "____________________________"}</span>
+        <span>Cargo: {role || "____________________________"}</span>
+        {company !== undefined && (
+          <span>Empresa: {company || "____________________________"}</span>
+        )}
       </div>
     </div>
   );
@@ -450,22 +461,30 @@ export function WorkOrderPrintDocument({
           </section>
         )}
 
-        <footer className="mt-10 flex flex-col gap-8 break-inside-avoid">
+        {/* Fila de tabla propia (ver PrintKeepTogether): así el bloque
+            entero de firmas se mueve completo a la hoja siguiente si no
+            cabe, nunca partido entre las rúbricas y sus datos. pt-16/pb-10
+            son padding, no margin, en el <td> — ese espacio no se pierde
+            si el bloque termina abriendo hoja nueva. */}
+        <PrintKeepTogether className="pt-16 pb-10">
           <div className="grid grid-cols-1 gap-10 sm:grid-cols-2">
             <SignatureBox
               title="Técnico responsable"
               signatureImageUrl={order.technicianSignatureUrl}
               name={order.technicianName}
               document={order.technicianDocument}
+              role={order.technicianRole}
             />
             <SignatureBox
               title="Recibido por el cliente"
               signatureImageUrl={order.receiverSignatureUrl}
               name={order.receiverName}
               document={order.receiverDocument}
+              role={order.receiverRole}
+              company={order.receiverCompany}
             />
           </div>
-        </footer>
+        </PrintKeepTogether>
       </PrintDocumentFrame>
     </div>
   );
