@@ -6,12 +6,14 @@ import {
   PRIORITY_LABELS,
   type Priority,
 } from "@/components/shared/priority-badge";
+import { useOnlineStatus } from "@/hooks/use-online-status";
 
 const PRIORITIES = Object.keys(PRIORITY_LABELS) as Priority[];
 
 export function PriorityFilterSelect() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const isOnline = useOnlineStatus();
   const currentPriority = searchParams.get("priority") ?? "";
 
   function handleChange(event: ChangeEvent<HTMLSelectElement>) {
@@ -29,8 +31,9 @@ export function PriorityFilterSelect() {
     <select
       value={currentPriority}
       onChange={handleChange}
+      disabled={!isOnline}
       aria-label="Filtrar por prioridad"
-      className="h-8 rounded-lg border border-border bg-background px-2.5 text-sm text-foreground"
+      className="h-8 rounded-lg border border-border bg-background px-2.5 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-50"
     >
       <option value="">Todas las prioridades</option>
       {PRIORITIES.map((priority) => (

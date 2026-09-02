@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { useOnlineStatus } from "@/hooks/use-online-status";
 
 const DEBOUNCE_MS = 400;
 
@@ -26,6 +27,7 @@ interface OrdersSearchInputProps {
 export function OrdersSearchInput({ initialValue }: OrdersSearchInputProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const isOnline = useOnlineStatus();
   const [value, setValue] = useState(initialValue);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -64,25 +66,37 @@ export function OrdersSearchInput({ initialValue }: OrdersSearchInputProps) {
   }
 
   return (
-    <div className="relative w-full sm:max-w-xs">
-      <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-      <Input
-        type="text"
-        value={value}
-        onChange={handleChange}
-        placeholder="Buscar por OT, cliente, NIT o descripción..."
-        aria-label="Buscar órdenes"
-        className="pl-8 pr-8"
-      />
-      {value && (
-        <button
-          type="button"
-          onClick={handleClear}
-          aria-label="Limpiar búsqueda"
-          className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <X className="size-3.5" />
-        </button>
+    <div className="flex flex-col gap-1">
+      <div className="relative w-full sm:max-w-xs">
+        <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          type="text"
+          value={value}
+          onChange={handleChange}
+          disabled={!isOnline}
+          placeholder={
+            isOnline
+              ? "Buscar por OT, cliente, NIT o descripción..."
+              : "Búsqueda no disponible sin conexión"
+          }
+          aria-label="Buscar órdenes"
+          className="pl-8 pr-8"
+        />
+        {value && isOnline && (
+          <button
+            type="button"
+            onClick={handleClear}
+            aria-label="Limpiar búsqueda"
+            className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <X className="size-3.5" />
+          </button>
+        )}
+      </div>
+      {!isOnline && (
+        <p className="text-xs text-muted-foreground">
+          Sin conexión — la búsqueda y los filtros de abajo no están disponibles.
+        </p>
       )}
     </div>
   );

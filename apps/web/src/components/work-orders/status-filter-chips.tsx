@@ -1,9 +1,12 @@
+"use client";
+
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import {
   ORDER_STATUS_LABELS,
   type OrderStatus,
 } from "@/components/shared/status-chip";
+import { useOnlineStatus } from "@/hooks/use-online-status";
 
 const STATUSES = Object.keys(ORDER_STATUS_LABELS) as OrderStatus[];
 
@@ -19,6 +22,14 @@ export function StatusFilterChips({
   currentPriority,
   currentSearch,
 }: StatusFilterChipsProps) {
+  // Sin conexión, cambiar de chip navegaría a una URL cuyo fetch va a
+  // fallar: el service worker la serviría desde su caché ignorando la
+  // cadena de consulta (ver apps/mobile.../sw.js, ignoreSearch), así que
+  // el filtro ni se aplicaría ni daría error — solo confundiría. Se
+  // desactivan en vez de arriesgar eso; la explicación vive junto al
+  // buscador (OrdersSearchInput), justo arriba de esto en la página.
+  const isOnline = useOnlineStatus();
+
   function hrefFor(status?: OrderStatus): string {
     const params = new URLSearchParams();
     if (status) params.set("status", status);
@@ -34,6 +45,20 @@ export function StatusFilterChips({
       active
         ? "bg-primary text-primary-foreground"
         : "bg-muted text-muted-foreground hover:text-foreground",
+      !isOnline && "pointer-events-none opacity-50",
+    );
+  }
+
+  if (!isOnline) {
+    return (
+      <div className="flex flex-wrap gap-2">
+        <span className={chipClasses(!currentStatus)}>Todas</span>
+        {STATUSES.map((status) => (
+          <span key={status} className={chipClasses(currentStatus === status)}>
+            {ORDER_STATUS_LABELS[status]}
+          </span>
+        ))}
+      </div>
     );
   }
 

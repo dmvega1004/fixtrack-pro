@@ -125,14 +125,16 @@ export default async function OrdenesPage({ searchParams }: OrdenesPageProps) {
         <PriorityFilterSelect />
       </div>
 
-      {workOrders.length === 0 ? (
-        search ? (
-          <EmptySearchState term={search} clearHref={clearSearchHref} />
+      {unassignedOnly ? (
+        workOrders.length === 0 ? (
+          search ? (
+            <EmptySearchState term={search} clearHref={clearSearchHref} />
+          ) : (
+            <EmptyOrdersState />
+          )
         ) : (
-          <EmptyOrdersState />
+          <WorkOrdersList workOrders={workOrders} />
         )
-      ) : unassignedOnly ? (
-        <WorkOrdersList workOrders={workOrders} />
       ) : (
         <OrdersListWithLoadMore
           // Nueva combinación de filtros (incluida la búsqueda): remonta el
@@ -142,6 +144,8 @@ export default async function OrdenesPage({ searchParams }: OrdenesPageProps) {
           initialOrders={workOrders}
           total={total}
           filters={{ status, priority, search, equipmentId }}
+          search={search}
+          clearSearchHref={clearSearchHref}
         />
       )}
     </div>
