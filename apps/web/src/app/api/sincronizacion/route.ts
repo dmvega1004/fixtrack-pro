@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
 import type { OrderStatus } from "@/components/shared/status-chip";
 import { getSession } from "@/lib/session";
-import { getWorkOrders, type WorkOrder } from "@/lib/api/work-orders";
-import { getPhotos, type Attachment } from "@/lib/api/attachments";
-import { getWorkOrderParts, type WorkOrderPartsSummary } from "@/lib/api/work-order-parts";
+import { getWorkOrders } from "@/lib/api/work-orders";
+import { getPhotos } from "@/lib/api/attachments";
+import { getWorkOrderParts } from "@/lib/api/work-order-parts";
 import { HttpError } from "@/lib/api/http";
-
-/** Sube cuando cambie la forma de este JSON, para poder migrar lo guardado en el celular. */
-const PAYLOAD_VERSION = 1;
+import { SYNC_PAYLOAD_VERSION } from "@/lib/sync/payload-version";
+import type { SyncPayload, SyncWorkOrder } from "@/lib/sync/types";
 
 /**
  * Igual que TERMINAL_STATUSES en ordenes/[id]/page.tsx, invertido: el
@@ -30,17 +29,6 @@ const NON_TERMINAL_STATUSES: OrderStatus[] = ["PENDING", "IN_PROGRESS", "COMPLET
  * combina, se ordena y se recorta al total — ver GET() más abajo.
  */
 const MAX_SYNC_ORDERS = 50;
-
-interface SyncWorkOrder extends WorkOrder {
-  photos: Attachment[];
-  parts: WorkOrderPartsSummary;
-}
-
-interface SyncResponseBody {
-  syncedAt: string;
-  payloadVersion: number;
-  orders: SyncWorkOrder[];
-}
 
 /**
  * GET /api/sincronizacion — el conjunto de trabajo pendiente del usuario
@@ -91,9 +79,9 @@ export async function GET() {
       }),
     );
 
-    const body: SyncResponseBody = {
+    const body: SyncPayload = {
       syncedAt: new Date().toISOString(),
-      payloadVersion: PAYLOAD_VERSION,
+      payloadVersion: SYNC_PAYLOAD_VERSION,
       orders,
     };
 
