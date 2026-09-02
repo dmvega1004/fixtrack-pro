@@ -174,6 +174,7 @@ model Company {
   retentions            Retention[]
   clientRetentions      ClientRetention[]
   workOrderRetentions   WorkOrderRetention[]
+  idempotencyKeys       IdempotencyKey[]
 }
 
 model User {
@@ -211,6 +212,9 @@ model User {
   /// Cotizaciones que este usuario creó; sobrevive a su eliminación
   /// (createdById queda en null, la cotización no se toca).
   quotesCreated      Quote[]
+  /// Llaves de idempotencia de operaciones que este usuario disparó;
+  /// sobrevive a su eliminación (userId queda en null).
+  idempotencyKeys    IdempotencyKey[]
 
   @@index([companyId])
 }
@@ -849,4 +853,40 @@ model QuoteEquipment {
   @@index([companyId])
   @@index([quoteId])
   @@index([equipmentId])
+}
+
+/// Registro de operaciones de escritura ya procesadas, para que un
+/// reintento con la misma llave (cabecera Idempotency-Key) devuelva la
+/// respuesta guardada en vez de ejecutar de nuevo — ver
+/// IdempotencyInterceptor en el backend. Única por EMPRESA (companyId +
+/// key), no global: dos empresas pueden generar la misma llave sin
+/// pisarse.
+///
+/// reservedAt vs. createdAt: createdAt queda fijo desde el primer
+/// intento (lo usa la purga por antigüedad, ver
+/// scripts/purge-idempotency-keys.ts); reservedAt se actualiza cada vez
+/// que una petición "reclama" la llave — la primera vez, o al retomar una
+/// reserva abandonada tras RESERVATION_WINDOW_MS sin completarse (por
+/// ejemplo, el proceso murió a mitad de la operación). Con responseBody
+/// en null, la fila está reservada pero todavía sin terminar.
+model IdempotencyKey {
+  id           String   @id @default(uuid())
+  key          String
+  companyId    String
+  company      Company  @relation(fields: [companyId], references: [id])
+  /// SetNull (no Cascade): igual criterio que Payment.registeredBy o
+  /// ActivityLog.user — el registro de la operación sobrevive aunque el
+  /// usuario que la disparó se elimine después.
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  /// Identificador libre de la operación protegida (ej. "payments.create")
+  /// — String, no enum: sumar una operación nueva no debe pedir migración.
+  operation    String
+  reservedAt   DateTime
+  statusCode   Int?
+  responseBody Json?
+  createdAt    DateTime @default(now())
+
+  @@unique([companyId, key])
+  @@index([createdAt])
 }
