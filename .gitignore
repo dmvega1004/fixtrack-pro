@@ -31,3 +31,14 @@ pnpm-debug.log*
 
 # --- Respaldos de base de datos (contienen datos de clientes, nunca a git) ---
 /backups/
+
+# --- Documentos internos (costos, márgenes, precios: nunca a git) ---
+FixTrack_Pro_Precios_y_Monetizacion.pdf
+
+# --- Firma digital y llave de firma de la app (nunca a git) ---
+firma_*.png
+*.jks
+key.properties
+
+# --- Configuración local del agente ---
+.claude/
