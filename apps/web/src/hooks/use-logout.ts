@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { clearOfflineCaches } from "@/lib/offline-cache";
 
 export function useLogout() {
   const router = useRouter();
@@ -12,6 +13,7 @@ export function useLogout() {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
     } finally {
+      await clearOfflineCaches();
       setIsLoading(false);
       router.push("/login");
       router.refresh();
