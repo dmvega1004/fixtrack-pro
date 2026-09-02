@@ -28,6 +28,7 @@ import { PhotosTab } from "@/components/work-orders/photos-tab";
 import { ActivityTab } from "@/components/work-orders/activity-tab";
 import { EquipmentSection } from "@/components/work-orders/equipment-section";
 import { CollectionDocumentButton } from "@/components/work-orders/collection-document-button";
+import { OrderDetailGate } from "@/components/work-orders/order-detail-gate";
 
 const TERMINAL_STATUSES = ["DELIVERED", "CANCELLED"];
 
@@ -91,98 +92,104 @@ export default async function OrdenDetallePage({
   ]);
 
   return (
-    <div className="flex flex-1 flex-col pb-36 md:pb-6">
-      <div className="flex flex-col gap-3 border-b border-border p-4 md:p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-semibold md:text-3xl">
-              {formatOrderNumber(order.orderNumber)}
-            </h1>
-            <StatusChip status={order.status} />
-            <PriorityBadge priority={order.priority} />
-            <ServiceTypeBadge serviceType={order.serviceType} />
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href={`/ordenes/${order.id}/imprimir`}
-              className={buttonVariants({ variant: "outline", size: "sm" })}
-            >
-              <Printer className="size-4" />
-              Imprimir orden
-            </Link>
-            {client.reportFormatEnabled && (
+    // Sin conexión, esto se reemplaza ENTERO por una vista de solo lectura
+    // propia (ver order-detail-gate.tsx) — nunca este árbol, que trae en
+    // vivo todos los botones de escritura del detalle (cambiar estado,
+    // editar, firmar, fotos, repuestos, imprimir, cuenta de cobro...).
+    <OrderDetailGate orderId={order.id}>
+      <div className="flex flex-1 flex-col pb-36 md:pb-6">
+        <div className="flex flex-col gap-3 border-b border-border p-4 md:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-2xl font-semibold md:text-3xl">
+                {formatOrderNumber(order.orderNumber)}
+              </h1>
+              <StatusChip status={order.status} />
+              <PriorityBadge priority={order.priority} />
+              <ServiceTypeBadge serviceType={order.serviceType} />
+            </div>
+            <div className="flex flex-wrap gap-2">
               <Link
-                href={`/ordenes/${order.id}/formato-cliente`}
+                href={`/ordenes/${order.id}/imprimir`}
                 className={buttonVariants({ variant: "outline", size: "sm" })}
               >
                 <Printer className="size-4" />
-                Imprimir formato del cliente
+                Imprimir orden
               </Link>
-            )}
-            {isAdmin && isClosed && (
-              <CollectionDocumentButton
-                orderId={order.id}
-                collectionNumber={order.collectionNumber}
-                docTitle={company.collectionDocTitle}
-              />
-            )}
+              {client.reportFormatEnabled && (
+                <Link
+                  href={`/ordenes/${order.id}/formato-cliente`}
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                >
+                  <Printer className="size-4" />
+                  Imprimir formato del cliente
+                </Link>
+              )}
+              {isAdmin && isClosed && (
+                <CollectionDocumentButton
+                  orderId={order.id}
+                  collectionNumber={order.collectionNumber}
+                  docTitle={company.collectionDocTitle}
+                />
+              )}
+            </div>
           </div>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          {formatDate(order.createdAt)}
-        </p>
-        <p className="line-clamp-2 text-sm">{order.description}</p>
+          <p className="text-xs text-muted-foreground">
+            {formatDate(order.createdAt)}
+          </p>
+          <p className="line-clamp-2 text-sm">{order.description}</p>
 
-        <EquipmentSection
+          <EquipmentSection
+            orderId={order.id}
+            clientName={order.client.name}
+            equipments={order.equipments}
+            clientEquipments={clientEquipments}
+            canManage={canManage}
+            isTerminal={isTerminal}
+          />
+        </div>
+
+        <OrderStatusChanger
           orderId={order.id}
-          clientName={order.client.name}
-          equipments={order.equipments}
-          clientEquipments={clientEquipments}
-          canManage={canManage}
+          currentStatus={order.status}
           isTerminal={isTerminal}
         />
+
+        <OrderTabs
+          detalles={
+            <DetailsTab
+              order={order}
+              canManage={canManage}
+              isAdmin={isAdmin}
+              technicians={technicians}
+              isTerminal={isTerminal}
+              myProfile={myProfile}
+            />
+          }
+          repuestos={
+            <PartsTab
+              orderId={order.id}
+              summary={partsSummary}
+              catalog={catalog}
+              isTerminal={isTerminal}
+              currency={company.currency}
+              isAdmin={isAdmin}
+              isClosed={isClosed}
+              payments={payments}
+              collectionNumber={order.collectionNumber}
+              retentionCatalog={retentionCatalog}
+            />
+          }
+          fotos={
+            <PhotosTab
+              orderId={order.id}
+              initialPhotos={photos}
+              isTerminal={isTerminal}
+            />
+          }
+          historial={<ActivityTab entries={activityLog} />}
+        />
       </div>
-
-      <OrderStatusChanger
-        orderId={order.id}
-        currentStatus={order.status}
-        isTerminal={isTerminal}
-      />
-
-      <OrderTabs
-        detalles={
-          <DetailsTab
-            order={order}
-            canManage={canManage}
-            isAdmin={isAdmin}
-            technicians={technicians}
-            isTerminal={isTerminal}
-            myProfile={myProfile}
-          />
-        }
-        repuestos={
-          <PartsTab
-            orderId={order.id}
-            summary={partsSummary}
-            catalog={catalog}
-            isTerminal={isTerminal}
-            currency={company.currency}
-            isAdmin={isAdmin}
-            isClosed={isClosed}
-            payments={payments}
-            collectionNumber={order.collectionNumber}
-            retentionCatalog={retentionCatalog}
-          />
-        }
-        fotos={
-          <PhotosTab
-            orderId={order.id}
-            initialPhotos={photos}
-            isTerminal={isTerminal}
-          />
-        }
-        historial={<ActivityTab entries={activityLog} />}
-      />
-    </div>
+    </OrderDetailGate>
   );
 }
