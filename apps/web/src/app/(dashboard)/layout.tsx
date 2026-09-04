@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/api/auth";
 import { AppShell } from "@/components/shared/app-shell";
 import { OfflineBanner } from "@/components/shared/offline-banner";
 import { SyncEngineRegister } from "@/components/shared/sync-engine-register";
+import { QueueEngineRegister } from "@/components/shared/queue-engine-register";
 
 export default async function DashboardLayout({
   children,
@@ -31,6 +32,7 @@ export default async function DashboardLayout({
   return (
     <div className="flex min-h-svh flex-1 flex-col">
       <SyncEngineRegister userId={session.userId} />
+      <QueueEngineRegister userId={session.userId} />
       <OfflineBanner />
       <AppShell session={session}>{children}</AppShell>
     </div>

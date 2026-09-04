@@ -1,6 +1,7 @@
 "use client";
 
 import type { SyncPayload } from "./types";
+import { openDb, WORKSET_STORE as STORE_NAME } from "./db";
 
 /**
  * IndexedDB, no localStorage: el conjunto de trabajo trae fotos (URLs) y
@@ -8,10 +9,11 @@ import type { SyncPayload } from "./types";
  * típicos de localStorage, y su API es síncrona (bloquea el hilo principal
  * al leer/escribir un JSON grande). Una sola entrada de tamaño variable,
  * se reemplaza entera en cada sincronización — no hay merge por orden.
+ *
+ * La apertura de la base vive en ./db.ts — compartida con la cola de
+ * cambios pendientes (../queue/storage.ts, Etapa 2-B), misma base,
+ * tienda separada.
  */
-const DB_NAME = "fixtrack-sync";
-const DB_VERSION = 1;
-const STORE_NAME = "workset";
 /** Única clave usada: siempre hay a lo sumo un registro en todo el store. */
 const RECORD_KEY = "current";
 
@@ -21,22 +23,6 @@ export interface StoredWorkset {
   syncedAt: string;
   payloadVersion: number;
   payload: SyncPayload;
-}
-
-function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME);
-      }
-    };
-
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
 }
 
 export async function saveWorkset(record: StoredWorkset): Promise<void> {
