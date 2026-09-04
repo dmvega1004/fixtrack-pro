@@ -2,19 +2,18 @@ import type { WorkOrder, WorkOrderEquipment } from "@/lib/api/work-orders";
 import type { Client } from "@/lib/api/clients";
 import type { Company } from "@/lib/api/company";
 import type { Attachment } from "@/lib/api/attachments";
-import type { WorkOrderPartsSummary } from "@/lib/api/work-order-parts";
 import { DOCUMENT_TYPE_LABELS, type DocumentType } from "@/lib/document-type";
 import { ORDER_STATUS_LABELS } from "@/components/shared/status-chip";
 import { PRIORITY_LABELS } from "@/components/shared/priority-badge";
 import { SERVICE_TYPE_LABELS } from "@/components/shared/service-type-badge";
 import { formatOrderNumber } from "@/lib/format/order-number";
 import { formatDate } from "@/lib/format/dates";
-import { formatCurrency } from "@/lib/format/currency";
 import { cn } from "@/lib/utils";
 import { SignatureLine } from "@/components/shared/signature-line";
 import { PrintDocumentFrame } from "@/components/shared/print-document-frame";
 import { PrintKeepTogether } from "@/components/shared/print-keep-together";
 import { PrintPhotoGrid } from "@/components/shared/print-photo-grid";
+import { QrCodeImage } from "@/components/equipment/qr-code-image";
 import { PrintLetterhead, PRINT_BRAND_BLUE as BRAND_BLUE } from "./print-letterhead";
 
 interface WorkOrderPrintDocumentProps {
@@ -23,7 +22,6 @@ interface WorkOrderPrintDocumentProps {
   equipments: WorkOrderEquipment[];
   client: Client;
   company: Company;
-  partsSummary: WorkOrderPartsSummary;
   photos: Attachment[];
 }
 
@@ -88,30 +86,6 @@ function Callout({
   );
 }
 
-function BillingRow({
-  label,
-  value,
-  currency,
-  negative,
-  className,
-}: {
-  label: string;
-  value: string;
-  currency: string;
-  negative?: boolean;
-  className?: string;
-}) {
-  return (
-    <tr className={className}>
-      <td className="py-1 pr-2 text-neutral-700">{label}</td>
-      <td className="py-1 text-right text-neutral-900">
-        {negative ? "− " : ""}
-        {formatCurrency(value, currency)}
-      </td>
-    </tr>
-  );
-}
-
 function SignatureBox({
   title,
   signatureImageUrl,
@@ -151,19 +125,8 @@ export function WorkOrderPrintDocument({
   equipments,
   client,
   company,
-  partsSummary,
   photos,
 }: WorkOrderPrintDocumentProps) {
-  const billing = partsSummary.billing;
-  // RBAC financiero: billing/totalSale/unitPrice vienen omitidos del todo
-  // para TECHNICIAN (ver WorkOrderPartsService.listParts) — sin ningún
-  // valor que mostrar en este informe.
-  const hasFinancials = billing !== undefined && partsSummary.totalSale !== undefined;
-  const conceptsTotal = (partsSummary.concepts ?? []).reduce(
-    (sum, concept) => sum + Number(concept.quantity) * Number(concept.unitPrice),
-    0,
-  );
-
   const documentLabel =
     client.documentType && client.documentNumber
       ? `${DOCUMENT_TYPE_LABELS[client.documentType as DocumentType] ?? client.documentType} ${client.documentNumber}`
@@ -201,18 +164,14 @@ export function WorkOrderPrintDocument({
           <MetaItem label="Cliente" value={clientMeta} />
           <MetaItem label="Estado" value={ORDER_STATUS_LABELS[order.status]} />
           <MetaItem label="Tipo de servicio" value={SERVICE_TYPE_LABELS[order.serviceType]} />
+          {/* Contacto del cliente, solo cuando existe — antes vivía en su
+              propia sección "Datos del cliente", duplicando nombre/documento
+              que ya están arriba en "Cliente". Se fusiona acá para que el
+              cliente aparezca una sola vez en todo el documento. */}
+          {client.phone && <MetaItem label="Teléfono" value={client.phone} />}
+          {client.email && <MetaItem label="Correo" value={client.email} />}
+          {client.address && <MetaItem label="Dirección" value={client.address} />}
         </div>
-
-        <section className="mt-6 flex flex-col gap-3">
-          <SectionTitle>Datos del cliente</SectionTitle>
-          <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
-            <Field label="Nombre" value={client.name} />
-            <Field label="Documento" value={documentLabel} />
-            <Field label="Teléfono" value={client.phone} />
-            <Field label="Correo" value={client.email} />
-            <Field label="Dirección" value={client.address} />
-          </div>
-        </section>
 
         {equipments.length === 1 && (
           <section className="mt-6 flex flex-col gap-3">
@@ -222,7 +181,19 @@ export function WorkOrderPrintDocument({
               <Field label="Modelo" value={equipments[0].model} />
               <Field label="Serial" value={equipments[0].serialNumber} />
               <Field label="Ubicación" value={equipments[0].location} />
-              <Field label="Código QR" value={equipments[0].qrCode} />
+              {/* QR real en vez del identificador crudo — nadie puede hacer
+                  nada con un UUID impreso como texto. Discreto a propósito
+                  (56px): es un complemento para escanear, no el
+                  protagonista del bloque. Sin qrCode, se omite el campo
+                  entero — nunca cae de vuelta al identificador crudo. */}
+              {equipments[0].qrCode && (
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[11px] font-medium tracking-wide text-neutral-500 uppercase">
+                    Código QR
+                  </span>
+                  <QrCodeImage value={equipments[0].qrCode} size={56} />
+                </div>
+              )}
             </div>
           </section>
         )}
@@ -286,166 +257,6 @@ export function WorkOrderPrintDocument({
               {order.suggestions}
             </Callout>
           </div>
-        )}
-
-        <section className="mt-6 flex flex-col gap-3">
-          <SectionTitle>Repuestos</SectionTitle>
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="break-after-avoid border-b border-neutral-400 text-left text-[11px] tracking-wide text-neutral-500 uppercase">
-                <th className="py-1.5 pr-2 font-medium">Repuesto</th>
-                <th className="py-1.5 pr-2 font-medium">SKU</th>
-                <th className="py-1.5 pr-2 text-right font-medium">Cant.</th>
-                {hasFinancials && (
-                  <>
-                    <th className="py-1.5 pr-2 text-right font-medium">
-                      Precio unitario
-                    </th>
-                    <th className="py-1.5 text-right font-medium">Subtotal</th>
-                  </>
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {partsSummary.items.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={hasFinancials ? 5 : 3}
-                    className="py-3 text-center text-neutral-500"
-                  >
-                    No se utilizaron repuestos en esta orden.
-                  </td>
-                </tr>
-              ) : (
-                partsSummary.items.map((item) => {
-                  const unitPrice =
-                    item.unitPrice !== undefined ? Number(item.unitPrice) : undefined;
-                  const subtotal =
-                    unitPrice !== undefined ? unitPrice * item.quantity : undefined;
-                  return (
-                    <tr key={item.id} className="break-inside-avoid border-b border-neutral-200">
-                      <td className="py-1.5 pr-2">{item.sparePart.name}</td>
-                      <td className="py-1.5 pr-2 text-neutral-600">
-                        {item.sparePart.sku}
-                      </td>
-                      <td className="py-1.5 pr-2 text-right">{item.quantity}</td>
-                      {hasFinancials && unitPrice !== undefined && subtotal !== undefined && (
-                        <>
-                          <td className="py-1.5 pr-2 text-right">
-                            {formatCurrency(unitPrice, company.currency)}
-                          </td>
-                          <td className="py-1.5 text-right">
-                            {formatCurrency(subtotal, company.currency)}
-                          </td>
-                        </>
-                      )}
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </section>
-
-        {/* Conceptos: describen lo que se ejecutó, así que se muestran sin
-            costos incluso cuando hasFinancials es true — a diferencia de la
-            tabla de repuestos de arriba. Omitido por completo si la orden no
-            tiene conceptos o si el rol no los recibe (ver
-            WorkOrderPartsService.listParts: TECHNICIAN nunca recibe
-            partsSummary.concepts). */}
-        {partsSummary.concepts && partsSummary.concepts.length > 0 && (
-          <section className="mt-6 flex flex-col gap-3">
-            <SectionTitle>Conceptos</SectionTitle>
-            <table className="w-full border-collapse text-sm">
-              <thead>
-                <tr className="break-after-avoid border-b border-neutral-400 text-left text-[11px] tracking-wide text-neutral-500 uppercase">
-                  <th className="py-1.5 pr-2 font-medium">Descripción</th>
-                  <th className="py-1.5 text-right font-medium">Cant.</th>
-                </tr>
-              </thead>
-              <tbody>
-                {partsSummary.concepts.map((concept) => (
-                  <tr key={concept.id} className="break-inside-avoid border-b border-neutral-200">
-                    <td className="py-1.5 pr-2">{concept.description}</td>
-                    <td className="py-1.5 text-right">{concept.quantity}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
-        )}
-
-        {hasFinancials && billing && (
-          <section className="mt-4 flex flex-col gap-2 break-inside-avoid">
-            <SectionTitle>Cierre económico</SectionTitle>
-            <table className="w-full border-collapse text-sm">
-              <tbody>
-                <BillingRow label="Repuestos" value={partsSummary.totalSale!} currency={company.currency} />
-                {conceptsTotal > 0 && (
-                  <BillingRow
-                    label="Conceptos"
-                    value={conceptsTotal.toFixed(2)}
-                    currency={company.currency}
-                  />
-                )}
-                <BillingRow label="Mano de obra" value={billing.laborAmount} currency={company.currency} />
-                {Number(billing.additionalAmount) > 0 && (
-                  <BillingRow
-                    label={billing.additionalDescription ?? "Otros cargos"}
-                    value={billing.additionalAmount}
-                    currency={company.currency}
-                  />
-                )}
-                {Number(billing.discountAmount) > 0 && (
-                  <BillingRow
-                    label="Descuento"
-                    value={billing.discountAmount}
-                    currency={company.currency}
-                    negative
-                  />
-                )}
-                <BillingRow
-                  label="Subtotal"
-                  value={billing.subtotal}
-                  currency={company.currency}
-                  className="border-t border-neutral-300 font-semibold"
-                />
-                {Number(billing.taxRate) > 0 && (
-                  <BillingRow
-                    label={`IVA (${Number(billing.taxRate)}%)`}
-                    value={billing.taxAmount}
-                    currency={company.currency}
-                  />
-                )}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td className="pt-2 text-right text-base font-bold uppercase">
-                    Total a pagar
-                  </td>
-                  <td
-                    className="pt-2 text-right text-base font-bold"
-                    style={{ color: BRAND_BLUE }}
-                  >
-                    {formatCurrency(billing.total, company.currency)}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-
-            <div className="flex flex-col gap-0.5 text-xs text-neutral-600">
-              <span>Pago a {client.paymentTermDays} días</span>
-              {Number(billing.paidAmount) > 0 && (
-                <span className="font-medium text-neutral-800">
-                  Saldo pendiente:{" "}
-                  {formatCurrency(
-                    Math.max(Number(billing.total) - Number(billing.paidAmount), 0),
-                    company.currency,
-                  )}
-                </span>
-              )}
-            </div>
-          </section>
         )}
 
         {/* Salto de página antes del registro fotográfico: el texto del

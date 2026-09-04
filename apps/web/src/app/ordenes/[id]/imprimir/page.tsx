@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { getWorkOrder } from "@/lib/api/work-orders";
-import { getWorkOrderParts } from "@/lib/api/work-order-parts";
 import { getClient } from "@/lib/api/clients";
 import { getCompany } from "@/lib/api/company";
 import { getPhotos } from "@/lib/api/attachments";
@@ -63,10 +62,9 @@ export default async function ImprimirOrdenPage({
     throw error;
   }
 
-  const [client, company, partsSummary, photos] = await Promise.all([
+  const [client, company, photos] = await Promise.all([
     getClient(order.client.id),
     getCompany(),
-    getWorkOrderParts(id),
     getPhotos(id),
   ]);
 
@@ -77,7 +75,6 @@ export default async function ImprimirOrdenPage({
         equipments={order.equipments}
         client={client}
         company={company}
-        partsSummary={partsSummary}
         photos={photos}
       />
       <PrintActions orderId={order.id} />
