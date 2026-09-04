@@ -3,7 +3,7 @@
 import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,7 +44,6 @@ interface CompanyFormState {
   quoteFollowUpDays: string;
   quoteFootnote: string;
   signatureInCollection: boolean;
-  signatureInWorkOrder: boolean;
   signatureInQuote: boolean;
 }
 
@@ -77,7 +76,6 @@ function toFormState(company: Company): CompanyFormState {
     quoteFollowUpDays: String(company.quoteFollowUpDays),
     quoteFootnote: company.quoteFootnote ?? "",
     signatureInCollection: company.signatureInCollection,
-    signatureInWorkOrder: company.signatureInWorkOrder,
     signatureInQuote: company.signatureInQuote,
   };
 }
@@ -205,6 +203,15 @@ export function CompanyForm({ company }: CompanyFormProps) {
   const isQuoteSectionValid =
     isNextQuoteNumberValid && isDefaultValidityDaysValid && isQuoteFollowUpDaysValid;
 
+  // Defecto silencioso: en los documentos, TODO el bloque de firma (línea +
+  // imagen + nombre) está condicionado a signerName — correcto, una firma
+  // sin nombre de quien firma no sirve. Lo que falta es avisarlo ACÁ, al
+  // configurar, en vez de que el ADMIN lo descubra con el documento ya
+  // generado y sin firma. Dispara con imagen cargada O alguna casilla
+  // activada — cualquiera de las dos sin el nombre es tiempo perdido.
+  const wantsSignatureStamped = Boolean(signatureUrl) || form.signatureInCollection || form.signatureInQuote;
+  const signatureWontStamp = wantsSignatureStamped && !form.signerName.trim();
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (
@@ -235,7 +242,6 @@ export function CompanyForm({ company }: CompanyFormProps) {
       signerRole: form.signerRole.trim() || undefined,
       collectionDocFootnote: form.collectionDocFootnote.trim() || undefined,
       signatureInCollection: form.signatureInCollection,
-      signatureInWorkOrder: form.signatureInWorkOrder,
       signatureInQuote: form.signatureInQuote,
       nextCollectionNumber,
       nextQuoteNumber,
@@ -509,23 +515,6 @@ export function CompanyForm({ company }: CompanyFormProps) {
             </div>
             <div className="flex items-start gap-2 rounded-lg border border-border p-3">
               <input
-                id="signatureInWorkOrder"
-                type="checkbox"
-                className="mt-0.5"
-                checked={form.signatureInWorkOrder}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    signatureInWorkOrder: event.target.checked,
-                  }))
-                }
-              />
-              <Label htmlFor="signatureInWorkOrder" className="font-normal">
-                Informe técnico
-              </Label>
-            </div>
-            <div className="flex items-start gap-2 rounded-lg border border-border p-3">
-              <input
                 id="signatureInQuote"
                 type="checkbox"
                 className="mt-0.5"
@@ -543,11 +532,23 @@ export function CompanyForm({ company }: CompanyFormProps) {
             </div>
           </div>
 
-          <p className="text-xs font-medium text-amber-700">
-            Con una firma cargada, todos los documentos que marques arriba
-            saldrán firmados automáticamente, sin revisión manual antes de
-            enviarlos o imprimirlos.
-          </p>
+          {signatureWontStamp ? (
+            <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+              <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-600" />
+              <p>
+                <strong>La firma NO se va a estampar en ningún documento todavía.</strong>{" "}
+                Falta el nombre de quien firma — lo completas en la tarjeta
+                &quot;Documento de cobro&quot;, campo &quot;Nombre del firmante&quot;,
+                más abajo.
+              </p>
+            </div>
+          ) : (
+            <p className="text-xs font-medium text-amber-700">
+              Con una firma cargada, todos los documentos que marques arriba
+              saldrán firmados automáticamente, sin revisión manual antes de
+              enviarlos o imprimirlos.
+            </p>
+          )}
         </CardContent>
       </Card>
 
@@ -609,6 +610,7 @@ export function CompanyForm({ company }: CompanyFormProps) {
                 id="signerName"
                 value={form.signerName}
                 onChange={updateField("signerName")}
+                aria-invalid={signatureWontStamp}
               />
             </div>
             <div className="flex flex-col gap-1.5">
@@ -621,8 +623,16 @@ export function CompanyForm({ company }: CompanyFormProps) {
               />
             </div>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Si dejas el firmante vacío, el documento no muestra recuadro de firma.
+          <p
+            className={
+              signatureWontStamp
+                ? "text-xs font-medium text-destructive"
+                : "text-xs text-muted-foreground"
+            }
+          >
+            {signatureWontStamp
+              ? "Falta este nombre — la firma cargada en \"Firma digital\" NO se va a estampar en ningún documento hasta que lo completes."
+              : "Si dejas el firmante vacío, el documento no muestra recuadro de firma."}
           </p>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="collectionDocFootnote">Nota al pie</Label>

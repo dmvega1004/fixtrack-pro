@@ -122,10 +122,6 @@ export class UpdateCompanyDto {
   signatureInCollection?: boolean;
 
   @IsOptional()
-  @IsBoolean({ message: 'signatureInWorkOrder debe ser verdadero o falso' })
-  signatureInWorkOrder?: boolean;
-
-  @IsOptional()
   @IsBoolean({ message: 'signatureInQuote debe ser verdadero o falso' })
   signatureInQuote?: boolean;
 

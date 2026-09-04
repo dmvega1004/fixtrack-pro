@@ -20,7 +20,6 @@ export interface Company {
   signatureImageUrl: string | null;
   /** Documentos en los que se estampa la firma automáticamente. */
   signatureInCollection: boolean;
-  signatureInWorkOrder: boolean;
   signatureInQuote: boolean;
   currency: string;
   /** Porcentaje de IVA del tenant (ej. "19.00"). "0.00" si no es responsable de IVA. */
@@ -69,7 +68,6 @@ export interface UpdateCompanyInput {
   signerRole?: string;
   collectionDocFootnote?: string;
   signatureInCollection?: boolean;
-  signatureInWorkOrder?: boolean;
   signatureInQuote?: boolean;
   nextCollectionNumber?: number;
   nextQuoteNumber?: number;

@@ -110,6 +110,11 @@ model Company {
   /// porque es el caso que motivó la función (cuenta de cobro firmada sin
   /// imprimir/escanear); los otros dos arrancan apagados, a criterio del
   /// ADMIN.
+  /// signatureInWorkOrder: NINGÚN código la lee ni la escribe desde el
+  /// commit que retira el Defecto 2 de la firma institucional — ver PR.
+  /// La columna sigue aquí a propósito hasta que se apruebe y aplique la
+  /// migración que la elimina (corre contra producción); no la reintroduzcas
+  /// en el DTO/servicio sin esa migración.
   signatureInCollection Boolean              @default(true)
   signatureInWorkOrder  Boolean              @default(false)
   signatureInQuote      Boolean              @default(false)

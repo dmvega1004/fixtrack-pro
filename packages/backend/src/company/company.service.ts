@@ -36,7 +36,6 @@ const COMPANY_SELECT = {
   logoUrl: true,
   signatureImageUrl: true,
   signatureInCollection: true,
-  signatureInWorkOrder: true,
   signatureInQuote: true,
   currency: true,
   taxRate: true,
@@ -74,7 +73,6 @@ export type PublicCompany = Pick<
   | 'logoUrl'
   | 'signatureImageUrl'
   | 'signatureInCollection'
-  | 'signatureInWorkOrder'
   | 'signatureInQuote'
   | 'currency'
   | 'taxRate'
@@ -169,7 +167,6 @@ export class CompanyService {
         signerRole: dto.signerRole?.trim(),
         collectionDocFootnote: dto.collectionDocFootnote?.trim(),
         signatureInCollection: dto.signatureInCollection,
-        signatureInWorkOrder: dto.signatureInWorkOrder,
         signatureInQuote: dto.signatureInQuote,
         nextCollectionNumber: dto.nextCollectionNumber,
         nextQuoteNumber: dto.nextQuoteNumber,
