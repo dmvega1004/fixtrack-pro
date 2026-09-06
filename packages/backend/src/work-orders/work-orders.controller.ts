@@ -22,6 +22,7 @@ import { ActivityService } from '../activity/activity.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
+import { Idempotent } from '../idempotency/idempotent.decorator';
 import { CreateWorkOrderDto } from './dto/create-work-order.dto';
 import { UpdateWorkOrderDto } from './dto/update-work-order.dto';
 import {
@@ -175,7 +176,15 @@ export class WorkOrdersController {
   /**
    * PATCH /work-orders/:id — Admin/Coordinador: todo campo.
    * Técnico: solo status, diagnosis y observations de SUS órdenes (403 si intenta más).
+   *
+   * Único consumidor real de @Idempotent además de payments.create (ver
+   * packages/backend/src/idempotency): la Etapa 2-C de soporte offline
+   * (descripción, diagnóstico, observaciones, recomendaciones y cambio de
+   * estado) sube por acá, con Idempotency-Key en la cabecera. Sin la
+   * cabecera (todo el resto de llamadas de hoy, con señal) el interceptor
+   * no hace nada — ver IdempotencyInterceptor.
    */
+  @Idempotent('work-orders.update')
   @Patch(':id')
   update(
     @CurrentUser() user: AuthenticatedUser,

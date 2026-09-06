@@ -13,6 +13,7 @@ import { DeleteOrderButton } from "./delete-order-button";
 
 interface DetailsTabProps {
   order: WorkOrder;
+  userId: string;
   canManage: boolean;
   isAdmin: boolean;
   technicians: Technician[];
@@ -22,6 +23,7 @@ interface DetailsTabProps {
 
 export function DetailsTab({
   order,
+  userId,
   canManage,
   isAdmin,
   technicians,
@@ -32,24 +34,28 @@ export function DetailsTab({
     <div className="flex flex-col gap-6 p-4 md:p-6">
       <DescriptionEditor
         orderId={order.id}
+        userId={userId}
         initialDescription={order.description}
         isTerminal={isTerminal}
       />
 
       <DiagnosisEditor
         orderId={order.id}
+        userId={userId}
         initialDiagnosis={order.diagnosis}
         isTerminal={isTerminal}
       />
 
       <ObservationsEditor
         orderId={order.id}
+        userId={userId}
         initialObservations={order.observations}
         isTerminal={isTerminal}
       />
 
       <SuggestionsEditor
         orderId={order.id}
+        userId={userId}
         initialSuggestions={order.suggestions}
         isTerminal={isTerminal}
       />

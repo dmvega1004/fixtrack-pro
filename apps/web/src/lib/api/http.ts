@@ -19,6 +19,14 @@ export class HttpError extends Error {
   constructor(
     public readonly status: number,
     message: string,
+    /**
+     * Cuerpo JSON crudo del backend, sin recortar a `message` — lo usa el
+     * proxy de escrituras encoladas (app/api/ordenes/[id]/route.ts, Etapa
+     * 2-C) para leer `idempotencyKeyConflict` en un 409 y distinguir "la
+     * reserva de idempotencia sigue vigente" (reintentar) de un 409 de
+     * negocio del handler (permanente, ver IdempotencyInterceptor).
+     */
+    public readonly body: unknown = null,
   ) {
     super(message);
     this.name = "HttpError";
@@ -90,7 +98,7 @@ async function parseResponse<T>(response: Response): Promise<T> {
       ? rawMessage.join("; ")
       : (rawMessage ?? "Error inesperado del servidor");
 
-    throw new HttpError(response.status, message);
+    throw new HttpError(response.status, message, data);
   }
 
   return data as T;

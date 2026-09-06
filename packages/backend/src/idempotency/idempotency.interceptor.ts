@@ -149,7 +149,9 @@ export class IdempotencyInterceptor implements NestInterceptor {
       // uno para la petición de otro.
       if (existing.userId !== userId || existing.operation !== operation) {
         throw new ConflictException(
-          'Esta llave de idempotencia ya se usó con otro usuario o para otra operación',
+          this.reservationConflictBody(
+            'Esta llave de idempotencia ya se usó con otro usuario o para otra operación',
+          ),
         );
       }
       return { mode: 'cached', responseBody: existing.responseBody };
@@ -158,13 +160,17 @@ export class IdempotencyInterceptor implements NestInterceptor {
     const ageMs = Date.now() - existing.reservedAt.getTime();
     if (ageMs < RESERVATION_WINDOW_MS) {
       throw new ConflictException(
-        'Esta operación con la misma llave ya se está procesando — intenta de nuevo en un momento',
+        this.reservationConflictBody(
+          'Esta operación con la misma llave ya se está procesando — intenta de nuevo en un momento',
+        ),
       );
     }
 
     if (attempt >= MAX_RECLAIM_ATTEMPTS) {
       throw new ConflictException(
-        'No se pudo procesar esta operación, intenta de nuevo',
+        this.reservationConflictBody(
+          'No se pudo procesar esta operación, intenta de nuevo',
+        ),
       );
     }
 
@@ -195,6 +201,26 @@ export class IdempotencyInterceptor implements NestInterceptor {
       operation,
       attempt + 1,
     );
+  }
+
+  /**
+   * Marca un 409 como propio de ESTA reserva (llave en uso ahora mismo,
+   * ajena, o recién liberada tras agotar los reintentos de retomarla) —
+   * nunca del handler protegido. La motor de la cola de cambios pendientes
+   * (apps/web/src/lib/queue/engine.ts) necesita distinguir esto de un 409
+   * de NEGOCIO que el handler mismo lance (ej. WorkOrdersService.update
+   * rechaza editar una orden ya cerrada): un 409 de esta reserva se espera
+   * y se reintenta más tarde tal cual; un 409 de negocio es un fallo
+   * permanente — ninguna espera lo va a resolver, y reintentarlo en bucle
+   * atascaría el resto de la cola detrás de esa operación para siempre.
+   * Sin este marcador, ambos casos llegan al cliente con el mismo status
+   * 409 y son indistinguibles.
+   */
+  private reservationConflictBody(message: string): {
+    message: string;
+    idempotencyKeyConflict: true;
+  } {
+    return { message, idempotencyKeyConflict: true };
   }
 
   /** El handler terminó bien: guarda la respuesta, la reserva queda "completada". */

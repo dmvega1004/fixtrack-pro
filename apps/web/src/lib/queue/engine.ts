@@ -1,6 +1,7 @@
 "use client";
 
 import { getSnapshot as getConnectivitySnapshot } from "../connectivity/store";
+import { refreshPendingChanges } from "./pending-changes";
 import { getOperationRequestBuilder } from "./registry";
 import {
   getNextOperation,
@@ -122,9 +123,17 @@ export async function enqueue(input: EnqueueInput): Promise<PendingOperation> {
   return op;
 }
 
+/**
+ * Refresca tanto los conteos (para la futura pantalla de estado de la
+ * cola) como la mezcla "conjunto de trabajo + cambios pendientes" que lee
+ * useSyncedOrder (ver ../queue/pending-changes.ts) — SIEMPRE juntos: la
+ * mezcla puede haber cambiado en cualquier punto en que los conteos
+ * también cambian (encolar, subir, apartar), nunca en uno sin el otro.
+ */
 async function refreshStats(userId: string): Promise<void> {
   const stats = await getQueueStats(userId);
   setQueueState({ pendingCount: stats.pending, parkedCount: stats.parked });
+  await refreshPendingChanges(userId);
 }
 
 type AttemptOutcome = "success" | "parked" | "retry-later" | "unauthorized";
@@ -200,17 +209,41 @@ async function attemptUpload(op: PendingOperation): Promise<AttemptOutcome> {
   }
 
   if (response.status === 409) {
-    // Mecanismo de idempotencia (Etapa 2-A): esta MISMA operación se está
-    // procesando ahora mismo con esta llave. NO es un fallo: se reintenta
-    // más tarde y encontrará la respuesta guardada (o, si la reserva
-    // quedó abandonada, la retoma y la ejecuta de verdad). No cuenta para
-    // el tope de reintentos ni se toca `attempts`/`lastError` — no hay
-    // nada que reportar como error.
-    console.log(
-      `${LOG} #${op.seq} (${op.type}) 409 — operación en curso por idempotencia, NO es un error, se reintenta en ${IDEMPOTENCY_RETRY_DELAY_MS / 1000}s`,
+    // Dos causas MUY distintas comparten el 409, y hay que distinguirlas
+    // por el cuerpo (ver idempotencyKeyConflict, marcado únicamente por
+    // IdempotencyInterceptor en packages/backend/src/idempotency):
+    //
+    // 1. Mecanismo de idempotencia (Etapa 2-A): esta MISMA operación se
+    //    está procesando ahora mismo con esta llave. NO es un fallo: se
+    //    reintenta más tarde y encontrará la respuesta guardada (o, si la
+    //    reserva quedó abandonada, la retoma y la ejecuta de verdad).
+    //
+    // 2. Un 409 de NEGOCIO que el propio handler protegido lanzó (ej.
+    //    WorkOrdersService.update rechaza editar una orden que pasó a
+    //    DELIVERED/CANCELLED mientras la operación esperaba en la cola).
+    //    Ningún reintento lo va a resolver — tratarlo como el caso 1
+    //    reintentaría cada 15s para siempre y atascaría el resto de la
+    //    cola detrás de esta operación. Es un fallo permanente: se aparta,
+    //    igual que un 400/403/404.
+    const data: unknown = await response.json().catch(() => null);
+    const isReservationConflict =
+      (data as { idempotencyKeyConflict?: boolean } | null)?.idempotencyKeyConflict === true;
+
+    if (isReservationConflict) {
+      console.log(
+        `${LOG} #${op.seq} (${op.type}) 409 — operación en curso por idempotencia, NO es un error, se reintenta en ${IDEMPOTENCY_RETRY_DELAY_MS / 1000}s`,
+      );
+      scheduleRetry(op.userId, IDEMPOTENCY_RETRY_DELAY_MS);
+      return "retry-later";
+    }
+
+    const message = (data as { message?: string | string[] } | null)?.message;
+    const reason = Array.isArray(message) ? message.join("; ") : (message ?? "Conflicto");
+    console.error(
+      `${LOG} #${op.seq} (${op.type}) 409 de negocio — fallo permanente, se aparta y se SIGUE con las demás: ${reason}`,
     );
-    scheduleRetry(op.userId, IDEMPOTENCY_RETRY_DELAY_MS);
-    return "retry-later";
+    await updateOperation({ ...op, parked: true, lastError: `http-409: ${reason}` });
+    return "parked";
   }
 
   if (response.status === 401) {

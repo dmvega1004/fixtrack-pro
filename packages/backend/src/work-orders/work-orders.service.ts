@@ -1457,6 +1457,14 @@ export class WorkOrdersService {
     // si el update falla o se revierte, ningún log de este cambio queda
     // escrito.
     const updated = await this.prisma.$transaction(async (tx) => {
+      // description/diagnosis/observations/suggestions/status: sobrescritura
+      // directa, sin comparar contra un valor "visto" ni ningún campo de
+      // versión — es una decisión, no un descuido: son también los cinco
+      // campos que la Etapa 2-C de soporte offline deja escribir sin señal
+      // (ver apps/web/src/lib/queue/producers.ts). Si el técnico editó sin
+      // señal y alguien más cambió lo mismo en el servidor mientras tanto,
+      // gana lo que llegue de último — aceptable para jornadas de horas de
+      // desconexión, y no se construye resolución de conflictos todavía.
       const result = await tx.workOrder.update({
         where: { id },
         data: {

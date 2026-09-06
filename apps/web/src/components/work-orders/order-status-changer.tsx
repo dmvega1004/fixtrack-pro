@@ -8,22 +8,28 @@ import {
   ORDER_STATUS_LABELS,
   type OrderStatus,
 } from "@/components/shared/status-chip";
-import { changeStatusAction } from "@/app/(dashboard)/ordenes/[id]/actions";
+import { changeStatusAction, type ActionResult } from "@/app/(dashboard)/ordenes/[id]/actions";
+import { useOnlineStatus } from "@/hooks/use-online-status";
+import { enqueueWorkOrderStatus } from "@/lib/queue/producers";
 
 const STATUSES = Object.keys(ORDER_STATUS_LABELS) as OrderStatus[];
 
 interface OrderStatusChangerProps {
   orderId: string;
+  userId: string;
   currentStatus: OrderStatus;
   isTerminal: boolean;
 }
 
+/** Etapa 2-C: sin señal, encola el cambio en vez de llamar la Server Action de siempre — ver description-editor.tsx. */
 export function OrderStatusChanger({
   orderId,
+  userId,
   currentStatus,
   isTerminal,
 }: OrderStatusChangerProps) {
   const router = useRouter();
+  const isOnline = useOnlineStatus();
   const [selected, setSelected] = useState<OrderStatus>(currentStatus);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -35,7 +41,13 @@ export function OrderStatusChanger({
     if (selected === currentStatus) return;
 
     setIsSaving(true);
-    const result = await changeStatusAction(orderId, selected);
+    let result: ActionResult;
+    if (isOnline) {
+      result = await changeStatusAction(orderId, selected);
+    } else {
+      await enqueueWorkOrderStatus(orderId, userId, selected);
+      result = { ok: true };
+    }
     setIsSaving(false);
 
     if (!result.ok) {
@@ -45,7 +57,10 @@ export function OrderStatusChanger({
     }
 
     toast.success("Estado actualizado");
-    router.refresh();
+    // Sin señal, la vista offline se actualiza sola (ver hooks/use-synced-order.ts)
+    // — un router.refresh() acá solo dispararía una petición RSC condenada
+    // a fallar por falta de señal.
+    if (isOnline) router.refresh();
   }
 
   if (isTerminal) {

@@ -22,8 +22,19 @@ interface DebugBody {
  * en memoria. En su lugar, el cliente manda su propio contador
  * (`intentoDebug`, ver lib/queue/debug.ts) y este endpoint decide en
  * base a eso — determinístico, sin estado.
+ *
+ * Candado de entorno (mismo criterio que ALLOW_DEBUG_HOOKS en
+ * queue-engine-register.tsx, que es lo único que hoy llama a este
+ * endpoint): sin él, cualquier usuario autenticado en producción podría
+ * mandarle peticiones arbitrarias desde la consola del navegador. 404 y no
+ * 403: no hay nada que insinuarle a quien lo intente sobre que este
+ * endpoint existe.
  */
 export async function POST(request: Request) {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ message: "No encontrado" }, { status: 404 });
+  }
+
   const body = (await request.json().catch(() => ({}))) as DebugBody;
 
   // Se resuelve ANTES de exigir sesión: el punto es simular que el
@@ -50,8 +61,15 @@ export async function POST(request: Request) {
 
     case "conflicto":
       if (intento <= vecesAntes) {
+        // idempotencyKeyConflict: true — simula el 409 de la RESERVA de
+        // idempotencia (ver IdempotencyInterceptor), el único que el motor
+        // reintenta. Sin este campo el motor lo trataría como un 409 de
+        // negocio y lo apartaría de inmediato (ver engine.ts).
         return NextResponse.json(
-          { message: `Esta operación con la misma llave ya se está procesando (simulado, intento ${intento}/${vecesAntes})` },
+          {
+            message: `Esta operación con la misma llave ya se está procesando (simulado, intento ${intento}/${vecesAntes})`,
+            idempotencyKeyConflict: true,
+          },
           { status: 409 },
         );
       }

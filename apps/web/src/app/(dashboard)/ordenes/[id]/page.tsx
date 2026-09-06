@@ -96,7 +96,12 @@ export default async function OrdenDetallePage({
     // propia (ver order-detail-gate.tsx) — nunca este árbol, que trae en
     // vivo todos los botones de escritura del detalle (cambiar estado,
     // editar, firmar, fotos, repuestos, imprimir, cuenta de cobro...).
-    <OrderDetailGate orderId={order.id}>
+    <OrderDetailGate
+      orderId={order.id}
+      userId={session.userId}
+      canManage={canManage}
+      isAdmin={isAdmin}
+    >
       <div className="flex flex-1 flex-col pb-36 md:pb-6">
         <div className="flex flex-col gap-3 border-b border-border p-4 md:p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -151,6 +156,7 @@ export default async function OrdenDetallePage({
 
         <OrderStatusChanger
           orderId={order.id}
+          userId={session.userId}
           currentStatus={order.status}
           isTerminal={isTerminal}
         />
@@ -159,6 +165,7 @@ export default async function OrdenDetallePage({
           detalles={
             <DetailsTab
               order={order}
+              userId={session.userId}
               canManage={canManage}
               isAdmin={isAdmin}
               technicians={technicians}
