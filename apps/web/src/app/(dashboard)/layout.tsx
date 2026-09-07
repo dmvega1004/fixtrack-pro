@@ -6,6 +6,7 @@ import { AppShell } from "@/components/shared/app-shell";
 import { OfflineBanner } from "@/components/shared/offline-banner";
 import { SyncEngineRegister } from "@/components/shared/sync-engine-register";
 import { QueueEngineRegister } from "@/components/shared/queue-engine-register";
+import { ShellCacheRefresh } from "@/components/shared/shell-cache-refresh";
 
 export default async function DashboardLayout({
   children,
@@ -33,6 +34,7 @@ export default async function DashboardLayout({
     <div className="flex min-h-svh flex-1 flex-col">
       <SyncEngineRegister userId={session.userId} />
       <QueueEngineRegister userId={session.userId} />
+      <ShellCacheRefresh />
       <OfflineBanner />
       <AppShell session={session}>{children}</AppShell>
     </div>

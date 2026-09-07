@@ -1,8 +1,11 @@
 // Etapa 1-A del soporte offline: el armazón del service worker. Ya no es
 // solo el armazón — Etapa 2-D agrega la pantalla de repuesto para
 // /ordenes/<id> (única dirección con identificador variable que puede
-// pedirse sin haberse precacheado nunca) y cierra el hueco de precacheo
-// envenenado por un redirect a /login (ver skipIfRedirected más abajo).
+// pedirse sin haberse precacheado nunca), cierra el hueco de precacheo
+// envenenado por un redirect a /login, y reintenta ese mismo precacheo
+// cuando la página lo pide (ver el listener de "message" más abajo) —
+// para el técnico nuevo que instala el service worker ANTES de iniciar
+// sesión, que es el camino por defecto, no un caso raro.
 // capacitor.config.ts apunta a server.url = https://fixtrackpro.com, y el
 // WebView carga ese mismo sitio en vivo, así que este mismo sw.js corre
 // igual adentro del APK que en cualquier navegador, sin nada especial de
@@ -32,6 +35,35 @@ const ORDER_DETAIL_PATTERN = /^\/ordenes\/(?!nueva$|detalle-offline$)[^/]+$/;
 self.addEventListener("install", (event) => {
   self.skipWaiting();
   event.waitUntil(precacheShell());
+});
+
+/**
+ * Reintento del precacheo, pedido por la página (ver shell-cache-refresh.tsx)
+ * en vez de dejarlo solo para el evento install. Sin esto, un service
+ * worker que se instaló SIN sesión válida (el camino de cualquier técnico
+ * nuevo: abre la app, ve /login, ahí mismo se instala) nunca vuelve a
+ * intentar precachear "/", "/ordenes" ni "/ordenes/detalle-offline" — las
+ * tres redirigieron a /login y precacheShellUrl las descartó con razón
+ * (ver ese comentario). "/" y "/ordenes" alcanzan a autocurarse solos la
+ * próxima vez que alguien navega ahí con señal (navigateNetworkFirst
+ * guarda la respuesta de cualquier navegación exitosa) — pero nadie
+ * navega NUNCA a "/ordenes/detalle-offline" a propósito, solo la sirve
+ * este mismo service worker (ver navigateNetworkFirst más abajo), así que
+ * sin este mensaje esa dirección se queda vacía para siempre y el
+ * detalle de cualquier orden nunca visitada cae en offline.html sin
+ * conexión.
+ *
+ * Mismo `precacheShell()` de siempre — vuelve a intentar las tres
+ * direcciones, con la sesión que haya AHORA (la cookie viaja sola en el
+ * fetch same-origin), y sigue descartando lo que redirija. Se puede
+ * llamar las veces que haga falta sin reinstalar el service worker ni
+ * cambiar CACHE_VERSION — completa lo que falte de la instalación
+ * existente, nunca empieza de cero.
+ */
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "fixtrack-refresh-shell-cache") {
+    event.waitUntil(precacheShell());
+  }
 });
 
 /**
