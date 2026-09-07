@@ -10,12 +10,12 @@ import { formatDate } from "@/lib/format/dates";
 import { formatCurrency } from "@/lib/format/currency";
 import { isTerminalStatus } from "@/lib/dashboard/summary";
 import type { SyncWorkOrder } from "@/lib/sync/types";
-import { DescriptionEditor } from "./description-editor";
-import { DiagnosisEditor } from "./diagnosis-editor";
-import { ObservationsEditor } from "./observations-editor";
-import { SuggestionsEditor } from "./suggestions-editor";
-import { OrderStatusChanger } from "./order-status-changer";
-import { OrderTabs } from "./order-tabs";
+import { DescriptionEditor } from "../description-editor";
+import { DiagnosisEditor } from "../diagnosis-editor";
+import { ObservationsEditor } from "../observations-editor";
+import { SuggestionsEditor } from "../suggestions-editor";
+import { OrderStatusChanger } from "../order-status-changer";
+import { OrderTabs } from "../order-tabs";
 import { OfflineDisabledNotice } from "./offline-disabled-notice";
 import { OfflinePhotoPlaceholder } from "./offline-photo-placeholder";
 

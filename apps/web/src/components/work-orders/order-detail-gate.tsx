@@ -2,9 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useOnlineStatus } from "@/hooks/use-online-status";
-import { useSyncedOrder } from "@/hooks/use-synced-order";
-import { OrderDetailOffline } from "./order-detail-offline";
-import { OrderNotDownloaded } from "./order-not-downloaded";
+import { OfflineOrderView } from "./offline-detail/offline-order-view";
 
 interface OrderDetailGateProps {
   orderId: string;
@@ -17,15 +15,17 @@ interface OrderDetailGateProps {
 
 /**
  * Con conexión: `children` tal cual — la pantalla de siempre, sin ningún
- * cambio. Sin conexión: swap completo a la pantalla real de detalle
- * (OrderDetailOffline, Etapa 2-C) armada desde el conjunto de trabajo
- * guardado CON los cambios pendientes de subir aplicados encima (ver
- * useSyncedOrder), o al aviso de "no descargada" si esta orden no está
- * ahí — nunca `children` (que puede traer props del servidor
- * desactualizadas, servidas por el service worker desde su caché, y sobre
- * todo trae en vivo todos los controles de escritura que esta entrega deja
+ * cambio. Sin conexión: swap completo a OfflineOrderView (Etapa 2-C/2-D) —
+ * nunca `children` (que puede traer props del servidor desactualizadas,
+ * servidas por el service worker desde su caché, y sobre todo trae en
+ * vivo todos los controles de escritura que esta entrega deja
  * deliberadamente desactivados: fotos, firma, repuestos, valores,
  * imprimir, cuenta de cobro, eliminar).
+ *
+ * Esta es la entrada que ya tenía `orderId` de antes (viene del árbol
+ * server-rendered de /ordenes/[id]) — la otra entrada a OfflineOrderView
+ * es OrderDetailOfflineByPath (Etapa 2-D), para cuando ni siquiera esa
+ * navegación llegó a tener señal (ver sw.js).
  *
  * `userId`/`canManage`/`isAdmin` vienen del server component (page.tsx,
  * que ya tiene la sesión) — el árbol offline los necesita para encolar
@@ -40,18 +40,15 @@ export function OrderDetailGate({
   children,
 }: OrderDetailGateProps) {
   const isOnline = useOnlineStatus();
-  const syncedOrder = useSyncedOrder(orderId);
 
   if (!isOnline) {
-    return syncedOrder ? (
-      <OrderDetailOffline
-        order={syncedOrder}
+    return (
+      <OfflineOrderView
+        orderId={orderId}
         userId={userId}
         canManage={canManage}
         isAdmin={isAdmin}
       />
-    ) : (
-      <OrderNotDownloaded />
     );
   }
 

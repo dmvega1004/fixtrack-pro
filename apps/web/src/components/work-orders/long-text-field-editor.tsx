@@ -51,6 +51,21 @@ export function LongTextFieldEditor({
   const [value, setValue] = useState(initialValue ?? "");
   const [isSaving, setIsSaving] = useState(false);
 
+  // `initialValue` puede llegar en null/vacío en el primer render y
+  // corregirse un instante después (la mezcla de cambios pendientes de la
+  // cola resuelve async, ver hooks/use-synced-order.ts) — useState(initialValue)
+  // solo lee el argumento en el montaje, así que sin este ajuste el campo
+  // se queda pegado en ese primer valor para siempre, así el técnico haya
+  // escrito y guardado algo hace rato. Patrón oficial de React para
+  // "ajustar estado cuando cambia una prop" (react.dev): solo resincroniza
+  // si el técnico no diverge todavía de lo último sincronizado — una
+  // edición en curso nunca se pisa.
+  const [syncedInitialValue, setSyncedInitialValue] = useState(initialValue);
+  if (initialValue !== syncedInitialValue && value === (syncedInitialValue ?? "")) {
+    setSyncedInitialValue(initialValue);
+    setValue(initialValue ?? "");
+  }
+
   function handleChange(event: ChangeEvent<HTMLTextAreaElement>) {
     setValue(event.target.value);
   }

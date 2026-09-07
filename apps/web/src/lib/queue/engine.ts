@@ -1,6 +1,8 @@
 "use client";
 
 import { getSnapshot as getConnectivitySnapshot } from "../connectivity/store";
+import { applyConfirmedWorksetUpdate } from "../sync/storage";
+import { FIELD_BY_OPERATION_TYPE } from "./field-operations";
 import { refreshPendingChanges } from "./pending-changes";
 import { getOperationRequestBuilder } from "./registry";
 import {
@@ -203,6 +205,18 @@ async function attemptUpload(op: PendingOperation): Promise<AttemptOutcome> {
 
   if (response.ok) {
     console.log(`${LOG} #${op.seq} (${op.type}) subida — ${response.status}`);
+    // ANTES de quitarla de la cola: si no, hay un instante real en que el
+    // parche pendiente ya desapareció pero el conjunto de trabajo todavía
+    // no se refrescó con un sync real, y useSyncedOrder volvería a mostrar
+    // el valor de ANTES de esta escritura. Ver el porqué completo en
+    // applyConfirmedWorksetUpdate.
+    const field = FIELD_BY_OPERATION_TYPE[op.type];
+    if (field) {
+      const value = (op.payload as { value: unknown }).value;
+      await applyConfirmedWorksetUpdate(op.orderId, { [field]: value }).catch((error) => {
+        console.error(`${LOG} no se pudo aplicar la confirmación al conjunto de trabajo`, error);
+      });
+    }
     await removeOperation(op.seq);
     setQueueState({ lastError: null });
     return "success";

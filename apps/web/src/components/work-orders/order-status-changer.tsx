@@ -33,6 +33,16 @@ export function OrderStatusChanger({
   const [selected, setSelected] = useState<OrderStatus>(currentStatus);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Mismo ajuste que LongTextFieldEditor (ver ese archivo): `currentStatus`
+  // puede llegar desactualizado en el primer render y corregirse un
+  // instante después (mezcla de cambios pendientes async) — sin esto, un
+  // cambio de estado ya encolado y guardado no se refleja al recargar.
+  const [syncedStatus, setSyncedStatus] = useState(currentStatus);
+  if (currentStatus !== syncedStatus && selected === syncedStatus) {
+    setSyncedStatus(currentStatus);
+    setSelected(currentStatus);
+  }
+
   function handleChange(event: ChangeEvent<HTMLSelectElement>) {
     setSelected(event.target.value as OrderStatus);
   }

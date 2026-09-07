@@ -1,22 +1,33 @@
-// Etapa 1-A del soporte offline: el armazón del service worker. Sigue
-// SIN ser soporte offline completo — nada de esto cachea datos de
-// negocio ni convierte pantallas a renderizado en el cliente (eso es
-// 1-B/1-C). Solo demuestra, y ahora corrige, que un service worker
-// puede servir una pantalla guardada dentro del WebView del APK cuando
-// no hay señal — capacitor.config.ts apunta a server.url =
-// https://fixtrackpro.com, y el WebView carga ese mismo sitio en vivo,
-// así que este mismo sw.js corre igual adentro del APK que en cualquier
-// navegador, sin nada especial de Capacitor.
+// Etapa 1-A del soporte offline: el armazón del service worker. Ya no es
+// solo el armazón — Etapa 2-D agrega la pantalla de repuesto para
+// /ordenes/<id> (única dirección con identificador variable que puede
+// pedirse sin haberse precacheado nunca) y cierra el hueco de precacheo
+// envenenado por un redirect a /login (ver skipIfRedirected más abajo).
+// capacitor.config.ts apunta a server.url = https://fixtrackpro.com, y el
+// WebView carga ese mismo sitio en vivo, así que este mismo sw.js corre
+// igual adentro del APK que en cualquier navegador, sin nada especial de
+// Capacitor.
 //
 // Estrategia: "red primero, caché de respaldo", ACOTADA a navegaciones
 // (request.mode === "navigate"). Todo lo demás — /api, imágenes de
 // Cloudinary, lo que sea — pasa directo a la red, sin tocar acá.
 
-const CACHE_VERSION = "v2";
+const CACHE_VERSION = "v3";
 const CACHE_NAME = `fixtrack-shell-${CACHE_VERSION}`;
 const CACHE_PREFIX = "fixtrack-shell-";
-const SHELL_URLS = ["/", "/ordenes"];
+const SHELL_URLS = ["/", "/ordenes", "/ordenes/detalle-offline"];
 const OFFLINE_URL = "/offline.html";
+const SPARE_ORDER_DETAIL_URL = "/ordenes/detalle-offline";
+
+/**
+ * /ordenes/<id> — un solo segmento después de /ordenes, que NO sea uno de
+ * los literales que ya tienen su propia entrada precacheada (nueva,
+ * detalle-offline) ni la lista misma. Mismo patrón (duplicado a propósito
+ * — este archivo no puede importar nada del build de Next) en
+ * OrderDetailOfflineByPath (apps/web/src/components/work-orders/
+ * offline-detail/order-detail-offline-by-path.tsx).
+ */
+const ORDER_DETAIL_PATTERN = /^\/ordenes\/(?!nueva$|detalle-offline$)[^/]+$/;
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
@@ -25,11 +36,11 @@ self.addEventListener("install", (event) => {
 
 /**
  * Precachea el armazón mínimo: la pantalla de "sin conexión" propia (no
- * la de Capacitor), "/" y "/ordenes" — la app puede arrancar en frío en
- * cualquiera de las dos —, y los assets de /_next/static que esas
- * páginas referencian. Se descubren leyendo el HTML de cada respuesta,
- * no hay forma de conocer sus nombres con hash de antemano sin tocar el
- * build (fuera de alcance de esta prueba).
+ * la de Capacitor), "/", "/ordenes" y "/ordenes/detalle-offline" — la app
+ * puede arrancar en frío en cualquiera de las tres —, y los assets de
+ * /_next/static que esas páginas referencian. Se descubren leyendo el
+ * HTML de cada respuesta, no hay forma de conocer sus nombres con hash de
+ * antemano sin tocar el build (fuera de alcance de esta prueba).
  */
 async function precacheShell() {
   const cache = await caches.open(CACHE_NAME);
@@ -47,6 +58,23 @@ async function precacheShellUrl(cache, shellUrl) {
   try {
     const shellResponse = await fetch(shellUrl);
     if (!shellResponse.ok) return;
+
+    // "/", "/ordenes" y "/ordenes/detalle-offline" exigen sesión (las
+    // sirve (dashboard)/layout.tsx, que redirige a /login sin una). Si el
+    // service worker instala o se actualiza SIN sesión válida (ej. la
+    // pestaña está en /login, o el token venció), esta respuesta ES la
+    // página de login — jamás la página pedida. Guardarla igual deja la
+    // caché "envenenada": la próxima vez que esa dirección se pida sin
+    // red, Chrome se niega a servir una Response redirigida como
+    // respuesta de una navegación y falla la carga entera con
+    // net::ERR_FAILED — ni siquiera se ve offline.html, se ve como si la
+    // app estuviera rota. Se salta la caché (queda como estaba, vacía la
+    // primera vez) y se resuelve solo en la próxima navegación exitosa a
+    // esa misma dirección con sesión (ver navigateNetworkFirst).
+    if (shellResponse.redirected) {
+      console.warn(`[sw] ${shellUrl} redirigió al precachear (sin sesión válida) — no se guarda`);
+      return;
+    }
 
     const html = await shellResponse.clone().text();
     await cache.put(shellUrl, shellResponse);
@@ -117,7 +145,14 @@ async function navigateNetworkFirst(request) {
     // hace que el navegador falle la navegación entera con ERR_FAILED en
     // vez de mostrar cualquier respuesta.
     const response = await fetch(request.clone());
-    if (response.ok) {
+
+    // Mismo candado que en precacheShellUrl: una navegación real (ej. el
+    // token venció a mitad de jornada y esta petición terminó en /login)
+    // puede terminar en una respuesta redirigida tan fácil como el
+    // precacheo inicial. Guardarla envenenaría esta entrada de caché para
+    // la próxima vez que se pida sin red — se deja la entrada anterior
+    // (si había alguna) tal cual, en vez de pisarla con la de /login.
+    if (response.ok && !response.redirected) {
       // Clave de caché SIN cadena de consulta: /ordenes?estado=abierta,
       // /ordenes?estado=cerrada, etc. son la MISMA pantalla guardada —
       // sin esto se acumula una entrada distinta por cada combinación de
@@ -135,6 +170,19 @@ async function navigateNetworkFirst(request) {
     // tenemos.
     const cached = await cache.match(request, { ignoreSearch: true });
     if (cached) return cached;
+
+    // /ordenes/<id>: hay tantas direcciones como órdenes, así que ninguna
+    // se precachea individual — la única forma de que caiga hasta acá con
+    // ALGO que no sea offline.html es servir la pantalla de repuesto
+    // (Etapa 2-D), precacheada UNA sola vez, EN ESTA MISMA dirección. Esa
+    // pantalla lee el id real de `window.location.pathname` del lado del
+    // cliente (ver OrderDetailOfflineByPath) — la barra de direcciones no
+    // cambia, sigue siendo /ordenes/<id>.
+    const pathname = new URL(request.url).pathname;
+    if (ORDER_DETAIL_PATTERN.test(pathname)) {
+      const spare = await cache.match(SPARE_ORDER_DETAIL_URL);
+      if (spare) return spare;
+    }
 
     const offline = await cache.match(OFFLINE_URL);
     if (offline) return offline;

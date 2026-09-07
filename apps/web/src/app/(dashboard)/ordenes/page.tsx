@@ -5,6 +5,7 @@ import { PriorityFilterSelect } from "@/components/work-orders/priority-filter-s
 import { OrdersSearchInput } from "@/components/work-orders/orders-search-input";
 import { WorkOrdersList } from "@/components/work-orders/work-orders-list";
 import { OrdersListWithLoadMore } from "@/components/work-orders/orders-list-with-load-more";
+import { OrdersResultsCount } from "@/components/work-orders/orders-results-count";
 import { EmptyOrdersState } from "@/components/work-orders/empty-orders-state";
 import { EmptySearchState } from "@/components/work-orders/empty-search-state";
 import { getWorkOrders, getWorkOrdersCount } from "@/lib/api/work-orders";
@@ -83,10 +84,7 @@ export default async function OrdenesPage({ searchParams }: OrdenesPageProps) {
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Órdenes de trabajo</h1>
-          <p className="text-sm text-muted-foreground">
-            {total} {total === 1 ? "resultado" : "resultados"}
-            {unassignedOnly && " · sin asignar"}
-          </p>
+          <OrdersResultsCount total={total} unassignedOnly={unassignedOnly} />
         </div>
         <Link
           href="/ordenes/nueva"

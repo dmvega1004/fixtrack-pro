@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { CloudOff } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
+import { OfflineSafeLink } from "./offline-safe-link";
 
 /**
  * Sin señal y esta orden en particular no está en el conjunto de trabajo
@@ -21,9 +21,9 @@ export function OrderNotDownloaded() {
           para verla.
         </p>
       </div>
-      <Link href="/ordenes" className={buttonVariants({ variant: "outline" })}>
+      <OfflineSafeLink href="/ordenes" className={buttonVariants({ variant: "outline" })}>
         Volver a Órdenes
-      </Link>
+      </OfflineSafeLink>
     </div>
   );
 }
