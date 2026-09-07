@@ -14,6 +14,17 @@ import { formatCurrency } from "@/lib/format/currency";
 import { amountInWords } from "@/lib/format/number-to-words";
 import { cn } from "@/lib/utils";
 import { SignatureLine } from "@/components/shared/signature-line";
+import { PrintDocumentFrame } from "@/components/shared/print-document-frame";
+import { PrintKeepTogether } from "@/components/shared/print-keep-together";
+
+/**
+ * Control de huérfanas/viudas para un bloque de texto largo que SÍ puede
+ * partirse entre hojas (alcance, metodología, observaciones, exclusiones):
+ * no se evita el corte —forzarlo sería empujar el bloque en vano cuando es
+ * más largo que una página—, solo se controla que caiga entre renglones
+ * (nunca a mitad de palabra) y que no queden líneas sueltas.
+ */
+const NO_ORPHAN_LINES_STYLE = { orphans: 2, widows: 2 } as const;
 
 const BRAND_BLUE = "#2563EB";
 
@@ -34,6 +45,24 @@ function Box({ title, children }: { title: string; children: ReactNode }) {
       </p>
       <div className="flex flex-col gap-0.5 text-sm text-neutral-800">{children}</div>
     </div>
+  );
+}
+
+/**
+ * Título de sección — borde inferior + azul de marca + negrita para que se
+ * distinga con claridad del cuerpo a 12px (mismo tamaño, jerarquía por
+ * peso/color, no por tamaño: evita volver a mezclar 14/12 en el documento).
+ * break-after-avoid: el corte de página nunca cae justo después de un
+ * título, así nunca queda solo al pie de una hoja separado de su texto.
+ */
+function SectionTitle({ children }: { children: ReactNode }) {
+  return (
+    <p
+      className="break-after-avoid border-b pb-1 text-xs font-bold tracking-wide uppercase"
+      style={{ color: BRAND_BLUE, borderColor: "#BFDBFE" }}
+    >
+      {children}
+    </p>
   );
 }
 
@@ -123,231 +152,268 @@ export function QuoteDocument({ quote, client, company }: QuoteDocumentProps) {
         </div>
       )}
 
-      {/* 1. Membrete */}
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-start gap-4">
-          {company.logoUrl && (
-            // eslint-disable-next-line @next/next/no-img-element -- logo remoto (Cloudinary), sin dominio fijo que declarar
-            <img
-              src={company.logoUrl}
-              alt={company.name}
-              className="h-12 w-auto object-contain"
-            />
-          )}
-          <div className="flex flex-col">
-            <p className="text-2xl font-bold" style={{ color: BRAND_BLUE }}>
-              {company.name}
-            </p>
-            {company.taxId && (
-              <p className="text-xs text-neutral-500">NIT {company.taxId}</p>
+      {/* Pie repetido en cada hoja vía PrintDocumentFrame (tfoot) — antes
+          era un <p> con position:fixed que no reservaba su espacio, y en
+          una segunda hoja terminaba montado sobre el final del contenido.
+          Mismo patrón que work-order-print-document.tsx y
+          collection-document.tsx. */}
+      <PrintDocumentFrame
+        footer={
+          <p className="pt-2 text-center text-[10px] text-neutral-400">
+            {printFooterText}
+          </p>
+        }
+      >
+        {/* 1. Membrete */}
+        <header className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-start gap-4">
+            {company.logoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element -- logo remoto (Cloudinary), sin dominio fijo que declarar
+              <img
+                src={company.logoUrl}
+                alt={company.name}
+                className="h-12 w-auto object-contain"
+              />
             )}
-            <p className="mt-1 text-xs text-neutral-500">
-              {[company.address, company.phone, company.email, company.website]
-                .filter(Boolean)
-                .join("  |  ")}
-            </p>
+            <div className="flex flex-col">
+              <p className="text-2xl font-bold" style={{ color: BRAND_BLUE }}>
+                {company.name}
+              </p>
+              {company.taxId && (
+                <p className="text-xs text-neutral-500">NIT {company.taxId}</p>
+              )}
+              <p className="mt-1 text-xs text-neutral-500">
+                {[company.address, company.phone, company.email, company.website]
+                  .filter(Boolean)
+                  .join("  |  ")}
+              </p>
+            </div>
           </div>
+
+          {/* 2. Cabecera */}
+          <div className="flex flex-col items-end text-right">
+            <p className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">
+              Cotización
+            </p>
+            <p
+              className={cn("font-bold", isDraft ? "text-xl" : "text-3xl")}
+              style={{ color: BRAND_BLUE }}
+            >
+              {isDraft ? "BORRADOR — sin emitir" : formatQuoteNumber(quote.quoteNumber)}
+            </p>
+            <p className="mt-1 text-xs text-neutral-500">Fecha de emisión: {emittedAtLabel}</p>
+            <p className="text-xs text-neutral-500">Válida hasta: {validUntilLabel}</p>
+          </div>
+        </header>
+
+        <hr className="mt-4 border-t-4" style={{ borderColor: BRAND_BLUE }} />
+
+        {/* 3. Cliente / sede */}
+        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Box title="Cliente">
+            <span className="font-medium">{client.name}</span>
+            {documentLabel && <span className="text-neutral-600">{documentLabel}</span>}
+            {client.phone && <span className="text-neutral-600">{client.phone}</span>}
+          </Box>
+          <Box title="Sede / Proyecto">
+            {quote.siteName && <span className="font-medium">{quote.siteName}</span>}
+            {equipmentLine && <span className="text-neutral-600">{equipmentLine}</span>}
+            {!quote.siteName && !equipmentLine && (
+              <span className="text-neutral-400">—</span>
+            )}
+          </Box>
         </div>
 
-        {/* 2. Cabecera */}
-        <div className="flex flex-col items-end text-right">
-          <p className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">
-            Cotización
-          </p>
+        {/* 4. Alcance — flujo de bloque normal, NO flex: Chrome no
+            fragmenta de forma fiable el contenido de un contenedor
+            flexible al imprimir (llega a cortar el texto a mitad de
+            palabra) — mismo defecto ya identificado en
+            client-report-format-document.tsx. El alcance puede ocupar
+            varias hojas completas: no se evita el corte
+            (break-inside-avoid lo empujaría en vano), solo se controla
+            dónde cae — ver SectionTitle (título nunca huérfano) y
+            NO_ORPHAN_LINES_STYLE (mínimo 2 líneas antes/después del
+            corte). */}
+        <section className="mt-6">
+          <SectionTitle>Alcance</SectionTitle>
           <p
-            className={cn("font-bold", isDraft ? "text-xl" : "text-3xl")}
-            style={{ color: BRAND_BLUE }}
+            className="mt-2 text-xs whitespace-pre-wrap text-neutral-900"
+            style={NO_ORPHAN_LINES_STYLE}
           >
-            {isDraft ? "BORRADOR — sin emitir" : formatQuoteNumber(quote.quoteNumber)}
+            {quote.scope}
           </p>
-          <p className="mt-1 text-xs text-neutral-500">Fecha de emisión: {emittedAtLabel}</p>
-          <p className="text-xs text-neutral-500">Válida hasta: {validUntilLabel}</p>
-        </div>
-      </header>
-
-      <hr className="mt-4 border-t-4" style={{ borderColor: BRAND_BLUE }} />
-
-      {/* 3. Cliente / sede */}
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Box title="Cliente">
-          <span className="font-medium">{client.name}</span>
-          {documentLabel && <span className="text-neutral-600">{documentLabel}</span>}
-          {client.phone && <span className="text-neutral-600">{client.phone}</span>}
-        </Box>
-        <Box title="Sede / Proyecto">
-          {quote.siteName && <span className="font-medium">{quote.siteName}</span>}
-          {equipmentLine && <span className="text-neutral-600">{equipmentLine}</span>}
-          {!quote.siteName && !equipmentLine && (
-            <span className="text-neutral-400">—</span>
-          )}
-        </Box>
-      </div>
-
-      {/* 4. Alcance */}
-      <section className="mt-6 flex flex-col gap-2">
-        <p className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">Alcance</p>
-        <p className="text-xs whitespace-pre-wrap text-neutral-900">{quote.scope}</p>
-      </section>
-
-      {/* 4b. Metodología / plan de trabajo — oculta por completo (ni
-          título) si está vacía. break-inside-avoid en la sección +
-          break-after-avoid en el título: mismo patrón que ReportSection en
-          client-report-format-document.tsx, para que un salto de página
-          nunca deje el título solo separado de su texto. */}
-      {quote.methodology && (
-        <section className="mt-6 flex flex-col gap-2 break-inside-avoid">
-          <p className="break-after-avoid text-xs font-semibold tracking-wide text-neutral-500 uppercase">
-            Metodología / plan de trabajo
-          </p>
-          <p className="text-xs whitespace-pre-wrap text-neutral-900">{quote.methodology}</p>
         </section>
-      )}
 
-      {/* 5. Ítems */}
-      <section className="mt-6">
-        <table className="w-full border-collapse text-xs">
-          <thead>
-            <tr className="border-b border-neutral-400 text-left text-[11px] tracking-wide text-neutral-500 uppercase">
-              <th className="w-8 py-1.5 pr-2 font-medium">#</th>
-              <th className="py-1.5 pr-2 font-medium">Descripción</th>
-              <th className="py-1.5 pr-2 text-right font-medium">Cantidad</th>
-              <th className="py-1.5 pr-2 text-right font-medium">Valor unitario</th>
-              <th className="py-1.5 text-right font-medium">Valor total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {quote.items.map((item, index) => (
-              <tr key={item.id} className="border-b border-neutral-200 break-inside-avoid">
-                <td className="py-1.5 pr-2 text-neutral-500 tabular-nums">{index + 1}</td>
-                <td className="py-1.5 pr-2">{item.description}</td>
-                <td className="py-1.5 pr-2 text-right tabular-nums">{item.quantity}</td>
-                <td className="py-1.5 pr-2 text-right tabular-nums">
-                  {formatCurrency(item.unitPrice, currency)}
-                </td>
-                <td className="py-1.5 text-right tabular-nums">
-                  {formatCurrency(item.lineTotal, currency)}
+        {/* 4b. Metodología / plan de trabajo — oculta por completo (ni
+            título) si está vacía. Mismo criterio de paginación que
+            Alcance. */}
+        {quote.methodology && (
+          <section className="mt-6">
+            <SectionTitle>Metodología / plan de trabajo</SectionTitle>
+            <p
+              className="mt-2 text-xs whitespace-pre-wrap text-neutral-900"
+              style={NO_ORPHAN_LINES_STYLE}
+            >
+              {quote.methodology}
+            </p>
+          </section>
+        )}
+
+        {/* 5. Ítems */}
+        <section className="mt-6">
+          <table className="w-full border-collapse text-xs">
+            <thead>
+              <tr className="border-b border-neutral-400 text-left text-[11px] tracking-wide text-neutral-500 uppercase">
+                <th className="w-8 py-1.5 pr-2 font-medium">#</th>
+                <th className="py-1.5 pr-2 font-medium">Descripción</th>
+                <th className="py-1.5 pr-2 text-right font-medium">Cantidad</th>
+                <th className="py-1.5 pr-2 text-right font-medium">Valor unitario</th>
+                <th className="py-1.5 text-right font-medium">Valor total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {quote.items.map((item, index) => (
+                <tr key={item.id} className="border-b border-neutral-200 break-inside-avoid">
+                  <td className="py-1.5 pr-2 text-neutral-500 tabular-nums">{index + 1}</td>
+                  <td className="py-1.5 pr-2">{item.description}</td>
+                  <td className="py-1.5 pr-2 text-right tabular-nums">{item.quantity}</td>
+                  <td className="py-1.5 pr-2 text-right tabular-nums">
+                    {formatCurrency(item.unitPrice, currency)}
+                  </td>
+                  <td className="py-1.5 text-right tabular-nums">
+                    {formatCurrency(item.lineTotal, currency)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+
+        {/* 6. Totales */}
+        <section className="mt-4 flex justify-end break-inside-avoid">
+          <table className="w-72 border-collapse text-xs">
+            <tbody>
+              <TotalRow label="Subtotal" value={formatCurrency(quote.billing.subtotal, currency)} />
+              {Number(quote.billing.discountAmount) > 0 && (
+                <TotalRow
+                  label="Descuento"
+                  value={`− ${formatCurrency(quote.billing.discountAmount, currency)}`}
+                />
+              )}
+              <TotalRow
+                label={`IVA (${Number(quote.billing.taxRate)}%)`}
+                value={formatCurrency(quote.billing.taxAmount, currency)}
+              />
+            </tbody>
+            <tfoot>
+              <tr>
+                <td className="pt-2 text-right text-base font-bold uppercase">Total</td>
+                <td
+                  className="pt-2 text-right text-base font-bold tabular-nums"
+                  style={{ color: BRAND_BLUE }}
+                >
+                  {formatCurrency(quote.billing.total, currency)}
                 </td>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
+            </tfoot>
+          </table>
+        </section>
 
-      {/* 6. Totales */}
-      <section className="mt-4 flex justify-end break-inside-avoid">
-        <table className="w-72 border-collapse text-xs">
-          <tbody>
-            <TotalRow label="Subtotal" value={formatCurrency(quote.billing.subtotal, currency)} />
-            {Number(quote.billing.discountAmount) > 0 && (
-              <TotalRow
-                label="Descuento"
-                value={`− ${formatCurrency(quote.billing.discountAmount, currency)}`}
-              />
+        {/* 7. Total en letras */}
+        <p className="mt-2 text-right text-xs font-medium text-neutral-600 italic">
+          {amountInWords(quote.billing.total, currency)}
+        </p>
+
+        {/* 8. Condiciones comerciales — sección en flujo de bloque normal
+            (no flex): el título gobierna dos bloques de tamaño muy
+            distinto, la grilla corta de campos (break-inside-avoid — SÍ
+            es válido evitar partirla, es acotada) y el cuadro de
+            exclusiones, que puede ser largo y necesita el mismo criterio
+            de Alcance. */}
+        {(hasAnyCommercialTerm || quote.exclusions) && (
+          <section className="mt-6">
+            <SectionTitle>Condiciones comerciales</SectionTitle>
+            {hasAnyCommercialTerm && (
+              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 break-inside-avoid">
+                <ConditionField label="Forma de pago" value={quote.paymentTerms} />
+                <ConditionField label="Tiempo de entrega" value={quote.deliveryTime} />
+                <ConditionField label="Garantía" value={quote.warrantyTerms} />
+                <ConditionField label="Validez de la oferta" value={`${quote.validityDays} días`} />
+              </div>
             )}
-            <TotalRow
-              label={`IVA (${Number(quote.billing.taxRate)}%)`}
-              value={formatCurrency(quote.billing.taxAmount, currency)}
-            />
-          </tbody>
-          <tfoot>
-            <tr>
-              <td className="pt-2 text-right text-base font-bold uppercase">Total</td>
-              <td
-                className="pt-2 text-right text-base font-bold tabular-nums"
-                style={{ color: BRAND_BLUE }}
-              >
-                {formatCurrency(quote.billing.total, currency)}
-              </td>
-            </tr>
-          </tfoot>
-        </table>
-      </section>
+            {quote.exclusions && (
+              <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 print-color-exact">
+                <p className="break-after-avoid text-xs font-bold tracking-wide text-amber-800 uppercase">
+                  No incluye
+                </p>
+                <p
+                  className="mt-1 text-xs whitespace-pre-wrap text-amber-900"
+                  style={NO_ORPHAN_LINES_STYLE}
+                >
+                  {quote.exclusions}
+                </p>
+              </div>
+            )}
+          </section>
+        )}
 
-      {/* 7. Total en letras */}
-      <p className="mt-2 text-right text-xs font-medium text-neutral-600 italic">
-        {amountInWords(quote.billing.total, currency)}
-      </p>
+        {/* 8b. Observaciones — al final del contenido, antes de firmas.
+            Misma regla de visibilidad y de paginación que Alcance. */}
+        {quote.observations && (
+          <section className="mt-6">
+            <SectionTitle>Observaciones</SectionTitle>
+            <p
+              className="mt-2 text-xs whitespace-pre-wrap text-neutral-900"
+              style={NO_ORPHAN_LINES_STYLE}
+            >
+              {quote.observations}
+            </p>
+          </section>
+        )}
 
-      {/* 8. Condiciones comerciales */}
-      {(hasAnyCommercialTerm || quote.exclusions) && (
-        <section className="mt-6 flex flex-col gap-4 break-inside-avoid">
-          <p className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">
-            Condiciones comerciales
-          </p>
-          {hasAnyCommercialTerm && (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <ConditionField label="Forma de pago" value={quote.paymentTerms} />
-              <ConditionField label="Tiempo de entrega" value={quote.deliveryTime} />
-              <ConditionField label="Garantía" value={quote.warrantyTerms} />
-              <ConditionField label="Validez de la oferta" value={`${quote.validityDays} días`} />
-            </div>
-          )}
-          {quote.exclusions && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 print-color-exact">
-              <p className="text-[10px] font-semibold tracking-wide text-amber-800 uppercase">
-                No incluye
-              </p>
-              <p className="mt-1 text-xs whitespace-pre-wrap text-amber-900">
-                {quote.exclusions}
-              </p>
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* 8b. Observaciones — al final del contenido, antes de firmas.
-          Misma regla de visibilidad y de paginación que Metodología. */}
-      {quote.observations && (
-        <section className="mt-6 flex flex-col gap-2 break-inside-avoid">
-          <p className="break-after-avoid text-xs font-semibold tracking-wide text-neutral-500 uppercase">
-            Observaciones
-          </p>
-          <p className="text-xs whitespace-pre-wrap text-neutral-900">{quote.observations}</p>
-        </section>
-      )}
-
-      {/* 9. Firmas */}
-      <footer className="mt-10 flex flex-col gap-6 break-inside-avoid">
-        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
-          {company.signerName && (
-            <div className="flex flex-col gap-8">
-              <SignatureLine
-                signatureImageUrl={
-                  company.signatureInQuote ? company.signatureImageUrl : null
-                }
-              />
-              <div className="flex flex-col text-sm text-neutral-800">
-                <span className="text-xs text-neutral-500">Elaborado por</span>
-                <span className="font-medium">{company.signerName}</span>
-                {company.signerRole && (
-                  <span className="text-xs text-neutral-500">{company.signerRole}</span>
-                )}
+        {/* 9. Firmas — bloque de firmas en su propia fila de tabla
+            atómica (ver PrintKeepTogether): así viaja completo a la hoja
+            siguiente si no cabe, nunca partido entre las rúbricas y sus
+            datos. pb-6 es padding del <td>, no margin: no se pierde si
+            el bloque abre hoja nueva. La nota al pie queda fuera, en
+            flujo normal — es corta y no necesita esa protección. */}
+        <footer className="mt-10">
+          <PrintKeepTogether className="pb-6">
+            <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
+              {company.signerName && (
+                <div className="flex flex-col gap-8">
+                  <SignatureLine
+                    signatureImageUrl={
+                      company.signatureInQuote ? company.signatureImageUrl : null
+                    }
+                  />
+                  <div className="flex flex-col text-sm text-neutral-800">
+                    <span className="text-xs text-neutral-500">Elaborado por</span>
+                    <span className="font-medium">{company.signerName}</span>
+                    {company.signerRole && (
+                      <span className="text-xs text-neutral-500">{company.signerRole}</span>
+                    )}
+                  </div>
+                </div>
+              )}
+              <div className="flex flex-col gap-8">
+                <div className="h-10 border-b border-neutral-400" />
+                <div className="flex flex-col gap-1 text-xs text-neutral-600">
+                  <span className="font-medium text-neutral-800">Aceptado por el cliente</span>
+                  <span>Nombre: ____________________________</span>
+                  <span>Firma: ____________________________</span>
+                  <span>Fecha: ____________________________</span>
+                </div>
               </div>
             </div>
-          )}
-          <div className="flex flex-col gap-8">
-            <div className="h-10 border-b border-neutral-400" />
-            <div className="flex flex-col gap-1 text-xs text-neutral-600">
-              <span className="font-medium text-neutral-800">Aceptado por el cliente</span>
-              <span>Nombre: ____________________________</span>
-              <span>Firma: ____________________________</span>
-              <span>Fecha: ____________________________</span>
-            </div>
-          </div>
-        </div>
+          </PrintKeepTogether>
 
-        {/* 10. Nota al pie */}
-        <p className="text-center text-xs text-neutral-500 italic">
-          {company.quoteFootnote || DEFAULT_FOOTNOTE}
-        </p>
-        <p className="text-center text-[11px] text-neutral-400 print:hidden">
-          Documento generado por FixTrack Pro
-        </p>
-      </footer>
-
-      <p className="hidden bg-white py-2 text-center text-[10px] text-neutral-400 print:fixed print:inset-x-0 print:bottom-0 print:z-10 print:block">
-        {printFooterText}
-      </p>
+          {/* 10. Nota al pie */}
+          <p className="text-center text-xs text-neutral-500 italic">
+            {company.quoteFootnote || DEFAULT_FOOTNOTE}
+          </p>
+        </footer>
+      </PrintDocumentFrame>
     </div>
   );
 }
