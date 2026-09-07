@@ -60,7 +60,7 @@ function isExcludedTarget(target: EventTarget | null, boundary: Element): boolea
  * implementado UNA sola vez acá (ver app-shell.tsx, que envuelve `children`
  * con esto) para no depender de que cada pantalla nueva se acuerde de
  * ponerlo. Solo en móvil: en escritorio ni siquiera se instalan los
- * listeners de puntero.
+ * listeners de touch.
  *
  * "Refrescar" son dos cosas a la vez: volver a pedir los datos de la
  * pantalla actual (router.refresh(), con señal) y forzar una
@@ -81,11 +81,11 @@ export function PullToRefresh({ userId, children }: PullToRefreshProps) {
 
   const containerRef = useRef<HTMLDivElement>(null);
   const startYRef = useRef<number | null>(null);
-  /** Puntero que arrancó ESTE gesto — para ignorar cualquier otro dedo que toque de paso mientras tanto. */
-  const pointerIdRef = useRef<number | null>(null);
+  /** identifier del toque que arrancó ESTE gesto — para ignorar cualquier otro dedo que toque de paso mientras tanto. */
+  const touchIdRef = useRef<number | null>(null);
   /** true = este toque ya calificó para el gesto (arrancó arriba del todo, fuera de zonas excluidas). */
   const armedRef = useRef(false);
-  /** true = ya estamos activamente arrastrando el indicador (pasado ARM_DISTANCE_PX). */
+  /** true = ya hubo algún movimiento hacia abajo real en este toque (para no disparar en un simple tap). */
   const draggingRef = useRef(false);
   const pullPxRef = useRef(0);
   const phaseRef = useRef<Phase>("idle");
@@ -128,32 +128,51 @@ export function PullToRefresh({ userId, children }: PullToRefreshProps) {
     const el = containerRef.current;
     if (!el || !isMobile) return;
 
-    // Eventos de PUNTERO, no de touch — mismo camino que signature-pad.tsx
-    // (cubre dedo, mouse y lápiz con un solo modelo). touch-action no
-    // detiene la propagación de estos eventos, solo el gesto nativo del
-    // navegador: isExcludedTarget sigue siendo necesario igual.
-    function handlePointerDown(event: PointerEvent): void {
+    // Eventos de TOQUE, no de puntero — a propósito, y no por costumbre.
+    // Se probó en un celular real que con Pointer Events el navegador
+    // reconoce el gesto como scroll nativo y dispara pointercancel ANTES
+    // de que el código alcance a acumular ARM_DISTANCE_PX y llamar a
+    // preventDefault() — los eventos dejan de llegar y el gesto nunca se
+    // arma. Con touchmove registrado NO pasivo, el navegador espera a ver
+    // si el handler llama a preventDefault() antes de comprometerse al
+    // scroll nativo — por eso acá se llama DESDE EL PRIMER píxel hacia
+    // abajo (no recién pasado ARM_DISTANCE_PX, que sigue existiendo pero
+    // solo para decidir cuándo mostrar el indicador, nunca para decidir
+    // cuándo capturar el gesto).
+    function findTrackedTouch(touches: TouchList): Touch | null {
+      for (let i = 0; i < touches.length; i++) {
+        if (touches[i].identifier === touchIdRef.current) return touches[i];
+      }
+      return null;
+    }
+
+    function handleTouchStart(event: TouchEvent): void {
       if (phaseRef.current !== "idle") return;
-      if (pointerIdRef.current !== null) return; // ya hay un dedo llevando este gesto
+      if (touchIdRef.current !== null) return; // ya hay un dedo llevando este gesto
+      const touch = event.changedTouches[0];
+      if (!touch) return;
 
       const scrollTop = document.scrollingElement?.scrollTop ?? window.scrollY;
       if (scrollTop > 0) return;
       if (isExcludedTarget(event.target, el!)) return;
 
-      pointerIdRef.current = event.pointerId;
-      startYRef.current = event.clientY;
+      touchIdRef.current = touch.identifier;
+      startYRef.current = touch.clientY;
       armedRef.current = true;
     }
 
-    function handlePointerMove(event: PointerEvent): void {
+    function handleTouchMove(event: TouchEvent): void {
       if (!armedRef.current || startYRef.current === null) return;
-      if (event.pointerId !== pointerIdRef.current) return;
+      const touch = findTrackedTouch(event.touches);
+      if (!touch) return;
 
-      const deltaY = event.clientY - startYRef.current;
+      const deltaY = touch.clientY - startYRef.current;
 
-      if (deltaY <= 0) {
-        // El dedo volvió hacia arriba (o no se movió) — esto no es un
-        // pull, se suelta el gesto para el resto de este toque y no se
+      if (deltaY === 0) return; // sin movimiento todavía (sampling) — sigue armado, nada que decidir aún
+
+      if (deltaY < 0) {
+        // El dedo se movió hacia arriba de verdad — esto no es un pull,
+        // se suelta el gesto para el resto de este toque y no se
         // interfiere con el desplazamiento normal.
         armedRef.current = false;
         draggingRef.current = false;
@@ -161,17 +180,26 @@ export function PullToRefresh({ userId, children }: PullToRefreshProps) {
         return;
       }
 
-      if (deltaY < ARM_DISTANCE_PX) return;
-
-      draggingRef.current = true;
+      // Captura el gesto YA — ver el porqué en el comentario de arriba.
       event.preventDefault();
+      draggingRef.current = true;
+
+      if (deltaY < ARM_DISTANCE_PX) return; // ya capturado, todavía sin mostrar nada (evita jitter visual)
+
       updatePull(Math.min(MAX_PULL_PX, deltaY * 0.5));
       updatePhase("pulling");
     }
 
-    function handlePointerEnd(event: PointerEvent): void {
-      if (event.pointerId !== pointerIdRef.current) return;
-      pointerIdRef.current = null;
+    function handleTouchEnd(event: TouchEvent): void {
+      let ourTouchEnded = false;
+      for (let i = 0; i < event.changedTouches.length; i++) {
+        if (event.changedTouches[i].identifier === touchIdRef.current) {
+          ourTouchEnded = true;
+          break;
+        }
+      }
+      if (!ourTouchEnded) return; // otro dedo distinto soltó, el nuestro sigue activo
+      touchIdRef.current = null;
       armedRef.current = false;
       if (!draggingRef.current) return;
       draggingRef.current = false;
@@ -184,16 +212,16 @@ export function PullToRefresh({ userId, children }: PullToRefreshProps) {
       }
     }
 
-    el.addEventListener("pointerdown", handlePointerDown, { passive: true });
-    el.addEventListener("pointermove", handlePointerMove, { passive: false });
-    el.addEventListener("pointerup", handlePointerEnd, { passive: true });
-    el.addEventListener("pointercancel", handlePointerEnd, { passive: true });
+    el.addEventListener("touchstart", handleTouchStart, { passive: true });
+    el.addEventListener("touchmove", handleTouchMove, { passive: false });
+    el.addEventListener("touchend", handleTouchEnd, { passive: true });
+    el.addEventListener("touchcancel", handleTouchEnd, { passive: true });
 
     return () => {
-      el.removeEventListener("pointerdown", handlePointerDown);
-      el.removeEventListener("pointermove", handlePointerMove);
-      el.removeEventListener("pointerup", handlePointerEnd);
-      el.removeEventListener("pointercancel", handlePointerEnd);
+      el.removeEventListener("touchstart", handleTouchStart);
+      el.removeEventListener("touchmove", handleTouchMove);
+      el.removeEventListener("touchend", handleTouchEnd);
+      el.removeEventListener("touchcancel", handleTouchEnd);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- el resto del estado que la función usa vive en refs, a propósito (ver arriba): re-instalar los listeners en cada pull perdería el gesto a mitad de camino.
   }, [isMobile, userId]);
