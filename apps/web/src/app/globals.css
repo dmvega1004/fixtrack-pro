@@ -123,6 +123,11 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* El propio "deslizar para refrescar" (pull-to-refresh.tsx) reemplaza
+       cualquier gesto nativo del navegador para el mismo movimiento —
+       sin esto, Chrome/Android puede disparar SU pull-to-refresh (recarga
+       dura de toda la página) al mismo tiempo que el nuestro. */
+    overscroll-behavior-y: contain;
   }
   html {
     @apply font-sans;

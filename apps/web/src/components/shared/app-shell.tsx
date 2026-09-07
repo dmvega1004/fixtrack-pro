@@ -15,6 +15,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { PullToRefresh } from "@/components/shared/pull-to-refresh";
 
 const SWIPE_CLOSE_THRESHOLD_PX = 60;
 
@@ -118,7 +119,9 @@ export function AppShell({ session, children }: AppShellProps) {
         </div>
       </aside>
 
-      <main className="flex-1 pb-16 md:pb-0">{children}</main>
+      <main className="flex-1 pb-16 md:pb-0">
+        <PullToRefresh userId={session.userId}>{children}</PullToRefresh>
+      </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-40 flex h-16 items-center justify-around border-t border-border bg-card md:hidden">
         {MOBILE_NAV_LEFT.map((item) => (
