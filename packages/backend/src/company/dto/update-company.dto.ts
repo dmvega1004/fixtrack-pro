@@ -169,6 +169,11 @@ export class UpdateCompanyDto {
   defaultExclusions?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(5000)
+  defaultMethodology?: string;
+
+  @IsOptional()
   @IsInt({ message: 'defaultValidityDays debe ser un entero' })
   @Min(1)
   @Max(365)

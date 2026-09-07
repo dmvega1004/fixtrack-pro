@@ -42,6 +42,7 @@ export interface Company {
   defaultDeliveryTime: string | null;
   defaultWarrantyTerms: string | null;
   defaultExclusions: string | null;
+  defaultMethodology: string | null;
   defaultValidityDays: number;
   quoteFollowUpDays: number;
   quoteFootnote: string | null;
@@ -75,6 +76,7 @@ export interface UpdateCompanyInput {
   defaultDeliveryTime?: string;
   defaultWarrantyTerms?: string;
   defaultExclusions?: string;
+  defaultMethodology?: string;
   defaultValidityDays?: number;
   quoteFollowUpDays?: number;
   quoteFootnote?: string;

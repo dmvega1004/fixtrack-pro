@@ -53,6 +53,7 @@ const COMPANY_SELECT = {
   defaultDeliveryTime: true,
   defaultWarrantyTerms: true,
   defaultExclusions: true,
+  defaultMethodology: true,
   defaultValidityDays: true,
   quoteFollowUpDays: true,
   quoteFootnote: true,
@@ -90,6 +91,7 @@ export type PublicCompany = Pick<
   | 'defaultDeliveryTime'
   | 'defaultWarrantyTerms'
   | 'defaultExclusions'
+  | 'defaultMethodology'
   | 'defaultValidityDays'
   | 'quoteFollowUpDays'
   | 'quoteFootnote'
@@ -174,6 +176,7 @@ export class CompanyService {
         defaultDeliveryTime: dto.defaultDeliveryTime?.trim(),
         defaultWarrantyTerms: dto.defaultWarrantyTerms?.trim(),
         defaultExclusions: dto.defaultExclusions?.trim(),
+        defaultMethodology: dto.defaultMethodology?.trim(),
         defaultValidityDays: dto.defaultValidityDays,
         quoteFollowUpDays: dto.quoteFollowUpDays,
         quoteFootnote: dto.quoteFootnote?.trim(),

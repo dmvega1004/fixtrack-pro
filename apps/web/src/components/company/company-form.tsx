@@ -40,6 +40,7 @@ interface CompanyFormState {
   defaultDeliveryTime: string;
   defaultWarrantyTerms: string;
   defaultExclusions: string;
+  defaultMethodology: string;
   defaultValidityDays: string;
   quoteFollowUpDays: string;
   quoteFootnote: string;
@@ -72,6 +73,7 @@ function toFormState(company: Company): CompanyFormState {
     defaultDeliveryTime: company.defaultDeliveryTime ?? "",
     defaultWarrantyTerms: company.defaultWarrantyTerms ?? "",
     defaultExclusions: company.defaultExclusions ?? "",
+    defaultMethodology: company.defaultMethodology ?? "",
     defaultValidityDays: String(company.defaultValidityDays),
     quoteFollowUpDays: String(company.quoteFollowUpDays),
     quoteFootnote: company.quoteFootnote ?? "",
@@ -165,7 +167,7 @@ export function CompanyForm({ company }: CompanyFormProps) {
   }
 
   function updateField(field: keyof CompanyFormState) {
-    return (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    return (event: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
       setForm((current) => ({ ...current, [field]: event.target.value }));
     };
   }
@@ -249,6 +251,7 @@ export function CompanyForm({ company }: CompanyFormProps) {
       defaultDeliveryTime: form.defaultDeliveryTime.trim() || undefined,
       defaultWarrantyTerms: form.defaultWarrantyTerms.trim() || undefined,
       defaultExclusions: form.defaultExclusions.trim() || undefined,
+      defaultMethodology: form.defaultMethodology.trim() || undefined,
       defaultValidityDays,
       quoteFollowUpDays,
       quoteFootnote: form.quoteFootnote.trim() || undefined,
@@ -709,6 +712,17 @@ export function CompanyForm({ company }: CompanyFormProps) {
               value={form.defaultExclusions}
               onChange={updateField("defaultExclusions")}
               placeholder="Ej. No incluye obra civil"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="defaultMethodology">Metodología / plan de trabajo</Label>
+            <textarea
+              id="defaultMethodology"
+              value={form.defaultMethodology}
+              onChange={updateField("defaultMethodology")}
+              rows={3}
+              placeholder="Texto que se prellena en cada cotización nueva — editable ahí mientras siga en borrador"
+              className="w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
             />
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

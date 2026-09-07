@@ -53,6 +53,8 @@ export interface Quote {
   title: string;
   siteName: string | null;
   scope: string;
+  /** Cómo se ejecuta el trabajo, en qué etapas. null = sección oculta en el documento. */
+  methodology: string | null;
   status: QuoteStatus;
   discountAmount: string;
   /** Congelados al enviar; null mientras sigue en DRAFT. */
@@ -63,6 +65,8 @@ export interface Quote {
   deliveryTime: string | null;
   warrantyTerms: string | null;
   exclusions: string | null;
+  /** Notas libres. null = sección oculta en el documento. */
+  observations: string | null;
   validityDays: number;
   validUntil: string | null;
   sentAt: string | null;
@@ -94,6 +98,7 @@ export interface CreateQuoteInput {
   title: string;
   siteName?: string;
   scope: string;
+  methodology?: string;
   equipmentIds?: string[];
   items: QuoteItemInput[];
   discountAmount?: number;
@@ -101,6 +106,7 @@ export interface CreateQuoteInput {
   deliveryTime?: string;
   warrantyTerms?: string;
   exclusions?: string;
+  observations?: string;
   validityDays?: number;
 }
 

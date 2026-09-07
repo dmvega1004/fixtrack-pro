@@ -95,8 +95,16 @@ export default async function CotizacionDetallePage({ params }: CotizacionDetall
           <CardHeader>
             <CardTitle>Alcance</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-col gap-4">
             <p className="text-sm whitespace-pre-wrap">{quote.scope}</p>
+            {quote.methodology && (
+              <div className="flex flex-col gap-0.5 border-t border-border pt-3">
+                <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                  Metodología / plan de trabajo
+                </span>
+                <p className="text-sm whitespace-pre-wrap">{quote.methodology}</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -182,6 +190,7 @@ export default async function CotizacionDetallePage({ params }: CotizacionDetall
             <Field label="Garantía" value={quote.warrantyTerms} />
             <Field label="Exclusiones" value={quote.exclusions} />
             <Field label="Días de validez" value={`${quote.validityDays} días`} />
+            <Field label="Observaciones" value={quote.observations} />
           </CardContent>
         </Card>
 

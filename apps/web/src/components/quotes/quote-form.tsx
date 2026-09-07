@@ -86,6 +86,9 @@ export function QuoteForm({
   const [siteName, setSiteName] = useState(initial?.siteName ?? "");
   const [title, setTitle] = useState(initial?.title ?? "");
   const [scope, setScope] = useState(initial?.scope ?? "");
+  const [methodology, setMethodology] = useState(
+    initial?.methodology ?? company.defaultMethodology ?? "",
+  );
   const [selectedEquipmentIds, setSelectedEquipmentIds] = useState<string[]>(
     initial?.equipments.map((e) => e.id) ?? [],
   );
@@ -107,6 +110,7 @@ export function QuoteForm({
   const [exclusions, setExclusions] = useState(
     initial?.exclusions ?? company.defaultExclusions ?? "",
   );
+  const [observations, setObservations] = useState(initial?.observations ?? "");
   const [validityDays, setValidityDays] = useState(
     String(initial?.validityDays ?? company.defaultValidityDays),
   );
@@ -253,6 +257,7 @@ export function QuoteForm({
         title: title.trim(),
         siteName: siteName.trim() || undefined,
         scope: scope.trim(),
+        methodology: methodology.trim() || undefined,
         equipmentIds: selectedEquipmentIds,
         items: itemsPayload,
         discountAmount: discount,
@@ -260,6 +265,7 @@ export function QuoteForm({
         deliveryTime: deliveryTime.trim() || undefined,
         warrantyTerms: warrantyTerms.trim() || undefined,
         exclusions: exclusions.trim() || undefined,
+        observations: observations.trim() || undefined,
         validityDays: validityDaysNumber,
       });
 
@@ -279,6 +285,7 @@ export function QuoteForm({
       title: title.trim(),
       siteName: siteName.trim() || undefined,
       scope: scope.trim(),
+      methodology: methodology.trim() || undefined,
       equipmentIds: selectedEquipmentIds,
       items: itemsPayload,
       discountAmount: discount,
@@ -286,6 +293,7 @@ export function QuoteForm({
       deliveryTime: deliveryTime.trim() || undefined,
       warrantyTerms: warrantyTerms.trim() || undefined,
       exclusions: exclusions.trim() || undefined,
+      observations: observations.trim() || undefined,
       validityDays: validityDaysNumber,
     });
 
@@ -440,6 +448,17 @@ export function QuoteForm({
               className="w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
             />
           </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="methodology">Metodología / plan de trabajo</Label>
+            <textarea
+              id="methodology"
+              value={methodology}
+              onChange={(event) => setMethodology(event.target.value)}
+              rows={4}
+              placeholder="Cómo se ejecuta el trabajo, en qué etapas"
+              className="w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            />
+          </div>
 
           {hasClient && (
             <div className="flex flex-col gap-2">
@@ -511,34 +530,53 @@ export function QuoteForm({
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="paymentTerms">Forma de pago</Label>
-            <Input
+            <textarea
               id="paymentTerms"
               value={paymentTerms}
               onChange={(event) => setPaymentTerms(event.target.value)}
+              rows={2}
+              className="w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
             />
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="deliveryTime">Tiempo de entrega</Label>
-            <Input
+            <textarea
               id="deliveryTime"
               value={deliveryTime}
               onChange={(event) => setDeliveryTime(event.target.value)}
+              rows={2}
+              className="w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
             />
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="warrantyTerms">Garantía</Label>
-            <Input
+            <textarea
               id="warrantyTerms"
               value={warrantyTerms}
               onChange={(event) => setWarrantyTerms(event.target.value)}
+              rows={3}
+              className="w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
             />
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="exclusions">Exclusiones</Label>
-            <Input
+            <textarea
               id="exclusions"
               value={exclusions}
               onChange={(event) => setExclusions(event.target.value)}
+              rows={3}
+              className="w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="observations">Observaciones</Label>
+            <textarea
+              id="observations"
+              value={observations}
+              onChange={(event) => setObservations(event.target.value)}
+              rows={3}
+              placeholder="Notas libres que no encajan en los otros bloques"
+              className="w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
             />
           </div>
 

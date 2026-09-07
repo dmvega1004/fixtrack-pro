@@ -61,7 +61,7 @@ function ConditionField({ label, value }: { label: string; value: string | null 
       <span className="text-[10px] font-medium tracking-wide text-neutral-500 uppercase">
         {label}
       </span>
-      <span className="text-sm text-neutral-900">{value}</span>
+      <span className="text-xs text-neutral-900">{value}</span>
     </div>
   );
 }
@@ -186,12 +186,26 @@ export function QuoteDocument({ quote, client, company }: QuoteDocumentProps) {
       {/* 4. Alcance */}
       <section className="mt-6 flex flex-col gap-2">
         <p className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">Alcance</p>
-        <p className="text-sm whitespace-pre-wrap text-neutral-900">{quote.scope}</p>
+        <p className="text-xs whitespace-pre-wrap text-neutral-900">{quote.scope}</p>
       </section>
+
+      {/* 4b. Metodología / plan de trabajo — oculta por completo (ni
+          título) si está vacía. break-inside-avoid en la sección +
+          break-after-avoid en el título: mismo patrón que ReportSection en
+          client-report-format-document.tsx, para que un salto de página
+          nunca deje el título solo separado de su texto. */}
+      {quote.methodology && (
+        <section className="mt-6 flex flex-col gap-2 break-inside-avoid">
+          <p className="break-after-avoid text-xs font-semibold tracking-wide text-neutral-500 uppercase">
+            Metodología / plan de trabajo
+          </p>
+          <p className="text-xs whitespace-pre-wrap text-neutral-900">{quote.methodology}</p>
+        </section>
+      )}
 
       {/* 5. Ítems */}
       <section className="mt-6">
-        <table className="w-full border-collapse text-sm">
+        <table className="w-full border-collapse text-xs">
           <thead>
             <tr className="border-b border-neutral-400 text-left text-[11px] tracking-wide text-neutral-500 uppercase">
               <th className="w-8 py-1.5 pr-2 font-medium">#</th>
@@ -221,7 +235,7 @@ export function QuoteDocument({ quote, client, company }: QuoteDocumentProps) {
 
       {/* 6. Totales */}
       <section className="mt-4 flex justify-end break-inside-avoid">
-        <table className="w-72 border-collapse text-sm">
+        <table className="w-72 border-collapse text-xs">
           <tbody>
             <TotalRow label="Subtotal" value={formatCurrency(quote.billing.subtotal, currency)} />
             {Number(quote.billing.discountAmount) > 0 && (
@@ -273,11 +287,22 @@ export function QuoteDocument({ quote, client, company }: QuoteDocumentProps) {
               <p className="text-[10px] font-semibold tracking-wide text-amber-800 uppercase">
                 No incluye
               </p>
-              <p className="mt-1 text-sm whitespace-pre-wrap text-amber-900">
+              <p className="mt-1 text-xs whitespace-pre-wrap text-amber-900">
                 {quote.exclusions}
               </p>
             </div>
           )}
+        </section>
+      )}
+
+      {/* 8b. Observaciones — al final del contenido, antes de firmas.
+          Misma regla de visibilidad y de paginación que Metodología. */}
+      {quote.observations && (
+        <section className="mt-6 flex flex-col gap-2 break-inside-avoid">
+          <p className="break-after-avoid text-xs font-semibold tracking-wide text-neutral-500 uppercase">
+            Observaciones
+          </p>
+          <p className="text-xs whitespace-pre-wrap text-neutral-900">{quote.observations}</p>
         </section>
       )}
 

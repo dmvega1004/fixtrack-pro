@@ -155,6 +155,11 @@ model Company {
   defaultDeliveryTime   String?
   defaultWarrantyTerms  String?
   defaultExclusions     String?
+  /// Metodología / plan de trabajo por defecto de una cotización nueva —
+  /// se COPIA a Quote.methodology al crear, mismo criterio que
+  /// defaultExclusions. Observaciones no tiene contraparte acá: es texto
+  /// libre por cotización, no una plantilla reutilizable.
+  defaultMethodology    String?
   defaultValidityDays   Int                  @default(30)
   /// Días tras el envío para sugerir Quote.followUpAt.
   quoteFollowUpDays     Int                  @default(5)
@@ -767,6 +772,13 @@ model Quote {
   siteName          String?
   /// Alcance del trabajo propuesto — texto largo.
   scope             String
+  /// Metodología / plan de trabajo — cómo se ejecuta, en qué etapas.
+  /// Opcional: si está vacía, la sección no aparece en el documento
+  /// impreso (ni el título). Se prellena con Company.defaultMethodology
+  /// al crear (copiado, no referenciado — ver defaultExclusions abajo);
+  /// editable solo en DRAFT, congelada al enviar como las demás
+  /// condiciones comerciales.
+  methodology       String?
   status            QuoteStatus      @default(DRAFT)
   discountAmount    Decimal          @default(0) @db.Decimal(12, 2)
   /// Congelados al ENVIAR (igual que WorkOrder.taxRateApplied/totalAmount):
@@ -781,6 +793,11 @@ model Quote {
   deliveryTime      String?
   warrantyTerms     String?
   exclusions        String?
+  /// Notas libres que no encajan en los otros bloques del documento.
+  /// Igual regla que methodology: opcional (sección oculta si vacía),
+  /// editable solo en DRAFT. Sin default de empresa — es texto propio de
+  /// cada cotización, no una plantilla reutilizable.
+  observations      String?
   /// Días de validez de la oferta desde que se envía. Copiado de
   /// Company.defaultValidityDays al crear.
   validityDays      Int

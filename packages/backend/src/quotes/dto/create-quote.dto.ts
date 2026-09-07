@@ -40,6 +40,12 @@ export class CreateQuoteDto {
   @MaxLength(5000)
   scope: string;
 
+  /** Cómo se ejecuta el trabajo, en qué etapas. Si se omite, el service aplica Company.defaultMethodology. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(5000)
+  methodology?: string;
+
   /**
    * Equipos involucrados (opcional, varios) del mismo cliente — mismo
    * patrón que CreateWorkOrderDto.equipmentIds. Duplicados se rechazan acá.
@@ -87,6 +93,12 @@ export class CreateQuoteDto {
   @IsString()
   @MaxLength(2000)
   exclusions?: string;
+
+  /** Notas libres, sin default de empresa. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(5000)
+  observations?: string;
 
   /** Si se omite, el service aplica Company.defaultValidityDays. */
   @IsOptional()
