@@ -6,6 +6,15 @@
 // cuando la página lo pide (ver el listener de "message" más abajo) —
 // para el técnico nuevo que instala el service worker ANTES de iniciar
 // sesión, que es el camino por defecto, no un caso raro.
+//
+// Desde que "/" tiene una landing comercial pública (app/landing/), un
+// GET a "/" sin sesión ya no redirige a /login: responde 200 con la
+// landing. Para que esa página nunca acabe guardada como armazón, tanto
+// el precacheo como la caché oportunista exigen una CONFIRMACIÓN POSITIVA
+// —la cabecera `x-fixtrack-shell: app` que proxy.ts pone solo con sesión
+// válida y vigente— antes de guardar "/" o cualquier navegación. Sin esa
+// cabecera no se guarda: el peor caso es caer en offline.html, nunca
+// mostrar publicidad donde el técnico espera sus órdenes.
 // capacitor.config.ts apunta a server.url = https://fixtrackpro.com, y el
 // WebView carga ese mismo sitio en vivo, así que este mismo sw.js corre
 // igual adentro del APK que en cualquier navegador, sin nada especial de
@@ -108,6 +117,24 @@ async function precacheShellUrl(cache, shellUrl) {
       return;
     }
 
+    // Confirmación POSITIVA antes de guardar: proxy.ts marca con
+    // `x-fixtrack-shell: app` únicamente las respuestas servidas con una
+    // sesión válida y vigente. Sin esa marca no se guarda NADA en esta
+    // dirección. El caso que esto ataja: "/" sin sesión ya no redirige a
+    // /login (el candado de arriba) sino que sirve 200 la landing
+    // comercial — indistinguible de la app para el chequeo `redirected`.
+    // La regla se invierte a propósito: ante la marca ausente (un error,
+    // un cambio futuro, una capa intermedia que la borre) el
+    // comportamiento por defecto es NO guardar, así que el peor caso es un
+    // arranque en frío que cae en offline.html, nunca la landing donde el
+    // técnico espera sus órdenes.
+    if (shellResponse.headers.get("x-fixtrack-shell") !== "app") {
+      console.warn(
+        `[sw] ${shellUrl} sin la marca de armazón autenticado (x-fixtrack-shell) — no se guarda`,
+      );
+      return;
+    }
+
     const html = await shellResponse.clone().text();
     await cache.put(shellUrl, shellResponse);
 
@@ -178,13 +205,19 @@ async function navigateNetworkFirst(request) {
     // vez de mostrar cualquier respuesta.
     const response = await fetch(request.clone());
 
-    // Mismo candado que en precacheShellUrl: una navegación real (ej. el
-    // token venció a mitad de jornada y esta petición terminó en /login)
-    // puede terminar en una respuesta redirigida tan fácil como el
-    // precacheo inicial. Guardarla envenenaría esta entrada de caché para
-    // la próxima vez que se pida sin red — se deja la entrada anterior
-    // (si había alguna) tal cual, en vez de pisarla con la de /login.
-    if (response.ok && !response.redirected) {
+    // Mismo par de candados que en precacheShellUrl:
+    //  1. `!response.redirected` — una navegación real (ej. el token
+    //     venció a mitad de jornada y esta petición terminó en /login)
+    //     puede terminar redirigida tan fácil como el precacheo inicial.
+    //  2. `x-fixtrack-shell: app` — confirmación POSITIVA de proxy.ts de
+    //     que esto se sirvió con sesión válida. Sin esa marca no se
+    //     guarda: cubre "/" sirviendo 200 la landing comercial a quien no
+    //     trae sesión (que el chequeo `redirected` no distingue de la
+    //     app), y deja como comportamiento por defecto —ante cualquier
+    //     duda— NO tocar la entrada anterior.
+    const isAuthenticatedShell =
+      response.headers.get("x-fixtrack-shell") === "app";
+    if (response.ok && !response.redirected && isAuthenticatedShell) {
       // Clave de caché SIN cadena de consulta: /ordenes?estado=abierta,
       // /ordenes?estado=cerrada, etc. son la MISMA pantalla guardada —
       // sin esto se acumula una entrada distinta por cada combinación de
