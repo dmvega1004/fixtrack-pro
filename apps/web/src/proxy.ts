@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { SESSION_COOKIE_NAME } from "@/lib/session";
+import {
+  SESSION_COOKIE_NAME,
+  DEVICE_KNOWN_COOKIE_NAME,
+  DEVICE_KNOWN_COOKIE_MAX_AGE,
+} from "@/lib/session";
 
 /**
  * Confirmación POSITIVA de sesión para el service worker: solo si esto
@@ -42,6 +46,36 @@ function isLiveSessionToken(token: string | undefined): boolean {
   }
 }
 
+/**
+ * ¿La petición viene de la app instalada (el APK), no de un navegador?
+ * Es una vista web de Android empaquetada con Capacitor. Quien la abre
+ * SIEMPRE es un usuario, jamás un prospecto: ahí la landing comercial no
+ * se muestra nunca. Sirve de respaldo si la marca de dispositivo conocido
+ * se pierde (borrado de datos de la app, instalación recién hecha).
+ *
+ * Señal que funciona en los APK YA instalados: el token `wv` que Android
+ * agrega al user-agent de toda WebView. Se excluyen los navegadores
+ * embebidos de apps sociales (Instagram, Facebook, etc.) — también son
+ * WebView, pero por ahí sí puede llegar alguien que nunca ha usado
+ * FixTrack.
+ *
+ * Señal explícita para builds futuros: `appendUserAgent: "FixTrackApp"`
+ * en apps/mobile/capacitor.config.ts. Requiere `npx cap sync` y
+ * redistribuir el APK para surtir efecto; hasta entonces manda el `wv`.
+ */
+function isAppWebView(request: NextRequest): boolean {
+  const ua = request.headers.get("user-agent") ?? "";
+  if (ua.includes("FixTrackApp")) return true;
+
+  if (!/\bwv\b/.test(ua)) return false;
+
+  const socialInAppBrowser =
+    /FBAN|FBAV|FB_IAB|Instagram|Line\/|Twitter|MicroMessenger|Snapchat|Pinterest|TikTok|musical_ly|GSA\//i.test(
+      ua,
+    );
+  return !socialInAppBrowser;
+}
+
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
@@ -54,15 +88,27 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // La raíz es PÚBLICA para quien no trae cookie de sesión: ve la landing
-  // comercial, servida por app/landing/page.tsx mediante una reescritura
-  // interna — la barra de direcciones se queda en "/". Con cookie presente
-  // (válida o no) esta rama NO se activa: el flujo sigue exactamente igual
-  // que antes (el tablero, o una redirección a /login si el layout no
-  // valida la sesión), así que un técnico con sesión nunca ve la landing
-  // ni de reojo. Es una ruta explícitamente pública: sin esto, el bloque
-  // `!hasSession` de más abajo la mandaría a /login como a cualquier otra.
+  // La raíz muestra la landing comercial SOLO a quien nunca ha iniciado
+  // sesión en este dispositivo. Un técnico cuya sesión de 8 h venció ya no
+  // tiene cookie de sesión, pero sí la marca de dispositivo conocido (o
+  // entra por el APK): a ese se le manda a /login, igual que antes de que
+  // existiera la landing. Con cookie de sesión presente (válida o no) esta
+  // rama ni se evalúa: el flujo sigue como siempre (tablero, o /login si
+  // el layout no valida la sesión).
+  //
+  // La landing se sirve por reescritura interna desde app/landing/page.tsx
+  // — la barra de direcciones se queda en "/". Es una ruta explícitamente
+  // pública: sin esto, el bloque `!hasSession` de más abajo la mandaría a
+  // /login como a cualquier otra.
   if (pathname === "/" && !hasSession) {
+    const knownDevice =
+      Boolean(request.cookies.get(DEVICE_KNOWN_COOKIE_NAME)?.value) ||
+      isAppWebView(request);
+
+    if (knownDevice) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+
     const url = request.nextUrl.clone();
     url.pathname = "/landing";
     return NextResponse.rewrite(url);
@@ -82,6 +128,21 @@ export function proxy(request: NextRequest) {
   const response = NextResponse.next();
   if (isLiveSessionToken(token)) {
     response.headers.set("x-fixtrack-shell", "app");
+
+    // Siembra la marca de dispositivo conocido para las sesiones que ya
+    // estaban abiertas antes de este cambio (el login nuevo ya la
+    // escribe). Solo si falta: así no se manda un Set-Cookie en cada
+    // petición. Como el login la reescribe fresca al menos cada 8 h, su
+    // año de vigencia nunca se acerca a expirar en un dispositivo en uso.
+    if (!request.cookies.get(DEVICE_KNOWN_COOKIE_NAME)?.value) {
+      response.cookies.set(DEVICE_KNOWN_COOKIE_NAME, "1", {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+        maxAge: DEVICE_KNOWN_COOKIE_MAX_AGE,
+      });
+    }
   }
   return response;
 }

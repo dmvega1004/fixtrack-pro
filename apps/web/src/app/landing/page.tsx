@@ -118,14 +118,26 @@ function Hero() {
   return (
     <header className="w-full px-4 pt-10 pb-14 sm:pt-16 sm:pb-20">
       <div className="mx-auto w-full max-w-5xl">
-        <Image
-          src="/brand/logo-sm.png"
-          alt="FixTrack Pro"
-          width={190}
-          height={44}
-          priority
-          unoptimized
-        />
+        {/* El enlace a /login es una red de seguridad: si un usuario que ya
+            conoce el sistema cae acá por error (marca de dispositivo
+            borrada, un navegador embebido no reconocido), tiene por dónde
+            salir. El prospecto lo ignora — su ruta es el botón de WhatsApp. */}
+        <div className="flex items-center justify-between gap-4">
+          <Image
+            src="/brand/logo-sm.png"
+            alt="FixTrack Pro"
+            width={190}
+            height={44}
+            priority
+            unoptimized
+          />
+          <a
+            href="/login"
+            className="shrink-0 text-sm font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+          >
+            Iniciar sesión
+          </a>
+        </div>
 
         <div className="mt-10 grid items-center gap-10 lg:grid-cols-2">
           <div>

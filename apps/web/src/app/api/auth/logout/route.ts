@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { SESSION_COOKIE_NAME } from "@/lib/session";
 
+// Solo se borra la cookie de sesión. La marca de dispositivo conocido
+// (DEVICE_KNOWN_COOKIE_NAME) se conserva a propósito: quien cierra sesión
+// sigue siendo un usuario, no un prospecto, así que la próxima vez que
+// abra la raíz debe ver /login, nunca la landing comercial.
+
 export async function POST() {
   const response = NextResponse.json({ ok: true });
   response.cookies.delete(SESSION_COOKIE_NAME);

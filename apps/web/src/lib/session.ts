@@ -4,6 +4,24 @@ import { ROLE_LABELS, type Session } from "./roles";
 
 export const SESSION_COOKIE_NAME = "fixtrack_session";
 
+/**
+ * Marca de "este dispositivo ya conoce FixTrack Pro". Se escribe al
+ * iniciar sesión con éxito y sobrevive de largo al vencimiento de la
+ * sesión (8 h): cuando la cookie de sesión caduca, esta marca es lo que
+ * hace que la raíz muestre /login en vez de la landing comercial a un
+ * técnico cuya jornada expiró.
+ *
+ * NO contiene ningún dato de sesión ni nada aprovechable — es solo el
+ * valor fijo "1", un indicador booleano de dispositivo. No se borra al
+ * cerrar sesión: quien cerró sesión sigue siendo un usuario, no un
+ * prospecto.
+ */
+export const DEVICE_KNOWN_COOKIE_NAME = "fixtrack_known";
+
+/** Un año, en segundos. Se refresca en cada login (que ocurre al menos
+ * cada 8 h en un dispositivo en uso), así que nunca se acerca a expirar. */
+export const DEVICE_KNOWN_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
+
 export { ROLE_LABELS, type Session };
 
 interface JwtPayload {

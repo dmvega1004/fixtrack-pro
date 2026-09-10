@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { login } from "@/lib/api/auth";
 import { HttpError } from "@/lib/api/http";
-import { SESSION_COOKIE_NAME } from "@/lib/session";
+import {
+  SESSION_COOKIE_NAME,
+  DEVICE_KNOWN_COOKIE_NAME,
+  DEVICE_KNOWN_COOKIE_MAX_AGE,
+} from "@/lib/session";
 
 const EIGHT_HOURS_IN_SECONDS = 60 * 60 * 8;
 
@@ -34,6 +38,19 @@ export async function POST(request: Request) {
       secure: process.env.NODE_ENV === "production",
       path: "/",
       maxAge: EIGHT_HOURS_IN_SECONDS,
+    });
+
+    // Marca de dispositivo conocido (ver DEVICE_KNOWN_COOKIE_NAME en
+    // lib/session.ts). Sobrevive al vencimiento de la sesión y hace que la
+    // raíz muestre /login —no la landing— a un técnico cuya jornada
+    // expiró. proxy.ts la vuelve a sembrar para sesiones abiertas antes de
+    // este cambio; acá se escribe fresca en cada login.
+    response.cookies.set(DEVICE_KNOWN_COOKIE_NAME, "1", {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: DEVICE_KNOWN_COOKIE_MAX_AGE,
     });
 
     return response;
