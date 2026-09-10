@@ -33,6 +33,13 @@ type ScanState =
 // pasa directo a escanear.
 const CAMERA_STATES: ScanState[] = ["requesting-permission", "scanning"];
 
+// Tras conseguir el stream, cuánto esperamos a que el <video> emita imagen
+// real antes de darlo por fallido. Un arranque normal tarda uno o dos
+// segundos; si a los diez no hay un solo frame, algo lo está bloqueando
+// (otra app tiene la cámara, el track murió en silencio) y hay que caer al
+// mensaje de error, no dejar "Iniciando cámara…" para siempre.
+const CAMERA_LIVE_TIMEOUT_MS = 10_000;
+
 const IS_DEV = process.env.NODE_ENV !== "production";
 const DIAGNOSTIC_LOG_SIZE = 5;
 
@@ -48,6 +55,11 @@ export function QrScannerView() {
   const [successInfo, setSuccessInfo] = useState<{ brand: string; model: string } | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [diagnosticLog, setDiagnosticLog] = useState<string[]>([]);
+  // El <video> está emitiendo imagen de verdad (no solo montado y con
+  // permiso). Hasta que esto es true, un panel opaco lo tapa: si no, el
+  // WebView de Android dibuja su control de reproducción nativo sobre el
+  // <video> todavía sin frames, y parece que hay que pulsarlo.
+  const [cameraLive, setCameraLive] = useState(false);
 
   const cameraActive = CAMERA_STATES.includes(state);
 
@@ -147,9 +159,51 @@ export function QrScannerView() {
     return () => stopCameraRef.current();
   }, []);
 
+  // Revela el <video> SOLO cuando emite imagen real. No sirve
+  // "loadedmetadata" (llega con las dimensiones pero a menudo sin un frame
+  // pintado, y en algunos Android no llega nunca) ni que el permiso se haya
+  // concedido. Se escuchan tres eventos porque los WebViews no coinciden en
+  // cuál emiten para un stream de cámara en vivo, y cualquiera de ellos ya
+  // implica píxeles en pantalla:
+  //   · loadeddata  — el primer frame de la posición actual terminó de cargar
+  //   · playing     — la reproducción arrancó de verdad (no solo "listo para")
+  //   · timeupdate  — la posición de reproducción avanza → hay frames fluyendo
+  useEffect(() => {
+    if (!cameraActive) return;
+    const video = videoRef.current;
+    if (!video) return;
+
+    const reveal = () => setCameraLive(true);
+    video.addEventListener("loadeddata", reveal);
+    video.addEventListener("playing", reveal);
+    video.addEventListener("timeupdate", reveal);
+
+    return () => {
+      video.removeEventListener("loadeddata", reveal);
+      video.removeEventListener("playing", reveal);
+      video.removeEventListener("timeupdate", reveal);
+    };
+  }, [cameraActive]);
+
+  // Red de seguridad: con el stream ya en mano pero sin un solo frame tras
+  // CAMERA_LIVE_TIMEOUT_MS, se cae al mismo error de cámara que ya maneja el
+  // componente — nunca se queda "Iniciando cámara…" indefinidamente.
+  useEffect(() => {
+    if (state !== "scanning" || cameraLive) return;
+    const timer = setTimeout(() => {
+      stopCameraRef.current();
+      setErrorMessage(
+        "La cámara no envió imagen. Cierra otras apps que puedan estar usándola e intenta de nuevo.",
+      );
+      setState("error-camera");
+    }, CAMERA_LIVE_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [state, cameraLive]);
+
   function handleStart() {
     resolvingRef.current = false;
     setErrorMessage(null);
+    setCameraLive(false);
     sessionStartRef.current = Date.now();
     setDiagnosticLog([]);
     setState("requesting-permission");
@@ -185,6 +239,13 @@ export function QrScannerView() {
   }
 
   if (cameraActive) {
+    // Hasta que el <video> emite imagen real, un panel OPACO lo tapa. El
+    // <video> sigue montado y decodificando debajo (eso mantiene vivo el
+    // escáner) — solo que oculto, para que no se vea el botón de
+    // reproducir nativo del WebView sobre el hueco sin frames.
+    const showStartupOverlay =
+      state === "requesting-permission" || !cameraLive;
+
     return (
       <div className="fixed inset-0 z-50 flex flex-col bg-black">
         <video
@@ -195,7 +256,7 @@ export function QrScannerView() {
           className="absolute inset-0 size-full object-cover"
         />
 
-        {state === "scanning" && (
+        {state === "scanning" && cameraLive && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             <div className="relative size-64 max-w-[70vw] overflow-hidden rounded-2xl">
               <div className="absolute inset-0 rounded-2xl border-2 border-white/70" />
@@ -204,22 +265,25 @@ export function QrScannerView() {
           </div>
         )}
 
-        <div className="relative z-10 flex flex-1 flex-col items-center justify-center gap-3 text-center text-white">
-          {state === "requesting-permission" && (
-            <>
-              <Loader2 className="size-8 animate-spin" />
-              <p className="text-sm">Solicitando permiso de cámara…</p>
-            </>
-          )}
-          {state === "scanning" && (
-            <p className="absolute bottom-10 text-sm text-white/80">
-              Apunta al código QR del equipo
+        {state === "scanning" && cameraLive && (
+          <p className="absolute inset-x-0 bottom-10 z-10 text-center text-sm text-white/80">
+            Apunta al código QR del equipo
+          </p>
+        )}
+
+        {showStartupOverlay && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black text-center text-white">
+            <Loader2 className="size-8 animate-spin" />
+            <p className="text-sm">
+              {state === "requesting-permission"
+                ? "Solicitando permiso de cámara…"
+                : "Iniciando cámara…"}
             </p>
-          )}
-        </div>
+          </div>
+        )}
 
         {IS_DEV && (
-          <div className="absolute bottom-4 left-4 z-10 max-w-[75vw] rounded-lg bg-black/60 p-2 font-mono text-[10px] leading-tight text-white/70">
+          <div className="absolute bottom-4 left-4 z-30 max-w-[75vw] rounded-lg bg-black/60 p-2 font-mono text-[10px] leading-tight text-white/70">
             <p>{elapsedSeconds}s desde &quot;Iniciar escaneo&quot; (solo dev)</p>
             {diagnosticLog.map((line, index) => (
               <p key={index}>{line}</p>
@@ -232,7 +296,7 @@ export function QrScannerView() {
           variant="secondary"
           size="sm"
           onClick={handleCancel}
-          className="absolute top-4 right-4 z-10 bg-black/40 text-white hover:bg-black/60"
+          className="absolute top-4 right-4 z-30 bg-black/40 text-white hover:bg-black/60"
         >
           Cancelar
         </Button>
