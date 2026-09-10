@@ -10,6 +10,13 @@ interface LandingFigureProps {
   alt: string;
   /** `aspect-ratio` CSS del marco. El alto se deriva del ancho real. */
   ratio?: string;
+  /**
+   * Captura VERTICAL (pantallazo de celular). Le pone un ancho máximo y la
+   * centra: sin esto, un marco de proporción vertical ocupando el ancho
+   * completo de la columna sale altísimo y empequeñece a las capturas
+   * apaisadas de al lado. Ancho real de la imagen ≈ el de un teléfono.
+   */
+  narrow?: boolean;
   /** Solo la imagen del encabezado: se descarga con prioridad. */
   priority?: boolean;
   sizes?: string;
@@ -43,6 +50,7 @@ export function LandingFigure({
   src,
   alt,
   ratio = "16 / 10",
+  narrow = false,
   priority = false,
   sizes = "(min-width: 768px) 640px, 100vw",
   className,
@@ -53,6 +61,7 @@ export function LandingFigure({
     <div
       className={cn(
         "relative overflow-hidden rounded-xl border border-border bg-white",
+        narrow && "mx-auto w-full max-w-64",
         className,
       )}
       style={{ aspectRatio: ratio }}

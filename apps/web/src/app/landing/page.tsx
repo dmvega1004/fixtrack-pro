@@ -237,16 +237,19 @@ function Pain() {
 /* -------------------------------------------------------------------------- */
 
 /**
- * `ratio` por paso: el bucle mezcla capturas verticales (de celular) con
- * capturas apaisadas (de escritorio). Cada una lleva la proporción de su
- * orientación para que `object-contain` deje el mínimo de franja blanca.
- * Si mañana se reemplaza una imagen por otra de forma distinta, ajustar
- * este valor — nunca vuelve a recortarse, solo cambia el marco.
+ * `ratio` y `narrow` por paso: el bucle mezcla capturas verticales (de
+ * celular) con capturas apaisadas (de escritorio). Cada una lleva la
+ * proporción de su orientación para que `object-contain` deje el mínimo de
+ * franja blanca, y las verticales llevan `narrow` para que no salgan
+ * gigantes al lado de las apaisadas. Si mañana se reemplaza una imagen por
+ * otra de forma distinta, ajustar estos dos valores — nunca vuelve a
+ * recortarse, solo cambia el marco.
  */
 const STEPS = [
   {
     img: "/landing/paso-1-escanear.png",
-    ratio: "9 / 16",
+    ratio: "9 / 20",
+    narrow: true,
     alt: "Un técnico escanea la etiqueta QR de un equipo con el celular",
     title: "Escanear la etiqueta",
     body: "El técnico llega al sitio y escanea el QR del equipo. En pantalla aparece su ficha y todo lo que se le ha hecho antes.",
@@ -254,13 +257,15 @@ const STEPS = [
   {
     img: "/landing/paso-2-orden.png",
     ratio: "3 / 2",
+    narrow: false,
     alt: "Formulario de una orden de trabajo en el celular",
     title: "Levantar la orden",
     body: "Registra el hallazgo, el trabajo realizado y los repuestos usados. El inventario se descuenta solo.",
   },
   {
     img: "/landing/paso-3-firma.png",
-    ratio: "9 / 16",
+    ratio: "9 / 20",
+    narrow: true,
     alt: "El cliente firma la orden en la pantalla del celular",
     title: "El cliente firma",
     body: "El cliente revisa y firma en la pantalla, ahí mismo. Queda su nombre, la fecha y la hora.",
@@ -268,6 +273,7 @@ const STEPS = [
   {
     img: "/landing/paso-4-informe.png",
     ratio: "3 / 2",
+    narrow: false,
     alt: "Informe técnico en PDF generado por el sistema",
     title: "Sale el informe",
     body: "El sistema arma el informe técnico con firma institucional y lo envía. Sin volver a la oficina a transcribir nada.",
@@ -275,6 +281,7 @@ const STEPS = [
   {
     img: "/landing/paso-5-cobro.png",
     ratio: "3 / 2",
+    narrow: false,
     alt: "Cuenta de cobro generada a partir de la orden",
     title: "Queda el cobro",
     body: "La orden alimenta la cuenta de cobro y la cartera del cliente. Lo que se hizo y lo que se debe quedan atados.",
@@ -307,6 +314,7 @@ function HowItWorks() {
               src={step.img}
               alt={step.alt}
               ratio={step.ratio}
+              narrow={step.narrow}
               className={i % 2 === 1 ? "sm:order-1" : ""}
               sizes="(min-width: 640px) 420px, 100vw"
             />
@@ -357,9 +365,10 @@ function Differentiators() {
           <LandingFigure
             src="/landing/sin-senal.png"
             alt="La aplicación funcionando sin conexión, con un aviso de sin señal"
-            ratio="9 / 16"
+            ratio="9 / 20"
+            narrow
             className="md:order-2"
-            sizes="(min-width: 768px) 420px, 100vw"
+            sizes="(min-width: 768px) 300px, 100vw"
           />
           <div className="md:order-1">
             <WifiOff className="size-7 text-primary" aria-hidden />
@@ -390,9 +399,9 @@ function Differentiators() {
             </p>
           </div>
           <LandingFigure
-            src="/landing/paso-3-firma.png"
-            alt="El cliente firmando la orden en la pantalla"
-            ratio="9 / 16"
+            src="/landing/firma-cliente.png"
+            alt="El informe con la firma del cliente y la del técnico, con nombre, documento y fecha"
+            ratio="3 / 2"
             sizes="(min-width: 768px) 420px, 100vw"
           />
         </div>
