@@ -8,9 +8,20 @@ interface EquipmentLabelDocumentProps {
 }
 
 /**
- * Tarjeta de ~70×45mm en unidades mm (no px): así el tamaño impreso es
+ * Tarjeta de 70×45mm en unidades mm (no px): así el tamaño impreso es
  * exacto sin importar el viewport, igual que WorkOrderPrintDocument fija su
  * ancho en mm para el documento de orden.
+ *
+ * El texto NO se trunca: cada campo fluye a los renglones que necesite
+ * (`break-words` parte incluso un serial sin separadores antes que
+ * desbordar de lado). El QR mantiene su recuadro de 32mm intacto — es lo
+ * único que un técnico escanea a 30cm con mala luz — y la letra se
+ * dimensiona para que el caso real más largo (un motor con nombre
+ * descriptivo + razón social completa + serial) quepa dentro de los 45mm.
+ * La altura es `minHeight`, no fija: si alguien registra un texto
+ * absurdamente largo, la etiqueta crece hacia abajo con su borde punteado
+ * antes que recortar el serial o la referencia, que son los que
+ * identifican la pieza.
  */
 export function EquipmentLabelDocument({
   equipment,
@@ -21,8 +32,8 @@ export function EquipmentLabelDocument({
   return (
     <div
       id="equipment-label-card"
-      className="flex items-center gap-3 rounded-md border-2 border-dashed border-neutral-400 bg-white p-3 text-neutral-900 print:border-neutral-500"
-      style={{ width: "70mm", height: "45mm" }}
+      className="flex items-center gap-2.5 rounded-md border-2 border-dashed border-neutral-400 bg-white p-2.5 text-neutral-900 print:border-neutral-500"
+      style={{ width: "70mm", minHeight: "45mm" }}
     >
       <div
         className="flex shrink-0 items-center justify-center"
@@ -34,15 +45,15 @@ export function EquipmentLabelDocument({
           className="h-full w-full"
         />
       </div>
-      <div className="flex min-w-0 flex-col gap-1">
-        <span className="truncate text-sm font-bold">{company.name}</span>
-        <span className="truncate text-xs font-medium">
+      <div className="flex min-w-0 flex-col gap-0.5 leading-tight">
+        <span className="text-[10px] font-bold break-words">{company.name}</span>
+        <span className="text-[9px] font-medium break-words">
           {equipment.brand} {equipment.model}
         </span>
-        <span className="truncate text-[11px] text-neutral-600">
+        <span className="text-[8px] break-words text-neutral-600">
           Serial: {equipment.serialNumber ?? "—"}
         </span>
-        <span className="truncate text-[11px] font-mono text-neutral-600">
+        <span className="text-[8px] font-mono break-words text-neutral-600">
           Ref: {reference}
         </span>
       </div>
