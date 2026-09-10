@@ -236,33 +236,45 @@ function Pain() {
 /*  c) Cómo funciona — cinco pasos                                            */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * `ratio` por paso: el bucle mezcla capturas verticales (de celular) con
+ * capturas apaisadas (de escritorio). Cada una lleva la proporción de su
+ * orientación para que `object-contain` deje el mínimo de franja blanca.
+ * Si mañana se reemplaza una imagen por otra de forma distinta, ajustar
+ * este valor — nunca vuelve a recortarse, solo cambia el marco.
+ */
 const STEPS = [
   {
     img: "/landing/paso-1-escanear.png",
+    ratio: "9 / 16",
     alt: "Un técnico escanea la etiqueta QR de un equipo con el celular",
     title: "Escanear la etiqueta",
     body: "El técnico llega al sitio y escanea el QR del equipo. En pantalla aparece su ficha y todo lo que se le ha hecho antes.",
   },
   {
     img: "/landing/paso-2-orden.png",
+    ratio: "3 / 2",
     alt: "Formulario de una orden de trabajo en el celular",
     title: "Levantar la orden",
     body: "Registra el hallazgo, el trabajo realizado y los repuestos usados. El inventario se descuenta solo.",
   },
   {
     img: "/landing/paso-3-firma.png",
+    ratio: "9 / 16",
     alt: "El cliente firma la orden en la pantalla del celular",
     title: "El cliente firma",
     body: "El cliente revisa y firma en la pantalla, ahí mismo. Queda su nombre, la fecha y la hora.",
   },
   {
     img: "/landing/paso-4-informe.png",
+    ratio: "3 / 2",
     alt: "Informe técnico en PDF generado por el sistema",
     title: "Sale el informe",
     body: "El sistema arma el informe técnico con firma institucional y lo envía. Sin volver a la oficina a transcribir nada.",
   },
   {
     img: "/landing/paso-5-cobro.png",
+    ratio: "3 / 2",
     alt: "Cuenta de cobro generada a partir de la orden",
     title: "Queda el cobro",
     body: "La orden alimenta la cuenta de cobro y la cartera del cliente. Lo que se hizo y lo que se debe quedan atados.",
@@ -294,6 +306,7 @@ function HowItWorks() {
             <LandingFigure
               src={step.img}
               alt={step.alt}
+              ratio={step.ratio}
               className={i % 2 === 1 ? "sm:order-1" : ""}
               sizes="(min-width: 640px) 420px, 100vw"
             />
@@ -334,7 +347,7 @@ function Differentiators() {
           <LandingFigure
             src="/landing/etiqueta-qr.png"
             alt="Etiqueta QR pegada a un equipo, lista para escanear"
-            ratio="4 / 3"
+            ratio="16 / 10"
             sizes="(min-width: 768px) 420px, 100vw"
           />
         </div>
@@ -344,7 +357,7 @@ function Differentiators() {
           <LandingFigure
             src="/landing/sin-senal.png"
             alt="La aplicación funcionando sin conexión, con un aviso de sin señal"
-            ratio="4 / 3"
+            ratio="9 / 16"
             className="md:order-2"
             sizes="(min-width: 768px) 420px, 100vw"
           />
@@ -379,7 +392,7 @@ function Differentiators() {
           <LandingFigure
             src="/landing/paso-3-firma.png"
             alt="El cliente firmando la orden en la pantalla"
-            ratio="4 / 3"
+            ratio="9 / 16"
             sizes="(min-width: 768px) 420px, 100vw"
           />
         </div>
@@ -398,16 +411,17 @@ function Differentiators() {
               buena voluntad.
             </p>
           </div>
-          {/* Lado a lado SIEMPRE, también en celular: la comparación —una
-              columna con valores, la otra sin ellos— ES el argumento, y se
-              pierde si las imágenes se apilan. */}
-          <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4">
+          {/* Las capturas son apaisadas: lado a lado en pantalla grande, pero
+              APILADAS en celular. Forzadas a dos columnas en un teléfono
+              quedaban diminutas y no se leía si hay o no valores — que es
+              justo lo que la comparación tiene que mostrar. */}
+          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <figure>
               <LandingFigure
                 src="/landing/roles-admin.png"
                 alt="La orden vista por un administrador, con valores y totales"
-                ratio="3 / 4"
-                sizes="(min-width: 640px) 320px, 45vw"
+                ratio="3 / 2"
+                sizes="(min-width: 640px) 320px, 100vw"
               />
               <figcaption className="mt-2 text-center text-xs font-medium text-muted-foreground">
                 Como la ve el administrador — con valores
@@ -417,8 +431,8 @@ function Differentiators() {
               <LandingFigure
                 src="/landing/roles-tecnico.png"
                 alt="La misma orden vista por el técnico, sin ningún valor"
-                ratio="3 / 4"
-                sizes="(min-width: 640px) 320px, 45vw"
+                ratio="3 / 2"
+                sizes="(min-width: 640px) 320px, 100vw"
               />
               <figcaption className="mt-2 text-center text-xs font-medium text-muted-foreground">
                 Como la ve el técnico — sin valores

@@ -27,6 +27,17 @@ interface LandingFigureProps {
  *    nunca el ícono de imagen rota del navegador.
  *  - next/image con `sizes` explícito: no se baja una imagen más grande
  *    que el hueco donde entra. Una landing lenta pierde visitantes.
+ *
+ * `object-contain`, NO `object-cover` — a propósito, no lo cambies.
+ * `object-cover` recorta en silencio: si una imagen tiene una forma
+ * distinta a la del marco, se le come los bordes sin que nadie se entere.
+ * Las capturas de esta página se reemplazan seguido y no siempre con la
+ * misma proporción (etiqueta-qr.png, por ejemplo, todavía está pendiente
+ * de corregir), así que con `cover` cualquier reemplazo puede volver a
+ * salir recortado y pasar desapercibido. Con `contain` el peor caso es
+ * una franja en blanco a los lados: visible, evidente y sin pérdida de
+ * información. El fondo blanco + el relleno hacen que esa franja se lea
+ * como el marco de una captura, no como un error.
  */
 export function LandingFigure({
   src,
@@ -41,7 +52,7 @@ export function LandingFigure({
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-xl border border-border bg-muted",
+        "relative overflow-hidden rounded-xl border border-border bg-white",
         className,
       )}
       style={{ aspectRatio: ratio }}
@@ -60,7 +71,7 @@ export function LandingFigure({
           fill
           priority={priority}
           sizes={sizes}
-          className="object-cover"
+          className="object-contain p-3"
           onError={() => setFailed(true)}
         />
       )}
