@@ -97,13 +97,34 @@ interface PendingUpload {
   description: string;
 }
 
+/** Extensión → MIME, para cuando el navegador no rellena file.type (pasa con
+ *  PDF elegidos del explorador en algunos sistemas). NO es "adivinar para
+ *  colar": el backend igual revalida contra el tipo que guardó Supabase. */
+const MIME_BY_EXTENSION: Record<string, string> = {
+  pdf: "application/pdf",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  heic: "image/heic",
+};
+
+function extensionOf(name: string): string {
+  return name.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? "";
+}
+
+/** Tipo MIME real del archivo: el del navegador si lo trae, si no el de la
+ *  extensión. "" si no se puede determinar (se rechaza antes de subir). */
+function resolveContentType(file: File): string {
+  const fromBrowser = file.type.toLowerCase();
+  if (fromBrowser) return fromBrowser;
+  return MIME_BY_EXTENSION[extensionOf(file.name)] ?? "";
+}
+
 function isAllowedFile(file: File): boolean {
-  const type = file.type.toLowerCase();
-  if ((ALLOWED_EQUIPMENT_FILE_MIME_TYPES as readonly string[]).includes(type)) {
-    return true;
-  }
-  // Algunos navegadores no ponen type en un PDF elegido del explorador.
-  return type === "" && /\.pdf$/i.test(file.name);
+  return (ALLOWED_EQUIPMENT_FILE_MIME_TYPES as readonly string[]).includes(
+    resolveContentType(file),
+  );
 }
 
 export function EquipmentFilesSection({
@@ -184,6 +205,7 @@ export function EquipmentFilesSection({
   async function handleUpload() {
     if (!pending) return;
     const { file, category, description } = pending;
+    const contentType = resolveContentType(file) || "application/octet-stream";
 
     try {
       // Paso 1 — firma
@@ -195,7 +217,7 @@ export function EquipmentFilesSection({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             originalName: file.name,
-            contentType: file.type || "application/octet-stream",
+            contentType,
             sizeBytes: file.size,
             category,
           }),
@@ -213,20 +235,27 @@ export function EquipmentFilesSection({
       }
       const { uploadUrl, storagePath } = (await signRes.json()) as SignedUpload;
 
-      // Paso 2 — PUT directo a Supabase (no pasa por Next)
+      // Paso 2 — PUT directo a Supabase (no pasa por Next).
+      //
+      // Cuerpo CRUDO (el File es un Blob) con Content-Type EXPLÍCITO, no
+      // multipart/form-data. Con multipart, el tipo del archivo viaja solo
+      // en la cabecera de la parte y Supabase lo perdía → guardaba el
+      // objeto como application/octet-stream y el paso 3 lo rechazaba. Una
+      // cabecera Content-Type en un PUT crudo es inequívoca: es el valor
+      // con el que Supabase graba el mimetype del objeto. (Es lo que hace
+      // el SDK de Supabase para cuerpos que no son Blob.)
       setUploadStage("upload");
-      const form = new FormData();
-      form.append("cacheControl", "3600");
-      form.append("", file);
 
       let storageRes: Response;
       try {
         storageRes = await fetch(uploadUrl, {
           method: "PUT",
-          // El Content-Type (multipart con boundary) lo pone el navegador
-          // solo al pasar un FormData — no fijarlo a mano.
-          headers: { "x-upsert": "false" },
-          body: form,
+          headers: {
+            "Content-Type": contentType,
+            "Cache-Control": "max-age=3600",
+            "x-upsert": "false",
+          },
+          body: file,
         });
       } catch {
         reportRequestFailure();

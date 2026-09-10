@@ -148,11 +148,8 @@ export class SupabaseStorageService implements OnModuleInit {
       throw await this.remoteError('consultar el archivo subido', response);
     }
 
-    const data = (await response.json().catch(() => null)) as Record<
-      string,
-      unknown
-    > | null;
-    return this.parseObjectInfo(data);
+    const raw = await response.text().catch(() => '');
+    return this.parseObjectInfo('object/info', path, raw);
   }
 
   /** Respaldo de getObjectInfo cuando /object/info no está disponible. */
@@ -187,37 +184,76 @@ export class SupabaseStorageService implements OnModuleInit {
     const match = rows?.find((row) => row.name === name);
     if (!match) return null;
 
-    return this.parseObjectInfo(
-      (match.metadata ?? match) as Record<string, unknown>,
-    );
+    return this.parseObjectInfo('object/list', path, JSON.stringify(match));
   }
 
+  /**
+   * Extrae tamaño y tipo de la respuesta de Storage. La API es
+   * inconsistente entre endpoints y versiones: `mimetype` en /object/list,
+   * `contentType` en /object/info, a veces anidado en `metadata`, a veces
+   * snake_case. Se cubren esas variantes por nombre y, como último recurso,
+   * se busca en todo el objeto el primer valor con forma de MIME.
+   *
+   * Se registra la respuesta CRUDA siempre: sin eso, un "tipo no permitido"
+   * es imposible de diagnosticar (¿leímos mal, o se guardó mal?).
+   */
   private parseObjectInfo(
-    data: Record<string, unknown> | null,
+    source: string,
+    path: string,
+    rawBody: string,
   ): StorageObjectInfo | null {
-    if (!data) return null;
+    this.logger.log(`getObjectInfo(${path}) vía ${source}: ${rawBody}`);
 
-    // La API cameliza ("contentType", "size") pero versiones distintas han
-    // usado snake_case y un sub-objeto `metadata` — se cubren las tres.
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(rawBody);
+    } catch {
+      return null;
+    }
+    if (!parsed || typeof parsed !== 'object') return null;
+
+    const data = parsed as Record<string, unknown>;
     const metadata = (data.metadata ?? {}) as Record<string, unknown>;
-    const rawSize = data.size ?? metadata.size ?? metadata.contentLength;
+
+    const rawSize =
+      data.size ??
+      data.contentLength ??
+      data.content_length ??
+      metadata.size ??
+      metadata.contentLength ??
+      metadata.content_length;
+
     const rawType =
-      data.contentType ??
-      data.mimetype ??
-      metadata.mimetype ??
-      metadata.contentType;
+      firstString([
+        data.contentType,
+        data.mimetype,
+        data.mime_type,
+        data.content_type,
+        metadata.contentType,
+        metadata.mimetype,
+        metadata.mime_type,
+        metadata.content_type,
+      ]) ??
+      findMimeLike(data) ??
+      findMimeLike(metadata);
 
     const sizeBytes = Number(rawSize);
     if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
+      this.logger.warn(
+        `getObjectInfo(${path}): no se pudo leer un tamaño válido de la respuesta de Storage`,
+      );
       return null;
+    }
+
+    if (!rawType) {
+      this.logger.warn(
+        `getObjectInfo(${path}): la respuesta de Storage no trae ningún tipo MIME reconocible — se usará application/octet-stream`,
+      );
     }
 
     return {
       sizeBytes,
-      contentType:
-        typeof rawType === 'string' && rawType
-          ? rawType
-          : 'application/octet-stream',
+      contentType: rawType ?? 'application/octet-stream',
     };
   }
 
@@ -364,4 +400,25 @@ function encodePath(path: string): string {
     .split('/')
     .map((segment) => encodeURIComponent(segment))
     .join('/');
+}
+
+/** Primer valor de la lista que sea un string no vacío. */
+function firstString(values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+const MIME_LIKE = /^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*$/i;
+
+/** Último recurso: el primer valor con forma de tipo MIME dentro del objeto
+ *  (ej. "application/pdf"), sin importar bajo qué clave venga. */
+function findMimeLike(obj: Record<string, unknown>): string | undefined {
+  for (const value of Object.values(obj)) {
+    if (typeof value === 'string' && MIME_LIKE.test(value.trim())) {
+      return value.trim();
+    }
+  }
+  return undefined;
 }

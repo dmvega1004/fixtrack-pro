@@ -179,18 +179,26 @@ export class EquipmentFilesService {
     // navegador — mismo criterio que congelar unitCost/unitPrice.
     const mimeType = info.contentType.split(';')[0].trim().toLowerCase();
     const allowed: readonly string[] = ALLOWED_EQUIPMENT_FILE_MIME_TYPES;
+    const tooBig = info.sizeBytes > MAX_EQUIPMENT_FILE_BYTES;
+    const wrongType = !allowed.includes(mimeType);
 
-    if (
-      info.sizeBytes > MAX_EQUIPMENT_FILE_BYTES ||
-      !allowed.includes(mimeType)
-    ) {
+    if (tooBig || wrongType) {
       // El objeto ya subido no cumple: se borra (best-effort) para no dejar
       // un huérfano que además incumple, y no se crea la fila.
       await this.storage.remove(dto.storagePath);
+
+      if (wrongType) {
+        // El tipo REAL (el que guardó Supabase) va en el mensaje: sin ese
+        // dato es imposible saber si el archivo está mal o lo leímos mal.
+        this.logger.warn(
+          `Registro rechazado: Supabase reporta el tipo "${info.contentType}" para ${dto.storagePath} (declarado por el navegador: irrelevante). Permitidos: ${allowed.join(', ')}`,
+        );
+      }
+
       throw new BadRequestException(
-        info.sizeBytes > MAX_EQUIPMENT_FILE_BYTES
+        tooBig
           ? `El archivo supera el tamaño máximo permitido (${maxSizeLabel()}).`
-          : 'Tipo de archivo no permitido: solo se admiten PDF o imágenes.',
+          : `Tipo de archivo no permitido (el almacenamiento lo guardó como "${mimeType}"): solo se admiten PDF o imágenes.`,
       );
     }
 
