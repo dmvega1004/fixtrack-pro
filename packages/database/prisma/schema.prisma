@@ -185,18 +185,19 @@ model Company {
   clientRetentions      ClientRetention[]
   workOrderRetentions   WorkOrderRetention[]
   idempotencyKeys       IdempotencyKey[]
+  equipmentFiles        EquipmentFile[]
 }
 
 model User {
-  id                 String        @id @default(uuid())
-  email              String        @unique
+  id                 String           @id @default(uuid())
+  email              String           @unique
   password           String
   name               String
-  role               Role          @default(TECHNICIAN)
+  role               Role             @default(TECHNICIAN)
   /// true = la contraseña actual fue asignada por un tercero (alta de
   /// empresa o restablecimiento por un administrador) y el usuario debe
   /// cambiarla antes de poder usar el sistema.
-  mustChangePassword Boolean       @default(false)
+  mustChangePassword Boolean          @default(false)
   /// Cédula (u otro documento) de este usuario — se congela sobre la orden
   /// al capturar su firma como técnico (ver WorkOrder.technicianDocument).
   documentNumber     String?
@@ -205,9 +206,9 @@ model User {
   /// técnico no vuelve a dibujarla cada vez.
   signatureImageUrl  String?
   companyId          String
-  company            Company       @relation(fields: [companyId], references: [id])
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
+  company            Company          @relation(fields: [companyId], references: [id])
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
   workOrders         WorkOrder[]
   /// Fotos que este usuario subió a órdenes; sobrevive a su eliminación
   /// (uploadedById queda en null, la foto y su orden no se tocan).
@@ -225,6 +226,9 @@ model User {
   /// Llaves de idempotencia de operaciones que este usuario disparó;
   /// sobrevive a su eliminación (userId queda en null).
   idempotencyKeys    IdempotencyKey[]
+  /// Archivos de equipo que este usuario subió; sobrevive a su eliminación
+  /// (uploadedById queda en null, el archivo no se toca).
+  equipmentFiles     EquipmentFile[]
 
   @@index([companyId])
 }
@@ -335,6 +339,9 @@ model Equipment {
   /// Cotizaciones en las que participa este equipo — mismo patrón, vía
   /// QuoteEquipment.
   quoteEquipment            QuoteEquipment[]
+  /// Documentos adjuntos al equipo (manuales, certificaciones, planos). Ver
+  /// modelo EquipmentFile — el binario vive en Supabase Storage, no acá.
+  files                     EquipmentFile[]
 
   @@index([companyId])
   @@index([clientId])
@@ -664,6 +671,65 @@ model Attachment {
 
   @@index([companyId])
   @@index([workOrderId])
+}
+
+/// Documento adjunto a un equipo: manuales de usuario y de programación,
+/// certificaciones, planos, fichas técnicas. SEPARADO de Attachment (fotos
+/// de órdenes): otro ciclo de vida, otro almacenamiento y —a diferencia de
+/// la foto de una orden vieja— una certificación puede ser IRREEMPLAZABLE.
+///
+/// ALMACENAMIENTO: el binario vive en un bucket PRIVADO de Supabase Storage
+/// (no en esta base, no en Cloudinary — que se queda con las imágenes,
+/// donde sus transformaciones sí sirven). El navegador sube el archivo
+/// DIRECTO a Supabase con una URL firmada que emite el backend (las
+/// funciones de Vercel limitan el cuerpo a ~4.5 MB y un manual pesa mucho
+/// más), y SOLO DESPUÉS se crea esta fila — ver EquipmentFilesService. Un
+/// huérfano en Storage (archivo sin fila) es tolerable; una fila sin
+/// archivo NO, de ahí ese orden.
+///
+/// RESPALDO — PENDIENTE: packages/database/scripts/backup.ts respalda ESTA
+/// base con pg_dump, pero NO el bucket de Supabase. Si el proyecto de
+/// Supabase se pierde, quedan estas filas apuntando a archivos que ya no
+/// existen. Cubrir Storage en la estrategia de respaldo está pendiente
+/// (ver la nota en backup.ts).
+model EquipmentFile {
+  id           String    @id @default(uuid())
+  equipmentId  String
+  equipment    Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  /// Candado multi-tenant, redundante con equipment.companyId a propósito —
+  /// mismo patrón que Attachment: toda consulta filtra por companyId directo.
+  companyId    String
+  company      Company   @relation(fields: [companyId], references: [id])
+  /// Quién lo subió. SetNull para conservar la fila si el usuario se elimina
+  /// (mismo criterio que Attachment.uploadedBy / Payment.registeredBy).
+  uploadedById String?
+  uploadedBy   User?     @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  /// Nombre original tal como lo subió el usuario ("Manual FANUC 0i-MD.pdf").
+  /// Se muestra en la lista y es el nombre con el que se descarga.
+  originalName String
+  /// MIME CONFIRMADO contra Supabase al registrar (info del objeto), nunca
+  /// el que declaró el navegador — mismo criterio que los valores congelados.
+  mimeType     String
+  /// Bytes tomados de Supabase al registrar, no del cliente.
+  sizeBytes    Int
+  /// Validada en el DTO contra EQUIPMENT_FILE_CATEGORIES. String, no enum de
+  /// BD — mismo criterio que Client.documentType / SparePart.category: sumar
+  /// una categoría no debe pedir migración (ver el TODO de la categoría de
+  /// configuración/parámetros en equipment-file.constants.ts).
+  category     String
+  description  String?
+
+  /// Ruta del objeto dentro del bucket privado:
+  /// "<companyId>/<equipmentId>/<uuid>.<ext>". Con esto se firma la URL de
+  /// descarga y se borra el objeto. @unique: una ruta = un archivo.
+  storagePath String @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([equipmentId])
 }
 
 /// Abono registrado contra una orden de trabajo. El módulo de cartera

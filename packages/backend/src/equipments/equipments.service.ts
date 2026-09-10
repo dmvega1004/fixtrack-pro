@@ -14,6 +14,7 @@ import {
   todayDateOnly,
 } from '../common/date-only.util';
 import { PrismaService } from '../prisma.service';
+import { SupabaseStorageService } from '../supabase/supabase-storage.service';
 import { ActivateMaintenanceBatchDto } from './dto/activate-maintenance-batch.dto';
 import { CreateEquipmentDto } from './dto/create-equipment.dto';
 import { UpdateEquipmentDto } from './dto/update-equipment.dto';
@@ -58,7 +59,10 @@ export interface MaintenanceDueItem {
  */
 @Injectable()
 export class EquipmentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: SupabaseStorageService,
+  ) {}
 
   async create(companyId: string, dto: CreateEquipmentDto): Promise<Equipment> {
     // Validación cruzada: el cliente debe pertenecer a MI empresa
@@ -366,8 +370,18 @@ export class EquipmentsService {
     // Verifica pertenencia al tenant ANTES de eliminar
     await this.findOne(companyId, id);
 
+    // Rutas de los documentos del equipo en Supabase Storage: el cascade de
+    // la BD borra las filas EquipmentFile, pero NO los objetos. Se leen
+    // ANTES del delete; se borran DESPUÉS y best-effort (un objeto huérfano
+    // es tolerable, ver EquipmentFilesService).
+    const files = await this.prisma.equipmentFile.findMany({
+      where: { equipmentId: id, companyId },
+      select: { storagePath: true },
+    });
+
+    let deleted: Equipment;
     try {
-      return await this.prisma.equipment.delete({ where: { id } });
+      deleted = await this.prisma.equipment.delete({ where: { id } });
     } catch (error) {
       // P2003: violación de FK — el equipo tiene órdenes de trabajo
       if (
@@ -381,6 +395,12 @@ export class EquipmentsService {
       }
       throw error;
     }
+
+    await Promise.all(
+      files.map((file) => this.storage.remove(file.storagePath)),
+    );
+
+    return deleted;
   }
 
   /** Validación cruzada multi-tenant de la relación Equipment → Client. */

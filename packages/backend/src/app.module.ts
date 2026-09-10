@@ -12,6 +12,7 @@ import { BillingModule } from './billing/billing.module';
 import { ClientsModule } from './clients/clients.module';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { CompanyModule } from './company/company.module';
+import { EquipmentFilesModule } from './equipment-files/equipment-files.module';
 import { EquipmentsModule } from './equipments/equipments.module';
 import { PaymentsModule } from './payments/payments.module';
 import { PrismaModule } from './prisma.module';
@@ -37,6 +38,7 @@ import { WorkOrdersModule } from './work-orders/work-orders.module';
     CloudinaryModule,
     CompanyModule,
     EquipmentsModule,
+    EquipmentFilesModule,
     PaymentsModule,
     ProfitabilityModule,
     QuotesModule,

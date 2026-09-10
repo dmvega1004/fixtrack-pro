@@ -13,6 +13,7 @@ import { MaintenancePlanSection } from "@/components/equipment/maintenance-plan-
 import { QrCodeImage } from "@/components/equipment/qr-code-image";
 import { DeleteEquipmentButton } from "@/components/equipment/delete-equipment-button";
 import { OrderHistorySection } from "@/components/shared/order-history-section";
+import { EquipmentFilesSection } from "@/components/equipment/equipment-files-section";
 import { formatDate } from "@/lib/format/dates";
 
 interface EquipoDetallePageProps {
@@ -161,6 +162,12 @@ export default async function EquipoDetallePage({
             viewAllHref={`/ordenes?equipmentId=${equipment.id}`}
             viewAllLabel={`Ver las ${history.length} órdenes de este equipo`}
           />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent>
+          <EquipmentFilesSection equipmentId={equipment.id} canDelete={isAdmin} />
         </CardContent>
       </Card>
 

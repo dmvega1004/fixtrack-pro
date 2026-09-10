@@ -38,10 +38,44 @@ Copia los nombres de `packages/backend/.env.example` y complétalos con valores 
 | `JWT_SECRET` | Genera uno nuevo para producción, no reuses el de desarrollo |
 | `JWT_EXPIRES_IN` | Opcional, default `8h` |
 | `FRONTEND_URL` | **Provisional al desplegar backend** — ver paso 3 |
-| `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | Cuenta de Cloudinary |
+| `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | Cuenta de Cloudinary (imágenes: fotos de OT, logo del tenant) |
+| `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_STORAGE_BUCKET` | Documentos de equipo — ver "Bucket de documentos de equipo" más abajo |
 | `PROVISIONING_KEY` | Habilita `POST /auth/register` — ver "Alta de una empresa nueva" más abajo |
 
 `PORT` **no** se configura manualmente: Railway la inyecta automáticamente y `main.ts` ya la lee de `process.env.PORT`.
+
+### Bucket de documentos de equipo (Supabase Storage)
+
+Los documentos adjuntos a un equipo (manuales, certificaciones, planos —
+modelo `EquipmentFile`) NO van a Cloudinary: viven en un bucket **privado**
+de Supabase Storage, en el **mismo proyecto** de Supabase que ya aloja la
+base de datos de producción. El navegador los sube directo a Supabase con
+una URL firmada que emite el backend; la descarga es siempre por un enlace
+firmado de vigencia corta (5 min). Sin sesión válida de la misma empresa,
+no hay archivo.
+
+Configuración por única vez, en el panel de Supabase:
+
+1. **Storage → New bucket**, nombre `equipment-files` (o el que pongas en
+   `SUPABASE_STORAGE_BUCKET`). Déjalo **Private** (NO marques "Public
+   bucket").
+2. En la configuración del bucket: `File size limit` = **45 MB**;
+   `Allowed MIME types` = `application/pdf, image/jpeg, image/png,
+   image/webp, image/heic`. (El backend revalida ambos contra el objeto
+   real; esto es la primera línea.)
+3. **Project Settings → API**: copia la `Project URL` a `SUPABASE_URL` y la
+   llave **`service_role`** a `SUPABASE_SERVICE_ROLE_KEY`.
+   ⚠️ La `service_role` salta las políticas RLS — trátala como una
+   contraseña: solo en las variables del backend en Railway, jamás en el
+   frontend, en Git, ni en un chat.
+
+**Límites del plan gratuito de Supabase:** 1 GB de almacenamiento total y
+5 GB de tráfico (egress) al mes. Con manuales de fabricante de 20–30 MB,
+1 GB son apenas unas decenas de archivos en toda la plataforma — esta
+función tiene un costo que crece con el uso y será lo que empuje a
+contratar Supabase Pro. Ver también la nota de respaldo en
+`packages/database/scripts/backup.ts`: **este bucket NO entra en el
+`pg_dump`**; cubrirlo en la estrategia de respaldo está pendiente.
 
 Railway provee HTTPS automático en el dominio `*.up.railway.app` (o el dominio custom que configures) — no requiere configuración adicional.
 

@@ -11,6 +11,16 @@
  *   pnpm --filter database run backup
  *
  * Restauración: ver packages/database/README.md.
+ *
+ * ALCANCE — PENDIENTE: esto respalda SOLO la base de datos. Desde el módulo
+ * de archivos de equipo (modelo EquipmentFile), los binarios —manuales,
+ * certificaciones, planos— viven en un bucket privado de Supabase Storage,
+ * que este script NO toca. Si el proyecto de Supabase se pierde, el volcado
+ * conserva las filas que dicen que un archivo existe, pero no el archivo; y
+ * a diferencia de la foto de una orden vieja, una certificación puede ser
+ * irreemplazable. Cubrir Storage en la estrategia de respaldo (otro dump,
+ * réplica del bucket, o exportación periódica) está pendiente — retomar
+ * junto con este script la próxima vez que se toque el tema de respaldos.
  */
 import path from 'node:path';
 import fs from 'node:fs';
