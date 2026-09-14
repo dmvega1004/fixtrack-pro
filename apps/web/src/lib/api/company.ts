@@ -1,5 +1,6 @@
 import { serverFetch } from "./server-fetch";
 import type { Currency } from "@/lib/currency";
+import type { SectionTitleStyle } from "@/lib/work-order-header-fields";
 
 export type { Currency } from "@/lib/currency";
 
@@ -65,6 +66,15 @@ export interface Company {
   letterheadFooterText: string | null;
   /** "Documento generado por FixTrack Pro" al pie. Default true = comportamiento de hoy. */
   letterheadShowFixtrackBranding: boolean;
+  /** Estilo de los títulos de sección en los 3 documentos. Default "UNDERLINE" = el de hoy. */
+  letterheadSectionTitleStyle: SectionTitleStyle;
+  /** Campos opcionales del encabezado de la orden de trabajo, EN EL ORDEN en que se pintan. [] = sin configurar. */
+  letterheadWorkOrderHeaderFields: string[];
+  /** Rótulos propios de los 4 bloques de texto de la orden de trabajo. Null = el de hoy. */
+  letterheadDescriptionLabel: string | null;
+  letterheadDiagnosisLabel: string | null;
+  letterheadObservationsLabel: string | null;
+  letterheadSuggestionsLabel: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -111,6 +121,12 @@ export interface UpdateCompanyInput {
   letterheadCollectionDocDate?: string;
   letterheadFooterText?: string;
   letterheadShowFixtrackBranding?: boolean;
+  letterheadSectionTitleStyle?: SectionTitleStyle;
+  letterheadWorkOrderHeaderFields?: string[];
+  letterheadDescriptionLabel?: string;
+  letterheadDiagnosisLabel?: string;
+  letterheadObservationsLabel?: string;
+  letterheadSuggestionsLabel?: string;
 }
 
 export interface UpdateCompanyResult extends Company {

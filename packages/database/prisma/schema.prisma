@@ -86,25 +86,25 @@ enum ActivityAction {
 }
 
 model Company {
-  id                             String               @id @default(uuid())
-  name                           String
-  slogan                         String?
+  id                              String               @id @default(uuid())
+  name                            String
+  slogan                          String?
   /// NIT (u otro documento tributario) de la empresa — distinto de
   /// payeeDocument, que es el documento del BENEFICIARIO del pago (puede
   /// ser una persona o razón social distinta). Aparece en el membrete de
   /// los documentos imprimibles (ej. cotización).
-  taxId                          String?
-  phone                          String?
-  email                          String?
-  address                        String?
-  website                        String?
+  taxId                           String?
+  phone                           String?
+  email                           String?
+  address                         String?
+  website                         String?
   /// URL del logo del tenant (Cloudinary). Aún sin flujo de carga: llega
   /// en una iteración posterior.
-  logoUrl                        String?
+  logoUrl                         String?
   /// URL de la imagen de la firma digital del tenant (Cloudinary, PNG).
   /// Se dibuja sobre la línea de firma de quien EMITE el documento — nunca
   /// en el espacio de firma del cliente.
-  signatureImageUrl              String?
+  signatureImageUrl               String?
   /// Documentos en los que se estampa la firma automáticamente. Todos
   /// controlables desde "Mi empresa" — collection va en true por defecto
   /// porque es el caso que motivó la función (cuenta de cobro firmada sin
@@ -115,56 +115,56 @@ model Company {
   /// La columna sigue aquí a propósito hasta que se apruebe y aplique la
   /// migración que la elimina (corre contra producción); no la reintroduzcas
   /// en el DTO/servicio sin esa migración.
-  signatureInCollection          Boolean              @default(true)
-  signatureInWorkOrder           Boolean              @default(false)
-  signatureInQuote               Boolean              @default(false)
+  signatureInCollection           Boolean              @default(true)
+  signatureInWorkOrder            Boolean              @default(false)
+  signatureInQuote                Boolean              @default(false)
   /// Moneda del tenant para formatear precios (ver DTO: COP/USD/EUR/MXN/PEN).
-  currency                       String               @default("COP")
+  currency                        String               @default("COP")
   /// Contador atómico por tenant para asignar WorkOrder.orderNumber consecutivo.
-  nextOrderNumber                Int                  @default(1)
+  nextOrderNumber                 Int                  @default(1)
   /// Porcentaje de IVA del tenant (ej. 19.00). 0 si no es responsable de IVA.
-  taxRate                        Decimal              @default(0) @db.Decimal(5, 2)
+  taxRate                         Decimal              @default(0) @db.Decimal(5, 2)
   /// Título configurable del documento de cobro (ej. "Cuenta de cobro", "Recibo de caja").
-  collectionDocTitle             String               @default("Cuenta de cobro")
+  collectionDocTitle              String               @default("Cuenta de cobro")
   /// Beneficiario del pago en el documento — puede diferir de Company.name
   /// (ej. cuenta a nombre de otra persona/razón social). Sin valor: se usa
   /// el nombre de la empresa como beneficiario por defecto.
-  payeeName                      String?
-  payeeDocument                  String?
-  bankName                       String?
-  bankAccount                    String?
+  payeeName                       String?
+  payeeDocument                   String?
+  bankName                        String?
+  bankAccount                     String?
   /// Nombre y cargo de quien firma el documento de cobro.
-  signerName                     String?
-  signerRole                     String?
+  signerName                      String?
+  signerRole                      String?
   /// Nota al pie del documento de cobro; el frontend aplica un texto por
   /// defecto ("no equivale a factura electrónica...") cuando está vacía.
-  collectionDocFootnote          String?
+  collectionDocFootnote           String?
   /// Contador atómico por tenant para el consecutivo de cuentas de cobro
   /// (WorkOrder.collectionNumber), mismo patrón que nextOrderNumber.
-  nextCollectionNumber           Int                  @default(1)
+  nextCollectionNumber            Int                  @default(1)
   /// Contador atómico por tenant para el consecutivo de cotizaciones
   /// (Quote.quoteNumber) — mismo patrón, pero se consume al ENVIAR, no al
   /// crear (ver QuotesService.send): un borrador abandonado no quema número.
-  nextQuoteNumber                Int                  @default(1)
+  nextQuoteNumber                 Int                  @default(1)
   /// Condiciones comerciales por defecto de una cotización nueva. Se
   /// COPIAN a cada Quote al crearla (no se referencian): una cotización ya
   /// enviada debe conservar las condiciones con que se envió aunque estos
   /// valores cambien después — mismo principio que congelar unitPrice en
   /// WorkOrderPart.
-  defaultPaymentTerms            String?
-  defaultDeliveryTime            String?
-  defaultWarrantyTerms           String?
-  defaultExclusions              String?
+  defaultPaymentTerms             String?
+  defaultDeliveryTime             String?
+  defaultWarrantyTerms            String?
+  defaultExclusions               String?
   /// Metodología / plan de trabajo por defecto de una cotización nueva —
   /// se COPIA a Quote.methodology al crear, mismo criterio que
   /// defaultExclusions. Observaciones no tiene contraparte acá: es texto
   /// libre por cotización, no una plantilla reutilizable.
-  defaultMethodology             String?
-  defaultValidityDays            Int                  @default(30)
+  defaultMethodology              String?
+  defaultValidityDays             Int                  @default(30)
   /// Días tras el envío para sugerir Quote.followUpAt.
-  quoteFollowUpDays              Int                  @default(5)
+  quoteFollowUpDays               Int                  @default(5)
   /// Nota al pie del documento de cotización (entrega 2 — vista imprimible).
-  quoteFootnote                  String?
+  quoteFootnote                   String?
   /// Membrete por empresa (panel "Mi empresa"): distinto eje de
   /// Client.reportFormat* (formato que exige un CLIENTE) — este aplica a
   /// TODOS los documentos salvo que el cliente entregado use su propio
@@ -173,50 +173,74 @@ model Company {
   /// Color de acento hexadecimal. Null = azul de FixTrack (#2563EB), igual
   /// que hoy — reemplaza ese azul en títulos de sección, franjas, líneas
   /// divisorias y totales destacados en los 3 documentos.
-  letterheadAccentColor          String?
+  letterheadAccentColor           String?
   /// Recuadro de control documental (código/versión/fecha), uno por tipo
   /// de documento. Si los 3 campos de un tipo quedan vacíos, el recuadro de
   /// ESE documento no se renderiza — nunca un marco vacío.
-  letterheadWorkOrderDocCode     String?
-  letterheadWorkOrderDocVersion  String?
+  letterheadWorkOrderDocCode      String?
+  letterheadWorkOrderDocVersion   String?
   /// Texto libre (mismo criterio que Client.reportFormatDate): fecha de
   /// VERSIÓN del documento, no una fecha operativa — no se parsea.
-  letterheadWorkOrderDocDate     String?
-  letterheadQuoteDocCode         String?
-  letterheadQuoteDocVersion      String?
-  letterheadQuoteDocDate         String?
-  letterheadCollectionDocCode    String?
-  letterheadCollectionDocVersion String?
-  letterheadCollectionDocDate    String?
+  letterheadWorkOrderDocDate      String?
+  letterheadQuoteDocCode          String?
+  letterheadQuoteDocVersion       String?
+  letterheadQuoteDocDate          String?
+  letterheadCollectionDocCode     String?
+  letterheadCollectionDocVersion  String?
+  letterheadCollectionDocDate     String?
   /// Pie de página de texto libre, único para los 3 documentos — reemplaza
   /// la línea de contacto automática (sitio | correo | teléfono) cuando
   /// está presente, en el color de acento efectivo. Null = la línea de
   /// contacto de hoy, sin cambios.
-  letterheadFooterText           String?
+  letterheadFooterText            String?
   /// "Documento generado por FixTrack Pro" al pie. Default true =
   /// comportamiento de hoy; la empresa lo apaga desde el mismo panel.
-  letterheadShowFixtrackBranding Boolean              @default(true)
-  createdAt                      DateTime             @default(now())
-  updatedAt                      DateTime             @updatedAt
-  users                          User[]
-  clients                        Client[]
-  equipments                     Equipment[]
-  workOrders                     WorkOrder[]
-  spareParts                     SparePart[]
-  workOrderParts                 WorkOrderPart[]
-  workOrderItems                 WorkOrderItem[]
-  attachments                    Attachment[]
-  payments                       Payment[]
-  workOrderEquipment             WorkOrderEquipment[]
-  activityLogs                   ActivityLog[]
-  quotes                         Quote[]
-  quoteItems                     QuoteItem[]
-  quoteEquipment                 QuoteEquipment[]
-  retentions                     Retention[]
-  clientRetentions               ClientRetention[]
-  workOrderRetentions            WorkOrderRetention[]
-  idempotencyKeys                IdempotencyKey[]
-  equipmentFiles                 EquipmentFile[]
+  letterheadShowFixtrackBranding  Boolean              @default(true)
+  /// Etapa 2 del membrete: estructura, no solo color.
+  /// Estilo de los títulos de sección en los 3 documentos. UNDERLINE =
+  /// texto en color de acento + línea debajo (el de hoy, default).
+  /// FILLED = franja rellena con el color de acento y texto de contraste
+  /// automático (getAccentTextColor). Solo tiene efecto visible en
+  /// work-order-print-document.tsx y quote-document.tsx — collection-
+  /// document.tsx no tiene ningún título con este patrón.
+  letterheadSectionTitleStyle     String               @default("UNDERLINE")
+  /// Campos opcionales del encabezado de la ORDEN DE TRABAJO, EN EL ORDEN
+  /// en que se pintan (el arreglo conserva el orden de configuración). []
+  /// = sin configurar → se muestran los de hoy. "Documento" y "Fecha" NO
+  /// son valores válidos acá: se pintan siempre, primero, sin poder
+  /// apagarse. Valores válidos: CLIENT, TAX_ID, STATUS, SERVICE_TYPE,
+  /// PHONE, EMAIL, ADDRESS, SERVICE_CITY, SERVICE_TIME, END_CLIENT,
+  /// TECHNICIAN (ver OPTIONAL_HEADER_FIELD_KEYS, validado en el DTO).
+  letterheadWorkOrderHeaderFields String[]             @default([])
+  /// Rótulos propios de los 4 bloques de texto de la orden de trabajo.
+  /// Null = el de hoy. Solo work-order-print-document.tsx: cotización y
+  /// cuenta de cobro no tienen diagnóstico/sugerencias, y "Observaciones"
+  /// de cotización es un campo distinto (Quote.observations).
+  letterheadDescriptionLabel      String?
+  letterheadDiagnosisLabel        String?
+  letterheadObservationsLabel     String?
+  letterheadSuggestionsLabel      String?
+  createdAt                       DateTime             @default(now())
+  updatedAt                       DateTime             @updatedAt
+  users                           User[]
+  clients                         Client[]
+  equipments                      Equipment[]
+  workOrders                      WorkOrder[]
+  spareParts                      SparePart[]
+  workOrderParts                  WorkOrderPart[]
+  workOrderItems                  WorkOrderItem[]
+  attachments                     Attachment[]
+  payments                        Payment[]
+  workOrderEquipment              WorkOrderEquipment[]
+  activityLogs                    ActivityLog[]
+  quotes                          Quote[]
+  quoteItems                      QuoteItem[]
+  quoteEquipment                  QuoteEquipment[]
+  retentions                      Retention[]
+  clientRetentions                ClientRetention[]
+  workOrderRetentions             WorkOrderRetention[]
+  idempotencyKeys                 IdempotencyKey[]
+  equipmentFiles                  EquipmentFile[]
 }
 
 model User {

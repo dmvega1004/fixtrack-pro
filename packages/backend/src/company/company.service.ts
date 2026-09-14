@@ -69,6 +69,12 @@ const COMPANY_SELECT = {
   letterheadCollectionDocDate: true,
   letterheadFooterText: true,
   letterheadShowFixtrackBranding: true,
+  letterheadSectionTitleStyle: true,
+  letterheadWorkOrderHeaderFields: true,
+  letterheadDescriptionLabel: true,
+  letterheadDiagnosisLabel: true,
+  letterheadObservationsLabel: true,
+  letterheadSuggestionsLabel: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -119,6 +125,12 @@ export type PublicCompany = Pick<
   | 'letterheadCollectionDocDate'
   | 'letterheadFooterText'
   | 'letterheadShowFixtrackBranding'
+  | 'letterheadSectionTitleStyle'
+  | 'letterheadWorkOrderHeaderFields'
+  | 'letterheadDescriptionLabel'
+  | 'letterheadDiagnosisLabel'
+  | 'letterheadObservationsLabel'
+  | 'letterheadSuggestionsLabel'
   | 'createdAt'
   | 'updatedAt'
 >;
@@ -218,6 +230,16 @@ export class CompanyService {
         letterheadCollectionDocDate: dto.letterheadCollectionDocDate?.trim(),
         letterheadFooterText: dto.letterheadFooterText?.trim(),
         letterheadShowFixtrackBranding: dto.letterheadShowFixtrackBranding,
+        letterheadSectionTitleStyle: dto.letterheadSectionTitleStyle,
+        // Arreglo completo, sin trim/|| undefined: [] es un valor válido
+        // (vuelve al set de hoy) y debe persistirse tal cual, no
+        // descartarse — a diferencia de los campos de texto de este
+        // mismo servicio.
+        letterheadWorkOrderHeaderFields: dto.letterheadWorkOrderHeaderFields,
+        letterheadDescriptionLabel: dto.letterheadDescriptionLabel?.trim(),
+        letterheadDiagnosisLabel: dto.letterheadDiagnosisLabel?.trim(),
+        letterheadObservationsLabel: dto.letterheadObservationsLabel?.trim(),
+        letterheadSuggestionsLabel: dto.letterheadSuggestionsLabel?.trim(),
       },
       select: COMPANY_SELECT,
     });

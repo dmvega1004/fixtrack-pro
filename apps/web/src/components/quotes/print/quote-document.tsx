@@ -17,7 +17,7 @@ import { SignatureLine } from "@/components/shared/signature-line";
 import { PrintDocumentFrame } from "@/components/shared/print-document-frame";
 import { PrintKeepTogether } from "@/components/shared/print-keep-together";
 import { PrintDocumentControlBox } from "@/components/shared/print-document-control-box";
-import { resolveAccentColor } from "@/lib/print/accent-color";
+import { resolveAccentColor, getAccentTextColor } from "@/lib/print/accent-color";
 import { buildPrintFooter } from "@/lib/print/footer";
 
 /**
@@ -67,10 +67,23 @@ function Box({
 function SectionTitle({
   children,
   accentColor,
+  filled,
 }: {
   children: ReactNode;
   accentColor: string;
+  /** true = franja rellena con texto de contraste (Company.letterheadSectionTitleStyle === "FILLED"). false = el de hoy: texto en color + línea debajo. */
+  filled: boolean;
 }) {
+  if (filled) {
+    return (
+      <p
+        className="print-color-exact break-after-avoid px-3 py-1.5 text-xs font-bold tracking-wide uppercase"
+        style={{ backgroundColor: accentColor, color: getAccentTextColor(accentColor) }}
+      >
+        {children}
+      </p>
+    );
+  }
   return (
     <p
       className="break-after-avoid border-b border-neutral-200 pb-1 text-xs font-bold tracking-wide uppercase"
@@ -148,6 +161,7 @@ export function QuoteDocument({ quote, client, company }: QuoteDocumentProps) {
   const equipmentLine = equipmentSummary(quote.equipments);
   const accentColor = resolveAccentColor(company.letterheadAccentColor);
   const footer = buildPrintFooter(company);
+  const sectionTitleFilled = company.letterheadSectionTitleStyle === "FILLED";
 
   const hasAnyCommercialTerm =
     quote.paymentTerms || quote.deliveryTime || quote.warrantyTerms;
@@ -260,7 +274,7 @@ export function QuoteDocument({ quote, client, company }: QuoteDocumentProps) {
             NO_ORPHAN_LINES_STYLE (mínimo 2 líneas antes/después del
             corte). */}
         <section className="mt-6">
-          <SectionTitle accentColor={accentColor}>Alcance</SectionTitle>
+          <SectionTitle accentColor={accentColor} filled={sectionTitleFilled}>Alcance</SectionTitle>
           <p
             className="mt-2 text-xs whitespace-pre-wrap text-neutral-900"
             style={NO_ORPHAN_LINES_STYLE}
@@ -274,7 +288,7 @@ export function QuoteDocument({ quote, client, company }: QuoteDocumentProps) {
             Alcance. */}
         {quote.methodology && (
           <section className="mt-6">
-            <SectionTitle accentColor={accentColor}>Metodología / plan de trabajo</SectionTitle>
+            <SectionTitle accentColor={accentColor} filled={sectionTitleFilled}>Metodología / plan de trabajo</SectionTitle>
             <p
               className="mt-2 text-xs whitespace-pre-wrap text-neutral-900"
               style={NO_ORPHAN_LINES_STYLE}
@@ -357,7 +371,7 @@ export function QuoteDocument({ quote, client, company }: QuoteDocumentProps) {
             de Alcance. */}
         {(hasAnyCommercialTerm || quote.exclusions) && (
           <section className="mt-6">
-            <SectionTitle accentColor={accentColor}>Condiciones comerciales</SectionTitle>
+            <SectionTitle accentColor={accentColor} filled={sectionTitleFilled}>Condiciones comerciales</SectionTitle>
             {hasAnyCommercialTerm && (
               <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 break-inside-avoid">
                 <ConditionField label="Forma de pago" value={quote.paymentTerms} />
@@ -386,7 +400,7 @@ export function QuoteDocument({ quote, client, company }: QuoteDocumentProps) {
             Misma regla de visibilidad y de paginación que Alcance. */}
         {quote.observations && (
           <section className="mt-6">
-            <SectionTitle accentColor={accentColor}>Observaciones</SectionTitle>
+            <SectionTitle accentColor={accentColor} filled={sectionTitleFilled}>Observaciones</SectionTitle>
             <p
               className="mt-2 text-xs whitespace-pre-wrap text-neutral-900"
               style={NO_ORPHAN_LINES_STYLE}

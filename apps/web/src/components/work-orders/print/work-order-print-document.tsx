@@ -7,7 +7,7 @@ import { ORDER_STATUS_LABELS } from "@/components/shared/status-chip";
 import { PRIORITY_LABELS } from "@/components/shared/priority-badge";
 import { SERVICE_TYPE_LABELS } from "@/components/shared/service-type-badge";
 import { formatOrderNumber } from "@/lib/format/order-number";
-import { formatDate } from "@/lib/format/dates";
+import { formatDate, formatTime, formatTimeOnly } from "@/lib/format/dates";
 import { cn } from "@/lib/utils";
 import { SignatureLine } from "@/components/shared/signature-line";
 import { PrintDocumentFrame } from "@/components/shared/print-document-frame";
@@ -16,8 +16,12 @@ import { PrintPhotoGrid } from "@/components/shared/print-photo-grid";
 import { QrCodeImage } from "@/components/equipment/qr-code-image";
 import { PrintLetterhead } from "./print-letterhead";
 import { PrintDocumentControlBox } from "@/components/shared/print-document-control-box";
-import { resolveAccentColor } from "@/lib/print/accent-color";
+import { resolveAccentColor, getAccentTextColor } from "@/lib/print/accent-color";
 import { buildPrintFooter } from "@/lib/print/footer";
+import {
+  HEADER_FIELD_LABELS,
+  type OptionalHeaderFieldKey,
+} from "@/lib/work-order-header-fields";
 
 interface WorkOrderPrintDocumentProps {
   order: WorkOrder;
@@ -55,10 +59,23 @@ function MetaItem({ label, value }: { label: string; value: string }) {
 function SectionTitle({
   children,
   accentColor,
+  filled,
 }: {
   children: string;
   accentColor: string;
+  /** true = franja rellena con texto de contraste (Company.letterheadSectionTitleStyle === "FILLED"). false = el de hoy: texto en color + línea debajo. */
+  filled: boolean;
 }) {
+  if (filled) {
+    return (
+      <h2
+        className="print-color-exact break-after-avoid px-3 py-1.5 text-xs font-semibold tracking-wide uppercase"
+        style={{ backgroundColor: accentColor, color: getAccentTextColor(accentColor) }}
+      >
+        {children}
+      </h2>
+    );
+  }
   return (
     <h2
       className="break-after-avoid border-b border-neutral-200 pb-1 text-xs font-semibold tracking-wide uppercase"
@@ -145,6 +162,56 @@ export function WorkOrderPrintDocument({
 
   const accentColor = resolveAccentColor(company.letterheadAccentColor);
   const footer = buildPrintFooter(company);
+  const sectionTitleFilled = company.letterheadSectionTitleStyle === "FILLED";
+
+  // Rótulos configurables de los 4 bloques de texto — vacío o sin
+  // configurar = el de hoy, mismo criterio que el resto del membrete.
+  const descriptionLabel = company.letterheadDescriptionLabel?.trim() || "Descripción";
+  const diagnosisLabel =
+    company.letterheadDiagnosisLabel?.trim() || "Hallazgo técnico / Diagnóstico";
+  const observationsLabel =
+    company.letterheadObservationsLabel?.trim() || "Observaciones y recomendaciones";
+  const suggestionsLabel =
+    company.letterheadSuggestionsLabel?.trim() || "Sugerencias y recomendaciones";
+
+  // Encabezado configurable: [] (sin configurar) usa el bloque original
+  // de siempre, sin tocar — ver más abajo. Configurado, se pinta EN EL
+  // ORDEN del arreglo (la empresa lo controla desde el panel), cada campo
+  // se omite si no tiene valor (ej. NIT sin documento registrado, hora
+  // sin capturar) — nunca un campo vacío o "N/A".
+  const headerFields = company.letterheadWorkOrderHeaderFields;
+  const useCustomHeader = headerFields.length > 0;
+
+  function getHeaderFieldValue(key: OptionalHeaderFieldKey): string | null {
+    switch (key) {
+      case "CLIENT":
+        return client.name;
+      case "TAX_ID":
+        return documentLabel;
+      case "STATUS":
+        return ORDER_STATUS_LABELS[order.status];
+      case "SERVICE_TYPE":
+        return SERVICE_TYPE_LABELS[order.serviceType];
+      case "PHONE":
+        return client.phone;
+      case "EMAIL":
+        return client.email;
+      case "ADDRESS":
+        return client.address;
+      case "SERVICE_CITY":
+        return order.serviceCity ?? client.city;
+      case "SERVICE_TIME":
+        return order.serviceTime
+          ? formatTimeOnly(order.serviceTime)
+          : order.billedAt
+            ? formatTime(order.billedAt)
+            : null;
+      case "END_CLIENT":
+        return order.endClientName;
+      case "TECHNICIAN":
+        return order.user?.name ?? null;
+    }
+  }
 
   return (
     <div className="mx-auto w-full max-w-[210mm] bg-white p-6 text-neutral-900 sm:p-10 print:w-full print:max-w-none print:p-0">
@@ -172,26 +239,54 @@ export function WorkOrderPrintDocument({
         <hr className="mt-4 border-t-4" style={{ borderColor: accentColor }} />
 
         <div className="mt-6 flex flex-wrap gap-x-8 gap-y-3 rounded-lg border border-neutral-200 bg-neutral-50 p-4 break-inside-avoid print:bg-transparent">
+          {/* "Documento" y "Fecha" identifican el documento — se pintan
+              siempre primero, sin poder apagarse, configurado o no. */}
           <MetaItem
             label="Documento"
             value={`Orden de trabajo ${formatOrderNumber(order.orderNumber)}`}
           />
           <MetaItem label="Fecha" value={formatDate(order.createdAt)} />
-          <MetaItem label="Cliente" value={clientMeta} />
-          <MetaItem label="Estado" value={ORDER_STATUS_LABELS[order.status]} />
-          <MetaItem label="Tipo de servicio" value={SERVICE_TYPE_LABELS[order.serviceType]} />
-          {/* Contacto del cliente, solo cuando existe — antes vivía en su
-              propia sección "Datos del cliente", duplicando nombre/documento
-              que ya están arriba en "Cliente". Se fusiona acá para que el
-              cliente aparezca una sola vez en todo el documento. */}
-          {client.phone && <MetaItem label="Teléfono" value={client.phone} />}
-          {client.email && <MetaItem label="Correo" value={client.email} />}
-          {client.address && <MetaItem label="Dirección" value={client.address} />}
+          {useCustomHeader ? (
+            // Configurado: EN EL ORDEN del arreglo — la empresa lo
+            // controla desde el panel (checklist + mover arriba/abajo).
+            // Campo sin valor (ej. NIT sin documento, hora sin capturar)
+            // se omite en silencio, nunca "N/A".
+            headerFields.map((key) => {
+              const value = getHeaderFieldValue(key as OptionalHeaderFieldKey);
+              if (!value) return null;
+              return (
+                <MetaItem
+                  key={key}
+                  label={HEADER_FIELD_LABELS[key as OptionalHeaderFieldKey]}
+                  value={value}
+                />
+              );
+            })
+          ) : (
+            // Sin configurar: el bloque original de siempre, intacto —
+            // Cliente combinado con NIT en un solo valor (clientMeta),
+            // distinto del renderizado campo-por-campo de arriba.
+            <>
+              <MetaItem label="Cliente" value={clientMeta} />
+              <MetaItem label="Estado" value={ORDER_STATUS_LABELS[order.status]} />
+              <MetaItem
+                label="Tipo de servicio"
+                value={SERVICE_TYPE_LABELS[order.serviceType]}
+              />
+              {/* Contacto del cliente, solo cuando existe — antes vivía en su
+                  propia sección "Datos del cliente", duplicando nombre/documento
+                  que ya están arriba en "Cliente". Se fusiona acá para que el
+                  cliente aparezca una sola vez en todo el documento. */}
+              {client.phone && <MetaItem label="Teléfono" value={client.phone} />}
+              {client.email && <MetaItem label="Correo" value={client.email} />}
+              {client.address && <MetaItem label="Dirección" value={client.address} />}
+            </>
+          )}
         </div>
 
         {equipments.length === 1 && (
           <section className="mt-6 flex flex-col gap-3">
-            <SectionTitle accentColor={accentColor}>Equipo</SectionTitle>
+            <SectionTitle accentColor={accentColor} filled={sectionTitleFilled}>Equipo</SectionTitle>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
               <Field label="Marca" value={equipments[0].brand} />
               <Field label="Modelo" value={equipments[0].model} />
@@ -216,7 +311,7 @@ export function WorkOrderPrintDocument({
 
         {equipments.length > 1 && (
           <section className="mt-6 flex flex-col gap-3">
-            <SectionTitle accentColor={accentColor}>{`Equipos (${equipments.length})`}</SectionTitle>
+            <SectionTitle accentColor={accentColor} filled={sectionTitleFilled}>{`Equipos (${equipments.length})`}</SectionTitle>
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr className="break-after-avoid border-b border-neutral-400 text-left text-[11px] tracking-wide text-neutral-500 uppercase">
@@ -243,17 +338,17 @@ export function WorkOrderPrintDocument({
         )}
 
         <section className="mt-6 flex flex-col gap-4">
-          <SectionTitle accentColor={accentColor}>Servicio realizado</SectionTitle>
+          <SectionTitle accentColor={accentColor} filled={sectionTitleFilled}>Servicio realizado</SectionTitle>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Técnico asignado" value={order.user?.name ?? null} />
             <Field label="Prioridad" value={PRIORITY_LABELS[order.priority]} />
           </div>
-          <Field label="Descripción" value={order.description} />
+          <Field label={descriptionLabel} value={order.description} />
         </section>
 
         {order.diagnosis && (
           <div className="mt-4 break-inside-avoid">
-            <Callout variant="amber" title="Hallazgo técnico / Diagnóstico">
+            <Callout variant="amber" title={diagnosisLabel}>
               {order.diagnosis}
             </Callout>
           </div>
@@ -261,7 +356,7 @@ export function WorkOrderPrintDocument({
 
         {order.observations && (
           <div className="mt-4 break-inside-avoid">
-            <Callout variant="blue" title="Observaciones y recomendaciones">
+            <Callout variant="blue" title={observationsLabel}>
               {order.observations}
             </Callout>
           </div>
@@ -269,7 +364,7 @@ export function WorkOrderPrintDocument({
 
         {order.suggestions && (
           <div className="mt-4 break-inside-avoid">
-            <Callout variant="green" title="Sugerencias y recomendaciones">
+            <Callout variant="green" title={suggestionsLabel}>
               {order.suggestions}
             </Callout>
           </div>
@@ -283,7 +378,7 @@ export function WorkOrderPrintDocument({
             así que nunca deja una hoja en blanco. */}
         {photos.length > 0 && (
           <section className="mt-6 flex flex-col gap-3 break-before-page">
-            <SectionTitle accentColor={accentColor}>Archivo fotográfico</SectionTitle>
+            <SectionTitle accentColor={accentColor} filled={sectionTitleFilled}>Archivo fotográfico</SectionTitle>
             <PrintPhotoGrid photos={photos} />
           </section>
         )}

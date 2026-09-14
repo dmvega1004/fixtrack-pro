@@ -1,4 +1,6 @@
 import {
+  ArrayUnique,
+  IsArray,
   IsBoolean,
   IsEmail,
   IsIn,
@@ -19,6 +21,29 @@ export const CURRENCIES = ['COP', 'USD', 'EUR', 'MXN', 'PEN'] as const;
 
 /** Mismo patrón que create-client.dto.ts (reportFormatAccentColor). */
 const HEX_COLOR_REGEX = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/;
+
+/** Debe reflejar exactamente SECTION_TITLE_STYLES en apps/web/src/lib/work-order-header-fields.ts. */
+export const SECTION_TITLE_STYLES = ['UNDERLINE', 'FILLED'] as const;
+
+/**
+ * Campos opcionales del encabezado de la orden de trabajo. "Documento" y
+ * "Fecha" no están acá a propósito: se pintan siempre, sin poder
+ * apagarse. Debe reflejar exactamente OPTIONAL_HEADER_FIELD_KEYS en
+ * apps/web/src/lib/work-order-header-fields.ts.
+ */
+export const OPTIONAL_HEADER_FIELD_KEYS = [
+  'CLIENT',
+  'TAX_ID',
+  'STATUS',
+  'SERVICE_TYPE',
+  'PHONE',
+  'EMAIL',
+  'ADDRESS',
+  'SERVICE_CITY',
+  'SERVICE_TIME',
+  'END_CLIENT',
+  'TECHNICIAN',
+] as const;
 
 export class UpdateCompanyDto {
   @IsOptional()
@@ -260,4 +285,49 @@ export class UpdateCompanyDto {
     message: 'letterheadShowFixtrackBranding debe ser verdadero o falso',
   })
   letterheadShowFixtrackBranding?: boolean;
+
+  // --- Etapa 2 del membrete: estructura, no solo color ---
+
+  @IsOptional()
+  @IsIn(SECTION_TITLE_STYLES, {
+    message: 'letterheadSectionTitleStyle debe ser UNDERLINE o FILLED',
+  })
+  letterheadSectionTitleStyle?: string;
+
+  /**
+   * Orden explícito de campos opcionales del encabezado de la orden de
+   * trabajo — el arreglo SÍ conserva el orden de configuración, se pinta
+   * tal cual llega. [] es un valor válido (vuelve al set de hoy), por eso
+   * no lleva @IsNotEmpty.
+   */
+  @IsOptional()
+  @IsArray({ message: 'letterheadWorkOrderHeaderFields debe ser un arreglo' })
+  @ArrayUnique({
+    message: 'letterheadWorkOrderHeaderFields no puede repetir un campo',
+  })
+  @IsIn(OPTIONAL_HEADER_FIELD_KEYS, {
+    each: true,
+    message: `letterheadWorkOrderHeaderFields solo admite: ${OPTIONAL_HEADER_FIELD_KEYS.join(', ')}`,
+  })
+  letterheadWorkOrderHeaderFields?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  letterheadDescriptionLabel?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  letterheadDiagnosisLabel?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  letterheadObservationsLabel?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  letterheadSuggestionsLabel?: string;
 }

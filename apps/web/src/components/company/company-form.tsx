@@ -12,6 +12,8 @@ import type { Company } from "@/lib/api/company";
 import { CURRENCIES, CURRENCY_LABELS, type Currency } from "@/lib/currency";
 import { saveCompanyAction } from "@/app/(dashboard)/empresa/actions";
 import { LetterheadPreview } from "@/components/company/letterhead-preview";
+import { HeaderFieldsPicker } from "@/components/company/header-fields-picker";
+import { SECTION_TITLE_STYLES, type SectionTitleStyle } from "@/lib/work-order-header-fields";
 
 /** Mismo azul que PRINT_BRAND_BLUE (print-letterhead.tsx) — valor por
  * defecto del selector cuando la empresa no ha configurado ninguno, mismo
@@ -64,6 +66,12 @@ interface CompanyFormState {
   letterheadCollectionDocDate: string;
   letterheadFooterText: string;
   letterheadShowFixtrackBranding: boolean;
+  letterheadSectionTitleStyle: SectionTitleStyle;
+  letterheadWorkOrderHeaderFields: string[];
+  letterheadDescriptionLabel: string;
+  letterheadDiagnosisLabel: string;
+  letterheadObservationsLabel: string;
+  letterheadSuggestionsLabel: string;
 }
 
 function toFormState(company: Company): CompanyFormState {
@@ -109,6 +117,12 @@ function toFormState(company: Company): CompanyFormState {
     letterheadCollectionDocDate: company.letterheadCollectionDocDate ?? "",
     letterheadFooterText: company.letterheadFooterText ?? "",
     letterheadShowFixtrackBranding: company.letterheadShowFixtrackBranding,
+    letterheadSectionTitleStyle: company.letterheadSectionTitleStyle,
+    letterheadWorkOrderHeaderFields: company.letterheadWorkOrderHeaderFields,
+    letterheadDescriptionLabel: company.letterheadDescriptionLabel ?? "",
+    letterheadDiagnosisLabel: company.letterheadDiagnosisLabel ?? "",
+    letterheadObservationsLabel: company.letterheadObservationsLabel ?? "",
+    letterheadSuggestionsLabel: company.letterheadSuggestionsLabel ?? "",
   };
 }
 
@@ -297,6 +311,14 @@ export function CompanyForm({ company }: CompanyFormProps) {
       letterheadCollectionDocDate: form.letterheadCollectionDocDate.trim() || undefined,
       letterheadFooterText: form.letterheadFooterText.trim() || undefined,
       letterheadShowFixtrackBranding: form.letterheadShowFixtrackBranding,
+      letterheadSectionTitleStyle: form.letterheadSectionTitleStyle,
+      // Arreglo completo siempre, sin "|| undefined": [] es un valor
+      // válido (vuelve al encabezado de hoy) y debe persistirse tal cual.
+      letterheadWorkOrderHeaderFields: form.letterheadWorkOrderHeaderFields,
+      letterheadDescriptionLabel: form.letterheadDescriptionLabel.trim() || undefined,
+      letterheadDiagnosisLabel: form.letterheadDiagnosisLabel.trim() || undefined,
+      letterheadObservationsLabel: form.letterheadObservationsLabel.trim() || undefined,
+      letterheadSuggestionsLabel: form.letterheadSuggestionsLabel.trim() || undefined,
     });
     setIsSaving(false);
 
@@ -510,6 +532,8 @@ export function CompanyForm({ company }: CompanyFormProps) {
                 date: form.letterheadCollectionDocDate,
               },
             }}
+            sectionTitleStyle={form.letterheadSectionTitleStyle}
+            headerFields={form.letterheadWorkOrderHeaderFields}
           />
 
           <div className="flex flex-col gap-1.5 border-t border-border pt-3">
@@ -536,6 +560,48 @@ export function CompanyForm({ company }: CompanyFormProps) {
               oscuro, el que mejor se lea) — puedes elegir cualquier color,
               incluso uno claro.
             </p>
+          </div>
+
+          <div className="flex flex-col gap-1.5 border-t border-border pt-3">
+            <p className="text-sm font-medium">Estilo de los títulos de sección</p>
+            <p className="-mt-1 text-xs text-muted-foreground">
+              Se aplica por igual a los 3 documentos (en la cuenta de cobro
+              no hay ningún título con este patrón, así que no le cambia
+              nada).
+            </p>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              {SECTION_TITLE_STYLES.map((styleOption) => (
+                <label
+                  key={styleOption}
+                  className="flex flex-1 items-start gap-2 rounded-lg border border-border p-3 has-checked:border-foreground"
+                >
+                  <input
+                    type="radio"
+                    name="letterheadSectionTitleStyle"
+                    className="mt-0.5"
+                    checked={form.letterheadSectionTitleStyle === styleOption}
+                    onChange={() =>
+                      setForm((current) => ({
+                        ...current,
+                        letterheadSectionTitleStyle: styleOption,
+                      }))
+                    }
+                  />
+                  <span className="flex flex-col gap-0.5">
+                    <span className="text-sm font-normal">
+                      {styleOption === "FILLED"
+                        ? "Franja rellena"
+                        : "Texto en color con línea (hoy)"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {styleOption === "FILLED"
+                        ? "Barra del color de acento con texto en blanco o gris oscuro."
+                        : "Texto en el color de acento con una línea divisoria debajo."}
+                    </span>
+                  </span>
+                </label>
+              ))}
+            </div>
           </div>
 
           <div className="flex flex-col gap-3 border-t border-border pt-3">
@@ -614,6 +680,71 @@ export function CompanyForm({ company }: CompanyFormProps) {
                   value={form.letterheadCollectionDocDate}
                   onChange={updateField("letterheadCollectionDocDate")}
                   placeholder="Fecha (ej. 28/09/2019)"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2 border-t border-border pt-3">
+            <p className="text-sm font-medium">Campos del encabezado de la orden de trabajo</p>
+            <p className="-mt-1 text-xs text-muted-foreground">
+              &quot;Documento&quot; y &quot;Fecha&quot; siempre aparecen primero — identifican el
+              documento. Marca los demás que quieras mostrar; se pintan en
+              el orden en que los marcas (usa las flechas para reordenar).
+              Sin ninguno marcado, se muestran los de hoy (Cliente, Estado,
+              Tipo de servicio, Teléfono, Correo, Dirección).
+            </p>
+            <HeaderFieldsPicker
+              value={form.letterheadWorkOrderHeaderFields}
+              onChange={(next) =>
+                setForm((current) => ({
+                  ...current,
+                  letterheadWorkOrderHeaderFields: next,
+                }))
+              }
+            />
+          </div>
+
+          <div className="flex flex-col gap-3 border-t border-border pt-3">
+            <p className="text-sm font-medium">Rótulos de los bloques de texto</p>
+            <p className="-mt-2 text-xs text-muted-foreground">
+              Solo aplica a la orden de trabajo. Vacío = el rótulo de hoy.
+            </p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="letterheadDescriptionLabel">Descripción</Label>
+                <Input
+                  id="letterheadDescriptionLabel"
+                  value={form.letterheadDescriptionLabel}
+                  onChange={updateField("letterheadDescriptionLabel")}
+                  placeholder="Descripción"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="letterheadDiagnosisLabel">Diagnóstico</Label>
+                <Input
+                  id="letterheadDiagnosisLabel"
+                  value={form.letterheadDiagnosisLabel}
+                  onChange={updateField("letterheadDiagnosisLabel")}
+                  placeholder="Hallazgo técnico / Diagnóstico"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="letterheadObservationsLabel">Observaciones</Label>
+                <Input
+                  id="letterheadObservationsLabel"
+                  value={form.letterheadObservationsLabel}
+                  onChange={updateField("letterheadObservationsLabel")}
+                  placeholder="Observaciones y recomendaciones"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="letterheadSuggestionsLabel">Sugerencias</Label>
+                <Input
+                  id="letterheadSuggestionsLabel"
+                  value={form.letterheadSuggestionsLabel}
+                  onChange={updateField("letterheadSuggestionsLabel")}
+                  placeholder="Sugerencias y recomendaciones"
                 />
               </div>
             </div>
