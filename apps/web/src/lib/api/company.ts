@@ -1,6 +1,7 @@
 import { serverFetch } from "./server-fetch";
 import type { Currency } from "@/lib/currency";
 import type { SectionTitleStyle } from "@/lib/work-order-header-fields";
+import type { WorkOrderSection } from "@/lib/work-order-sections";
 
 export type { Currency } from "@/lib/currency";
 
@@ -70,11 +71,8 @@ export interface Company {
   letterheadSectionTitleStyle: SectionTitleStyle;
   /** Campos opcionales del encabezado de la orden de trabajo, EN EL ORDEN en que se pintan. [] = sin configurar. */
   letterheadWorkOrderHeaderFields: string[];
-  /** Rótulos propios de los 4 bloques de texto de la orden de trabajo. Null = el de hoy. */
-  letterheadDescriptionLabel: string | null;
-  letterheadDiagnosisLabel: string | null;
-  letterheadObservationsLabel: string | null;
-  letterheadSuggestionsLabel: string | null;
+  /** Secciones de contenido configurables de la orden de trabajo, EN EL ORDEN en que se pintan. [] = sin configurar (bloque original de siempre). */
+  letterheadWorkOrderSections: WorkOrderSection[];
   createdAt: string;
   updatedAt: string;
 }
@@ -123,10 +121,7 @@ export interface UpdateCompanyInput {
   letterheadShowFixtrackBranding?: boolean;
   letterheadSectionTitleStyle?: SectionTitleStyle;
   letterheadWorkOrderHeaderFields?: string[];
-  letterheadDescriptionLabel?: string;
-  letterheadDiagnosisLabel?: string;
-  letterheadObservationsLabel?: string;
-  letterheadSuggestionsLabel?: string;
+  letterheadWorkOrderSections?: WorkOrderSection[];
 }
 
 export interface UpdateCompanyResult extends Company {

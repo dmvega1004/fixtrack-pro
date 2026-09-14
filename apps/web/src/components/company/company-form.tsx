@@ -14,6 +14,11 @@ import { saveCompanyAction } from "@/app/(dashboard)/empresa/actions";
 import { LetterheadPreview } from "@/components/company/letterhead-preview";
 import { HeaderFieldsPicker } from "@/components/company/header-fields-picker";
 import { SECTION_TITLE_STYLES, type SectionTitleStyle } from "@/lib/work-order-header-fields";
+import {
+  WorkOrderSectionsEditor,
+  newSectionId,
+  type EditableWorkOrderSection,
+} from "@/components/company/work-order-sections-editor";
 
 /** Mismo azul que PRINT_BRAND_BLUE (print-letterhead.tsx) — valor por
  * defecto del selector cuando la empresa no ha configurado ninguno, mismo
@@ -68,10 +73,7 @@ interface CompanyFormState {
   letterheadShowFixtrackBranding: boolean;
   letterheadSectionTitleStyle: SectionTitleStyle;
   letterheadWorkOrderHeaderFields: string[];
-  letterheadDescriptionLabel: string;
-  letterheadDiagnosisLabel: string;
-  letterheadObservationsLabel: string;
-  letterheadSuggestionsLabel: string;
+  letterheadWorkOrderSections: EditableWorkOrderSection[];
 }
 
 function toFormState(company: Company): CompanyFormState {
@@ -119,10 +121,11 @@ function toFormState(company: Company): CompanyFormState {
     letterheadShowFixtrackBranding: company.letterheadShowFixtrackBranding,
     letterheadSectionTitleStyle: company.letterheadSectionTitleStyle,
     letterheadWorkOrderHeaderFields: company.letterheadWorkOrderHeaderFields,
-    letterheadDescriptionLabel: company.letterheadDescriptionLabel ?? "",
-    letterheadDiagnosisLabel: company.letterheadDiagnosisLabel ?? "",
-    letterheadObservationsLabel: company.letterheadObservationsLabel ?? "",
-    letterheadSuggestionsLabel: company.letterheadSuggestionsLabel ?? "",
+    letterheadWorkOrderSections: company.letterheadWorkOrderSections.map((section) => ({
+      id: newSectionId(),
+      label: section.label,
+      source: section.source,
+    })),
   };
 }
 
@@ -315,10 +318,13 @@ export function CompanyForm({ company }: CompanyFormProps) {
       // Arreglo completo siempre, sin "|| undefined": [] es un valor
       // válido (vuelve al encabezado de hoy) y debe persistirse tal cual.
       letterheadWorkOrderHeaderFields: form.letterheadWorkOrderHeaderFields,
-      letterheadDescriptionLabel: form.letterheadDescriptionLabel.trim() || undefined,
-      letterheadDiagnosisLabel: form.letterheadDiagnosisLabel.trim() || undefined,
-      letterheadObservationsLabel: form.letterheadObservationsLabel.trim() || undefined,
-      letterheadSuggestionsLabel: form.letterheadSuggestionsLabel.trim() || undefined,
+      // Arreglo completo siempre, sin "|| undefined": [] es un valor
+      // válido (vuelve al bloque original de siempre) y debe
+      // persistirse tal cual. Se descarta el id de UI (ver
+      // EditableWorkOrderSection) — el backend no lo conoce.
+      letterheadWorkOrderSections: form.letterheadWorkOrderSections.map(
+        ({ label, source }) => ({ label: label.trim(), source }),
+      ),
     });
     setIsSaving(false);
 
@@ -705,49 +711,25 @@ export function CompanyForm({ company }: CompanyFormProps) {
             />
           </div>
 
-          <div className="flex flex-col gap-3 border-t border-border pt-3">
-            <p className="text-sm font-medium">Rótulos de los bloques de texto</p>
-            <p className="-mt-2 text-xs text-muted-foreground">
-              Solo aplica a la orden de trabajo. Vacío = el rótulo de hoy.
+          <div className="flex flex-col gap-2 border-t border-border pt-3">
+            <p className="text-sm font-medium">Secciones de contenido de la orden de trabajo</p>
+            <p className="-mt-1 text-xs text-muted-foreground">
+              Cada sección tiene un rótulo y un origen — de qué campo de la
+              orden se llena, o &quot;En blanco&quot; para dejar el espacio libre y
+              escribir a mano. Se pintan en este mismo orden, sin recuadro
+              de color. Sin ninguna configurada, la orden se ve exactamente
+              como hoy (Descripción adentro de &quot;Servicio realizado&quot; y los
+              3 recuadros de color de siempre).
             </p>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="letterheadDescriptionLabel">Descripción</Label>
-                <Input
-                  id="letterheadDescriptionLabel"
-                  value={form.letterheadDescriptionLabel}
-                  onChange={updateField("letterheadDescriptionLabel")}
-                  placeholder="Descripción"
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="letterheadDiagnosisLabel">Diagnóstico</Label>
-                <Input
-                  id="letterheadDiagnosisLabel"
-                  value={form.letterheadDiagnosisLabel}
-                  onChange={updateField("letterheadDiagnosisLabel")}
-                  placeholder="Hallazgo técnico / Diagnóstico"
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="letterheadObservationsLabel">Observaciones</Label>
-                <Input
-                  id="letterheadObservationsLabel"
-                  value={form.letterheadObservationsLabel}
-                  onChange={updateField("letterheadObservationsLabel")}
-                  placeholder="Observaciones y recomendaciones"
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="letterheadSuggestionsLabel">Sugerencias</Label>
-                <Input
-                  id="letterheadSuggestionsLabel"
-                  value={form.letterheadSuggestionsLabel}
-                  onChange={updateField("letterheadSuggestionsLabel")}
-                  placeholder="Sugerencias y recomendaciones"
-                />
-              </div>
-            </div>
+            <WorkOrderSectionsEditor
+              value={form.letterheadWorkOrderSections}
+              onChange={(next) =>
+                setForm((current) => ({
+                  ...current,
+                  letterheadWorkOrderSections: next,
+                }))
+              }
+            />
           </div>
 
           <div className="flex flex-col gap-1.5 border-t border-border pt-3">

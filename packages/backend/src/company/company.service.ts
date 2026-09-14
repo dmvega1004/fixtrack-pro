@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Company } from 'database';
+import { Company, Prisma } from 'database';
 import {
   cloudinaryRootFolder,
   CloudinaryService,
@@ -71,10 +71,7 @@ const COMPANY_SELECT = {
   letterheadShowFixtrackBranding: true,
   letterheadSectionTitleStyle: true,
   letterheadWorkOrderHeaderFields: true,
-  letterheadDescriptionLabel: true,
-  letterheadDiagnosisLabel: true,
-  letterheadObservationsLabel: true,
-  letterheadSuggestionsLabel: true,
+  letterheadWorkOrderSections: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -127,10 +124,7 @@ export type PublicCompany = Pick<
   | 'letterheadShowFixtrackBranding'
   | 'letterheadSectionTitleStyle'
   | 'letterheadWorkOrderHeaderFields'
-  | 'letterheadDescriptionLabel'
-  | 'letterheadDiagnosisLabel'
-  | 'letterheadObservationsLabel'
-  | 'letterheadSuggestionsLabel'
+  | 'letterheadWorkOrderSections'
   | 'createdAt'
   | 'updatedAt'
 >;
@@ -236,10 +230,12 @@ export class CompanyService {
         // descartarse — a diferencia de los campos de texto de este
         // mismo servicio.
         letterheadWorkOrderHeaderFields: dto.letterheadWorkOrderHeaderFields,
-        letterheadDescriptionLabel: dto.letterheadDescriptionLabel?.trim(),
-        letterheadDiagnosisLabel: dto.letterheadDiagnosisLabel?.trim(),
-        letterheadObservationsLabel: dto.letterheadObservationsLabel?.trim(),
-        letterheadSuggestionsLabel: dto.letterheadSuggestionsLabel?.trim(),
+        // Arreglo completo, sin trim/|| undefined — mismo criterio que
+        // letterheadWorkOrderHeaderFields: [] es un valor válido (vuelve
+        // al bloque original de siempre) y debe persistirse tal cual.
+        letterheadWorkOrderSections: dto.letterheadWorkOrderSections as
+          | Prisma.InputJsonValue
+          | undefined,
       },
       select: COMPANY_SELECT,
     });

@@ -212,14 +212,19 @@ model Company {
   /// PHONE, EMAIL, ADDRESS, SERVICE_CITY, SERVICE_TIME, END_CLIENT,
   /// TECHNICIAN (ver OPTIONAL_HEADER_FIELD_KEYS, validado en el DTO).
   letterheadWorkOrderHeaderFields String[]             @default([])
-  /// Rótulos propios de los 4 bloques de texto de la orden de trabajo.
-  /// Null = el de hoy. Solo work-order-print-document.tsx: cotización y
-  /// cuenta de cobro no tienen diagnóstico/sugerencias, y "Observaciones"
-  /// de cotización es un campo distinto (Quote.observations).
-  letterheadDescriptionLabel      String?
-  letterheadDiagnosisLabel        String?
-  letterheadObservationsLabel     String?
-  letterheadSuggestionsLabel      String?
+  /// Secciones de contenido configurables de la ORDEN DE TRABAJO —
+  /// sustituye letterheadDescriptionLabel/DiagnosisLabel/ObservationsLabel/
+  /// SuggestionsLabel (retirados en esta misma migración, con backfill a
+  /// esta estructura). Mismo mecanismo que Client.reportFormatS1/S2/S3
+  /// (rótulo + origen), pero lista variable y reordenable en vez de 3
+  /// campos fijos: acá sí hace falta reordenar y tener más de 3.
+  /// Array de { label: string, source: ReportFormatSource } — mismo enum
+  /// ya usado en Client (DESCRIPTION|DIAGNOSIS|OBSERVATIONS|SUGGESTIONS|
+  /// EMPTY, ver lib/report-format.ts), sin duplicar vocabulario. Orden =
+  /// orden del array. [] = sin configurar → work-order-print-document.tsx
+  /// sigue su bloque original (Servicio realizado con Descripción adentro
+  /// + los 3 recuadros de color de siempre), sin tocar.
+  letterheadWorkOrderSections     Json                 @default("[]")
   createdAt                       DateTime             @default(now())
   updatedAt                       DateTime             @updatedAt
   users                           User[]

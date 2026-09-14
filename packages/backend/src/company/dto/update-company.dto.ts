@@ -1,4 +1,6 @@
+import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   ArrayUnique,
   IsArray,
   IsBoolean,
@@ -14,6 +16,7 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator';
 
 /** Monedas soportadas para formatear precios en el frontend. */
@@ -44,6 +47,35 @@ export const OPTIONAL_HEADER_FIELD_KEYS = [
   'END_CLIENT',
   'TECHNICIAN',
 ] as const;
+
+/**
+ * Mismo vocabulario que REPORT_FORMAT_SOURCES en clients/dto/create-
+ * client.dto.ts (y lib/report-format.ts en el frontend) — mismo patrón
+ * de "duplicar con comentario" que HEX_COLOR_REGEX más arriba, para no
+ * cruzar el límite entre los módulos company/ y clients/.
+ */
+export const WORK_ORDER_SECTION_SOURCES = [
+  'DESCRIPTION',
+  'DIAGNOSIS',
+  'OBSERVATIONS',
+  'SUGGESTIONS',
+  'EMPTY',
+] as const;
+
+/** Máximo de secciones en letterheadWorkOrderSections — evita un documento sin fin. */
+const MAX_WORK_ORDER_SECTIONS = 10;
+
+export class WorkOrderSectionDto {
+  @IsString()
+  @IsNotEmpty({ message: 'El rótulo de la sección no puede quedar vacío' })
+  @MaxLength(100)
+  label: string;
+
+  @IsIn(WORK_ORDER_SECTION_SOURCES, {
+    message: `source debe ser uno de: ${WORK_ORDER_SECTION_SOURCES.join(', ')}`,
+  })
+  source: string;
+}
 
 export class UpdateCompanyDto {
   @IsOptional()
@@ -311,23 +343,19 @@ export class UpdateCompanyDto {
   })
   letterheadWorkOrderHeaderFields?: string[];
 
+  /**
+   * Secciones de contenido configurables de la orden de trabajo, EN EL
+   * ORDEN en que se pintan — sustituye letterheadDescriptionLabel/
+   * DiagnosisLabel/ObservationsLabel/SuggestionsLabel (retirados). []
+   * es un valor válido (vuelve al bloque original de siempre), por eso
+   * no lleva @IsNotEmpty ni @ArrayMinSize.
+   */
   @IsOptional()
-  @IsString()
-  @MaxLength(100)
-  letterheadDescriptionLabel?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(100)
-  letterheadDiagnosisLabel?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(100)
-  letterheadObservationsLabel?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(100)
-  letterheadSuggestionsLabel?: string;
+  @IsArray({ message: 'letterheadWorkOrderSections debe ser un arreglo' })
+  @ArrayMaxSize(MAX_WORK_ORDER_SECTIONS, {
+    message: `letterheadWorkOrderSections admite máximo ${MAX_WORK_ORDER_SECTIONS} secciones`,
+  })
+  @ValidateNested({ each: true })
+  @Type(() => WorkOrderSectionDto)
+  letterheadWorkOrderSections?: WorkOrderSectionDto[];
 }

@@ -22,6 +22,11 @@ import {
   HEADER_FIELD_LABELS,
   type OptionalHeaderFieldKey,
 } from "@/lib/work-order-header-fields";
+import type { WorkOrderSection } from "@/lib/work-order-sections";
+import type { ReportFormatSource } from "@/lib/report-format";
+
+/** Mismo criterio que ReportSection en client-report-format-document.tsx: altura mínima de una sección vacía, suficiente para escribir a mano. */
+const EMPTY_SECTION_MIN_HEIGHT = "42mm";
 
 interface WorkOrderPrintDocumentProps {
   order: WorkOrder;
@@ -83,6 +88,55 @@ function SectionTitle({
     >
       {children}
     </h2>
+  );
+}
+
+/**
+ * Sección de contenido genérica — título en el estilo elegido (SectionTitle)
+ * + texto plano debajo, sin recuadro de color. Reemplaza los recuadros
+ * semánticos (amber/blue/green) cuando la empresa tiene membrete
+ * configurado (ver hasLetterheadStyling) y es el único renderizado para
+ * las secciones configurables (letterheadWorkOrderSections). Reserva
+ * altura mínima cuando el contenido está vacío (ej. sección "en blanco",
+ * o una fuente sin capturar todavía) — mismo criterio y mismo valor que
+ * ReportSection en client-report-format-document.tsx, para que quede
+ * espacio real para escribir a mano sin romper la paginación.
+ */
+function ContentSection({
+  label,
+  content,
+  accentColor,
+  filled,
+  className,
+}: {
+  label: string;
+  content: string;
+  accentColor: string;
+  filled: boolean;
+  className?: string;
+}) {
+  const isEmpty = content.trim() === "";
+  return (
+    <section className={cn("break-inside-avoid", className)}>
+      <SectionTitle accentColor={accentColor} filled={filled}>
+        {label || " "}
+      </SectionTitle>
+      {filled ? (
+        <div
+          className="border border-t-0 border-neutral-300 p-3 text-sm whitespace-pre-wrap text-neutral-900"
+          style={isEmpty ? { minHeight: EMPTY_SECTION_MIN_HEIGHT } : undefined}
+        >
+          {content}
+        </div>
+      ) : (
+        <div
+          className="mt-2 text-sm whitespace-pre-wrap text-neutral-900"
+          style={isEmpty ? { minHeight: EMPTY_SECTION_MIN_HEIGHT } : undefined}
+        >
+          {content}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -164,15 +218,43 @@ export function WorkOrderPrintDocument({
   const footer = buildPrintFooter(company);
   const sectionTitleFilled = company.letterheadSectionTitleStyle === "FILLED";
 
-  // Rótulos configurables de los 4 bloques de texto — vacío o sin
-  // configurar = el de hoy, mismo criterio que el resto del membrete.
-  const descriptionLabel = company.letterheadDescriptionLabel?.trim() || "Descripción";
-  const diagnosisLabel =
-    company.letterheadDiagnosisLabel?.trim() || "Hallazgo técnico / Diagnóstico";
-  const observationsLabel =
-    company.letterheadObservationsLabel?.trim() || "Observaciones y recomendaciones";
-  const suggestionsLabel =
-    company.letterheadSuggestionsLabel?.trim() || "Sugerencias y recomendaciones";
+  // Defecto corregido: los recuadros semánticos (amber/blue/green) de
+  // diagnóstico/observaciones/sugerencias no se enteraban del membrete —
+  // al lado de franjas del color de acento, parecían de otro documento.
+  // Con CUALQUIER señal de que la empresa personalizó el membrete (color
+  // propio, o el estilo de franja rellena — las dos señales del reporte
+  // original), esos 3 bloques por defecto se pintan como cualquier otra
+  // sección (ContentSection), sin recuadro de color. Sin ninguna señal,
+  // se mantienen los recuadros de colores de siempre — sin cambios.
+  const hasLetterheadStyling = Boolean(company.letterheadAccentColor) || sectionTitleFilled;
+
+  // Secciones de contenido configurables — sustituyen los 4 rótulos fijos
+  // de antes. [] (sin configurar) usa el bloque original de siempre, sin
+  // tocar: Servicio realizado con Descripción adentro, y los 3 recuadros
+  // (o secciones planas si hasLetterheadStyling) de diagnóstico/
+  // observaciones/sugerencias, cada uno solo si la orden tiene ese dato.
+  // Configurado, TODAS las secciones del arreglo se pintan, en su orden,
+  // aunque el campo de origen esté vacío — reserva el espacio para
+  // llenarlo a mano (ver ContentSection/EMPTY_SECTION_MIN_HEIGHT), mismo
+  // criterio que el formato de cliente con su fuente EMPTY.
+  const sections = company.letterheadWorkOrderSections;
+  const useCustomSections = sections.length > 0;
+
+  function sectionContent(source: ReportFormatSource): string {
+    switch (source) {
+      case "DESCRIPTION":
+        return order.description;
+      case "DIAGNOSIS":
+        return order.diagnosis ?? "";
+      case "OBSERVATIONS":
+        return order.observations ?? "";
+      case "SUGGESTIONS":
+        return order.suggestions ?? "";
+      case "EMPTY":
+      default:
+        return "";
+    }
+  }
 
   // Encabezado configurable: [] (sin configurar) usa el bloque original
   // de siempre, sin tocar — ver más abajo. Configurado, se pinta EN EL
@@ -343,31 +425,86 @@ export function WorkOrderPrintDocument({
             <Field label="Técnico asignado" value={order.user?.name ?? null} />
             <Field label="Prioridad" value={PRIORITY_LABELS[order.priority]} />
           </div>
-          <Field label={descriptionLabel} value={order.description} />
+          {/* Sin secciones configuradas, la descripción vive acá adentro,
+              intacta — configurada, es una sección más de la lista
+              (abajo), en la posición que la empresa eligió. */}
+          {!useCustomSections && <Field label="Descripción" value={order.description} />}
         </section>
 
-        {order.diagnosis && (
-          <div className="mt-4 break-inside-avoid">
-            <Callout variant="amber" title={diagnosisLabel}>
-              {order.diagnosis}
-            </Callout>
-          </div>
-        )}
-
-        {order.observations && (
-          <div className="mt-4 break-inside-avoid">
-            <Callout variant="blue" title={observationsLabel}>
-              {order.observations}
-            </Callout>
-          </div>
-        )}
-
-        {order.suggestions && (
-          <div className="mt-4 break-inside-avoid">
-            <Callout variant="green" title={suggestionsLabel}>
-              {order.suggestions}
-            </Callout>
-          </div>
+        {useCustomSections ? (
+          // Configurado: TODAS las secciones del arreglo, en orden —
+          // nunca un recuadro de color, siempre ContentSection.
+          sections.map((section: WorkOrderSection, index: number) => (
+            <ContentSection
+              key={index}
+              label={section.label}
+              content={sectionContent(section.source)}
+              accentColor={accentColor}
+              filled={sectionTitleFilled}
+              className="mt-4"
+            />
+          ))
+        ) : hasLetterheadStyling ? (
+          // Membrete configurado (color o franja) pero sin secciones
+          // propias todavía: los 3 bloques de siempre, con sus rótulos de
+          // siempre, pero como sección plana — ya no como recuadro de
+          // color ajeno al membrete. Misma condición de siempre (solo si
+          // la orden tiene ese dato).
+          <>
+            {order.diagnosis && (
+              <ContentSection
+                label="Hallazgo técnico / Diagnóstico"
+                content={order.diagnosis}
+                accentColor={accentColor}
+                filled={sectionTitleFilled}
+                className="mt-4"
+              />
+            )}
+            {order.observations && (
+              <ContentSection
+                label="Observaciones y recomendaciones"
+                content={order.observations}
+                accentColor={accentColor}
+                filled={sectionTitleFilled}
+                className="mt-4"
+              />
+            )}
+            {order.suggestions && (
+              <ContentSection
+                label="Sugerencias y recomendaciones"
+                content={order.suggestions}
+                accentColor={accentColor}
+                filled={sectionTitleFilled}
+                className="mt-4"
+              />
+            )}
+          </>
+        ) : (
+          // Sin membrete configurado: el bloque original de siempre,
+          // intacto — recuadros de colores semánticos.
+          <>
+            {order.diagnosis && (
+              <div className="mt-4 break-inside-avoid">
+                <Callout variant="amber" title="Hallazgo técnico / Diagnóstico">
+                  {order.diagnosis}
+                </Callout>
+              </div>
+            )}
+            {order.observations && (
+              <div className="mt-4 break-inside-avoid">
+                <Callout variant="blue" title="Observaciones y recomendaciones">
+                  {order.observations}
+                </Callout>
+              </div>
+            )}
+            {order.suggestions && (
+              <div className="mt-4 break-inside-avoid">
+                <Callout variant="green" title="Sugerencias y recomendaciones">
+                  {order.suggestions}
+                </Callout>
+              </div>
+            )}
+          </>
         )}
 
         {/* Salto de página antes del registro fotográfico: el texto del
