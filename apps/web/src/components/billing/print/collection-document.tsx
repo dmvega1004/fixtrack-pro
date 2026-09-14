@@ -10,13 +10,13 @@ import { formatDate } from "@/lib/format/dates";
 import { formatCurrency } from "@/lib/format/currency";
 import { formatEquipmentSummary } from "@/lib/format/equipment-summary";
 import { amountInWords } from "@/lib/format/number-to-words";
-import {
-  PrintLetterhead,
-  PRINT_BRAND_BLUE as BRAND_BLUE,
-} from "@/components/work-orders/print/print-letterhead";
+import { PrintLetterhead } from "@/components/work-orders/print/print-letterhead";
 import { SignatureLine } from "@/components/shared/signature-line";
 import { PrintDocumentFrame } from "@/components/shared/print-document-frame";
 import { PrintKeepTogether } from "@/components/shared/print-keep-together";
+import { PrintDocumentControlBox } from "@/components/shared/print-document-control-box";
+import { resolveAccentColor, getAccentTextColor, getAccentTint } from "@/lib/print/accent-color";
+import { buildPrintFooter } from "@/lib/print/footer";
 
 const DEFAULT_FOOTNOTE =
   "Este documento constituye una solicitud de pago y no equivale a factura electrónica de venta.";
@@ -31,12 +31,20 @@ interface CollectionDocumentProps {
   partsSummary: WorkOrderPartsSummary;
 }
 
-function Box({ title, children }: { title: string; children: ReactNode }) {
+function Box({
+  title,
+  accentColor,
+  children,
+}: {
+  title: string;
+  accentColor: string;
+  children: ReactNode;
+}) {
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-neutral-200 p-4 break-inside-avoid">
       <p
         className="break-after-avoid text-xs font-semibold tracking-wide uppercase"
-        style={{ color: BRAND_BLUE }}
+        style={{ color: accentColor }}
       >
         {title}
       </p>
@@ -133,10 +141,8 @@ export function CollectionDocument({
     ? new Date(new Date(order.billedAt).getTime() + client.paymentTermDays * DAY_MS)
     : null;
 
-  const footerContact = company.website || company.email || company.phone;
-  const printFooterText = footerContact
-    ? `${footerContact} · Documento generado por FixTrack Pro`
-    : "Documento generado por FixTrack Pro";
+  const accentColor = resolveAccentColor(company.letterheadAccentColor);
+  const footer = buildPrintFooter(company);
 
   const valueRows: { concept: string; quantity: number; unitPrice: number; total: number }[] = [];
   if (Number(billing.laborAmount) > 0) {
@@ -179,36 +185,48 @@ export function CollectionDocument({
     <div className="mx-auto w-full max-w-[210mm] bg-white p-6 text-neutral-900 sm:p-10 print:w-full print:max-w-none print:p-0">
       <PrintDocumentFrame
         footer={
-          <p className="pt-2 text-center text-[10px] text-neutral-400">
-            {printFooterText}
-          </p>
+          footer.text ? (
+            <p
+              className="pt-2 text-center text-[10px]"
+              style={{ color: footer.useAccentColor ? accentColor : "#A3A3A3" }}
+            >
+              {footer.text}
+            </p>
+          ) : null
         }
       >
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <PrintLetterhead company={company} />
-          <div className="flex flex-col items-end text-right">
-            <p className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">
-              {company.collectionDocTitle}
-            </p>
-            <p className="text-3xl font-bold" style={{ color: BRAND_BLUE }}>
-              {formatCollectionNumber(order.collectionNumber!)}
-            </p>
-            <p className="mt-1 text-xs text-neutral-500">
-              Fecha de emisión: {formatDate(order.collectionIssuedAt!)}
-            </p>
+          <PrintLetterhead company={company} accentColor={accentColor} />
+          <div className="flex flex-col items-end gap-2 text-right">
+            <PrintDocumentControlBox
+              code={company.letterheadCollectionDocCode}
+              version={company.letterheadCollectionDocVersion}
+              date={company.letterheadCollectionDocDate}
+            />
+            <div className="flex flex-col items-end text-right">
+              <p className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">
+                {company.collectionDocTitle}
+              </p>
+              <p className="text-3xl font-bold" style={{ color: accentColor }}>
+                {formatCollectionNumber(order.collectionNumber!)}
+              </p>
+              <p className="mt-1 text-xs text-neutral-500">
+                Fecha de emisión: {formatDate(order.collectionIssuedAt!)}
+              </p>
+            </div>
           </div>
         </div>
 
-        <hr className="mt-4 border-t-4" style={{ borderColor: BRAND_BLUE }} />
+        <hr className="mt-4 border-t-4" style={{ borderColor: accentColor }} />
 
         <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Box title="A cargo de">
+          <Box title="A cargo de" accentColor={accentColor}>
             <span className="font-medium">{client.name}</span>
             {documentLabel && <span className="text-neutral-600">{documentLabel}</span>}
             {client.address && <span className="text-neutral-600">{client.address}</span>}
             {client.phone && <span className="text-neutral-600">{client.phone}</span>}
           </Box>
-          <Box title="Debe a">
+          <Box title="Debe a" accentColor={accentColor}>
             <span className="font-medium">{payeeName}</span>
             {company.payeeDocument && (
               <span className="text-neutral-600">{company.payeeDocument}</span>
@@ -217,8 +235,8 @@ export function CollectionDocument({
         </div>
 
         <div
-          className="print-color-exact mt-6 rounded-md border-l-4 bg-blue-50 p-4 break-inside-avoid"
-          style={{ borderColor: BRAND_BLUE }}
+          className="print-color-exact mt-6 rounded-md border-l-4 p-4 break-inside-avoid"
+          style={{ borderColor: accentColor, backgroundColor: getAccentTint(accentColor) }}
         >
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <MetaItem label="Orden de trabajo" value={formatOrderNumber(order.orderNumber)} />
@@ -311,7 +329,10 @@ export function CollectionDocument({
           </section>
 
           <section className="mt-2 flex justify-end">
-            <div className="print-color-exact flex w-72 items-center justify-between rounded-md bg-blue-600 px-4 py-3 text-white">
+            <div
+              className="print-color-exact flex w-72 items-center justify-between rounded-md px-4 py-3"
+              style={{ backgroundColor: accentColor, color: getAccentTextColor(accentColor) }}
+            >
               <span className="text-sm font-bold tracking-wide uppercase">Saldo a pagar</span>
               <span className="text-lg font-bold">{formatCurrency(balance, currency)}</span>
             </div>
@@ -331,7 +352,7 @@ export function CollectionDocument({
               <div className="flex flex-col gap-1.5 text-sm text-neutral-700">
                 <p
                   className="break-after-avoid text-xs font-semibold tracking-wide uppercase"
-                  style={{ color: BRAND_BLUE }}
+                  style={{ color: accentColor }}
                 >
                   Información para pago
                 </p>

@@ -57,6 +57,18 @@ const COMPANY_SELECT = {
   defaultValidityDays: true,
   quoteFollowUpDays: true,
   quoteFootnote: true,
+  letterheadAccentColor: true,
+  letterheadWorkOrderDocCode: true,
+  letterheadWorkOrderDocVersion: true,
+  letterheadWorkOrderDocDate: true,
+  letterheadQuoteDocCode: true,
+  letterheadQuoteDocVersion: true,
+  letterheadQuoteDocDate: true,
+  letterheadCollectionDocCode: true,
+  letterheadCollectionDocVersion: true,
+  letterheadCollectionDocDate: true,
+  letterheadFooterText: true,
+  letterheadShowFixtrackBranding: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -95,6 +107,18 @@ export type PublicCompany = Pick<
   | 'defaultValidityDays'
   | 'quoteFollowUpDays'
   | 'quoteFootnote'
+  | 'letterheadAccentColor'
+  | 'letterheadWorkOrderDocCode'
+  | 'letterheadWorkOrderDocVersion'
+  | 'letterheadWorkOrderDocDate'
+  | 'letterheadQuoteDocCode'
+  | 'letterheadQuoteDocVersion'
+  | 'letterheadQuoteDocDate'
+  | 'letterheadCollectionDocCode'
+  | 'letterheadCollectionDocVersion'
+  | 'letterheadCollectionDocDate'
+  | 'letterheadFooterText'
+  | 'letterheadShowFixtrackBranding'
   | 'createdAt'
   | 'updatedAt'
 >;
@@ -180,6 +204,20 @@ export class CompanyService {
         defaultValidityDays: dto.defaultValidityDays,
         quoteFollowUpDays: dto.quoteFollowUpDays,
         quoteFootnote: dto.quoteFootnote?.trim(),
+        letterheadAccentColor: dto.letterheadAccentColor,
+        letterheadWorkOrderDocCode: dto.letterheadWorkOrderDocCode?.trim(),
+        letterheadWorkOrderDocVersion:
+          dto.letterheadWorkOrderDocVersion?.trim(),
+        letterheadWorkOrderDocDate: dto.letterheadWorkOrderDocDate?.trim(),
+        letterheadQuoteDocCode: dto.letterheadQuoteDocCode?.trim(),
+        letterheadQuoteDocVersion: dto.letterheadQuoteDocVersion?.trim(),
+        letterheadQuoteDocDate: dto.letterheadQuoteDocDate?.trim(),
+        letterheadCollectionDocCode: dto.letterheadCollectionDocCode?.trim(),
+        letterheadCollectionDocVersion:
+          dto.letterheadCollectionDocVersion?.trim(),
+        letterheadCollectionDocDate: dto.letterheadCollectionDocDate?.trim(),
+        letterheadFooterText: dto.letterheadFooterText?.trim(),
+        letterheadShowFixtrackBranding: dto.letterheadShowFixtrackBranding,
       },
       select: COMPANY_SELECT,
     });

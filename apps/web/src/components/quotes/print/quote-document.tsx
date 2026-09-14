@@ -16,6 +16,9 @@ import { cn } from "@/lib/utils";
 import { SignatureLine } from "@/components/shared/signature-line";
 import { PrintDocumentFrame } from "@/components/shared/print-document-frame";
 import { PrintKeepTogether } from "@/components/shared/print-keep-together";
+import { PrintDocumentControlBox } from "@/components/shared/print-document-control-box";
+import { resolveAccentColor } from "@/lib/print/accent-color";
+import { buildPrintFooter } from "@/lib/print/footer";
 
 /**
  * Control de huérfanas/viudas para un bloque de texto largo que SÍ puede
@@ -26,8 +29,6 @@ import { PrintKeepTogether } from "@/components/shared/print-keep-together";
  */
 const NO_ORPHAN_LINES_STYLE = { orphans: 2, widows: 2 } as const;
 
-const BRAND_BLUE = "#2563EB";
-
 const DEFAULT_FOOTNOTE =
   "Esta cotización no constituye factura de venta. Los precios están sujetos a disponibilidad de inventario y pueden variar una vez vencida la validez de la oferta.";
 
@@ -37,10 +38,18 @@ interface QuoteDocumentProps {
   company: Company;
 }
 
-function Box({ title, children }: { title: string; children: ReactNode }) {
+function Box({
+  title,
+  accentColor,
+  children,
+}: {
+  title: string;
+  accentColor: string;
+  children: ReactNode;
+}) {
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-neutral-200 p-4">
-      <p className="text-xs font-semibold tracking-wide uppercase" style={{ color: BRAND_BLUE }}>
+      <p className="text-xs font-semibold tracking-wide uppercase" style={{ color: accentColor }}>
         {title}
       </p>
       <div className="flex flex-col gap-0.5 text-sm text-neutral-800">{children}</div>
@@ -49,17 +58,23 @@ function Box({ title, children }: { title: string; children: ReactNode }) {
 }
 
 /**
- * Título de sección — borde inferior + azul de marca + negrita para que se
- * distinga con claridad del cuerpo a 12px (mismo tamaño, jerarquía por
+ * Título de sección — borde inferior + color de acento + negrita para que
+ * se distinga con claridad del cuerpo a 12px (mismo tamaño, jerarquía por
  * peso/color, no por tamaño: evita volver a mezclar 14/12 en el documento).
  * break-after-avoid: el corte de página nunca cae justo después de un
  * título, así nunca queda solo al pie de una hoja separado de su texto.
  */
-function SectionTitle({ children }: { children: ReactNode }) {
+function SectionTitle({
+  children,
+  accentColor,
+}: {
+  children: ReactNode;
+  accentColor: string;
+}) {
   return (
     <p
-      className="break-after-avoid border-b pb-1 text-xs font-bold tracking-wide uppercase"
-      style={{ color: BRAND_BLUE, borderColor: "#BFDBFE" }}
+      className="break-after-avoid border-b border-neutral-200 pb-1 text-xs font-bold tracking-wide uppercase"
+      style={{ color: accentColor }}
     >
       {children}
     </p>
@@ -131,10 +146,8 @@ export function QuoteDocument({ quote, client, company }: QuoteDocumentProps) {
     : formatDateOnly(quote.validUntil!);
 
   const equipmentLine = equipmentSummary(quote.equipments);
-  const footerContact = company.website || company.email || company.phone;
-  const printFooterText = footerContact
-    ? `${footerContact} · Documento generado por FixTrack Pro`
-    : "Documento generado por FixTrack Pro";
+  const accentColor = resolveAccentColor(company.letterheadAccentColor);
+  const footer = buildPrintFooter(company);
 
   const hasAnyCommercialTerm =
     quote.paymentTerms || quote.deliveryTime || quote.warrantyTerms;
@@ -159,9 +172,14 @@ export function QuoteDocument({ quote, client, company }: QuoteDocumentProps) {
           collection-document.tsx. */}
       <PrintDocumentFrame
         footer={
-          <p className="pt-2 text-center text-[10px] text-neutral-400">
-            {printFooterText}
-          </p>
+          footer.text ? (
+            <p
+              className="pt-2 text-center text-[10px]"
+              style={{ color: footer.useAccentColor ? accentColor : "#A3A3A3" }}
+            >
+              {footer.text}
+            </p>
+          ) : null
         }
       >
         {/* 1. Membrete */}
@@ -176,7 +194,7 @@ export function QuoteDocument({ quote, client, company }: QuoteDocumentProps) {
               />
             )}
             <div className="flex flex-col">
-              <p className="text-2xl font-bold" style={{ color: BRAND_BLUE }}>
+              <p className="text-2xl font-bold" style={{ color: accentColor }}>
                 {company.name}
               </p>
               {company.taxId && (
@@ -191,31 +209,38 @@ export function QuoteDocument({ quote, client, company }: QuoteDocumentProps) {
           </div>
 
           {/* 2. Cabecera */}
-          <div className="flex flex-col items-end text-right">
-            <p className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">
-              Cotización
-            </p>
-            <p
-              className={cn("font-bold", isDraft ? "text-xl" : "text-3xl")}
-              style={{ color: BRAND_BLUE }}
-            >
-              {isDraft ? "BORRADOR — sin emitir" : formatQuoteNumber(quote.quoteNumber)}
-            </p>
-            <p className="mt-1 text-xs text-neutral-500">Fecha de emisión: {emittedAtLabel}</p>
-            <p className="text-xs text-neutral-500">Válida hasta: {validUntilLabel}</p>
+          <div className="flex flex-col items-end gap-2 text-right">
+            <PrintDocumentControlBox
+              code={company.letterheadQuoteDocCode}
+              version={company.letterheadQuoteDocVersion}
+              date={company.letterheadQuoteDocDate}
+            />
+            <div className="flex flex-col items-end text-right">
+              <p className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">
+                Cotización
+              </p>
+              <p
+                className={cn("font-bold", isDraft ? "text-xl" : "text-3xl")}
+                style={{ color: accentColor }}
+              >
+                {isDraft ? "BORRADOR — sin emitir" : formatQuoteNumber(quote.quoteNumber)}
+              </p>
+              <p className="mt-1 text-xs text-neutral-500">Fecha de emisión: {emittedAtLabel}</p>
+              <p className="text-xs text-neutral-500">Válida hasta: {validUntilLabel}</p>
+            </div>
           </div>
         </header>
 
-        <hr className="mt-4 border-t-4" style={{ borderColor: BRAND_BLUE }} />
+        <hr className="mt-4 border-t-4" style={{ borderColor: accentColor }} />
 
         {/* 3. Cliente / sede */}
         <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Box title="Cliente">
+          <Box title="Cliente" accentColor={accentColor}>
             <span className="font-medium">{client.name}</span>
             {documentLabel && <span className="text-neutral-600">{documentLabel}</span>}
             {client.phone && <span className="text-neutral-600">{client.phone}</span>}
           </Box>
-          <Box title="Sede / Proyecto">
+          <Box title="Sede / Proyecto" accentColor={accentColor}>
             {quote.siteName && <span className="font-medium">{quote.siteName}</span>}
             {equipmentLine && <span className="text-neutral-600">{equipmentLine}</span>}
             {!quote.siteName && !equipmentLine && (
@@ -235,7 +260,7 @@ export function QuoteDocument({ quote, client, company }: QuoteDocumentProps) {
             NO_ORPHAN_LINES_STYLE (mínimo 2 líneas antes/después del
             corte). */}
         <section className="mt-6">
-          <SectionTitle>Alcance</SectionTitle>
+          <SectionTitle accentColor={accentColor}>Alcance</SectionTitle>
           <p
             className="mt-2 text-xs whitespace-pre-wrap text-neutral-900"
             style={NO_ORPHAN_LINES_STYLE}
@@ -249,7 +274,7 @@ export function QuoteDocument({ quote, client, company }: QuoteDocumentProps) {
             Alcance. */}
         {quote.methodology && (
           <section className="mt-6">
-            <SectionTitle>Metodología / plan de trabajo</SectionTitle>
+            <SectionTitle accentColor={accentColor}>Metodología / plan de trabajo</SectionTitle>
             <p
               className="mt-2 text-xs whitespace-pre-wrap text-neutral-900"
               style={NO_ORPHAN_LINES_STYLE}
@@ -310,7 +335,7 @@ export function QuoteDocument({ quote, client, company }: QuoteDocumentProps) {
                 <td className="pt-2 text-right text-base font-bold uppercase">Total</td>
                 <td
                   className="pt-2 text-right text-base font-bold tabular-nums"
-                  style={{ color: BRAND_BLUE }}
+                  style={{ color: accentColor }}
                 >
                   {formatCurrency(quote.billing.total, currency)}
                 </td>
@@ -332,7 +357,7 @@ export function QuoteDocument({ quote, client, company }: QuoteDocumentProps) {
             de Alcance. */}
         {(hasAnyCommercialTerm || quote.exclusions) && (
           <section className="mt-6">
-            <SectionTitle>Condiciones comerciales</SectionTitle>
+            <SectionTitle accentColor={accentColor}>Condiciones comerciales</SectionTitle>
             {hasAnyCommercialTerm && (
               <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 break-inside-avoid">
                 <ConditionField label="Forma de pago" value={quote.paymentTerms} />
@@ -361,7 +386,7 @@ export function QuoteDocument({ quote, client, company }: QuoteDocumentProps) {
             Misma regla de visibilidad y de paginación que Alcance. */}
         {quote.observations && (
           <section className="mt-6">
-            <SectionTitle>Observaciones</SectionTitle>
+            <SectionTitle accentColor={accentColor}>Observaciones</SectionTitle>
             <p
               className="mt-2 text-xs whitespace-pre-wrap text-neutral-900"
               style={NO_ORPHAN_LINES_STYLE}

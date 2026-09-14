@@ -5,16 +5,18 @@ export const PRINT_BRAND_BLUE = "#2563EB";
 
 interface PrintLetterheadProps {
   company: Company;
+  /** Color de acento efectivo (ver resolveAccentColor) — default PRINT_BRAND_BLUE, igual que siempre. */
+  accentColor?: string;
 }
 
 /**
  * Membrete común a todos los documentos imprimibles (orden de trabajo,
- * cuenta de cobro): logo, nombre en azul, eslogan y línea de contacto.
- * La regla azul de abajo NO va acá — cada documento la agrega como
+ * cuenta de cobro): logo, nombre en el color de acento, eslogan y línea de
+ * contacto. La regla azul de abajo NO va acá — cada documento la agrega como
  * hermano, porque en algunos (cuenta de cobro) tiene que atravesar todo el
  * ancho por debajo de un bloque adicional a la derecha del membrete.
  */
-export function PrintLetterhead({ company }: PrintLetterheadProps) {
+export function PrintLetterhead({ company, accentColor = PRINT_BRAND_BLUE }: PrintLetterheadProps) {
   const contactLine = [company.address, company.phone, company.email]
     .filter(Boolean)
     .join("  |  ");
@@ -30,7 +32,7 @@ export function PrintLetterhead({ company }: PrintLetterheadProps) {
         />
       )}
       <div className="flex flex-col">
-        <p className="text-2xl font-bold" style={{ color: PRINT_BRAND_BLUE }}>
+        <p className="text-2xl font-bold" style={{ color: accentColor }}>
           {company.name}
         </p>
         {company.slogan && (

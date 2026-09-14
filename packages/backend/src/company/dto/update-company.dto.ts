@@ -17,6 +17,9 @@ import {
 /** Monedas soportadas para formatear precios en el frontend. */
 export const CURRENCIES = ['COP', 'USD', 'EUR', 'MXN', 'PEN'] as const;
 
+/** Mismo patrón que create-client.dto.ts (reportFormatAccentColor). */
+const HEX_COLOR_REGEX = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/;
+
 export class UpdateCompanyDto {
   @IsOptional()
   @IsString()
@@ -189,4 +192,72 @@ export class UpdateCompanyDto {
   @IsString()
   @MaxLength(500)
   quoteFootnote?: string;
+
+  // --- Membrete de empresa ("Mi empresa"): distinto eje de
+  // Client.reportFormat* (formato que exige un CLIENTE) — ver comentario
+  // en schema.prisma sobre el prefijo letterhead*. ---
+
+  @IsOptional()
+  @Matches(HEX_COLOR_REGEX, {
+    message:
+      'letterheadAccentColor debe ser un color hexadecimal válido (ej. #2563EB)',
+  })
+  letterheadAccentColor?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  letterheadWorkOrderDocCode?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  letterheadWorkOrderDocVersion?: string;
+
+  /** Texto libre — es la fecha de la VERSIÓN del documento, no una fecha operativa. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  letterheadWorkOrderDocDate?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  letterheadQuoteDocCode?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  letterheadQuoteDocVersion?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  letterheadQuoteDocDate?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  letterheadCollectionDocCode?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  letterheadCollectionDocVersion?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  letterheadCollectionDocDate?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  letterheadFooterText?: string;
+
+  @IsOptional()
+  @IsBoolean({
+    message: 'letterheadShowFixtrackBranding debe ser verdadero o falso',
+  })
+  letterheadShowFixtrackBranding?: boolean;
 }

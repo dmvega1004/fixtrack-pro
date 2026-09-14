@@ -11,6 +11,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Company } from "@/lib/api/company";
 import { CURRENCIES, CURRENCY_LABELS, type Currency } from "@/lib/currency";
 import { saveCompanyAction } from "@/app/(dashboard)/empresa/actions";
+import { LetterheadPreview } from "@/components/company/letterhead-preview";
+
+/** Mismo azul que PRINT_BRAND_BLUE (print-letterhead.tsx) — valor por
+ * defecto del selector cuando la empresa no ha configurado ninguno, mismo
+ * criterio que DEFAULT_ACCENT_COLOR en client-form.tsx. */
+const DEFAULT_ACCENT_COLOR = "#2563EB";
 
 interface UploadErrorBody {
   message?: string;
@@ -46,6 +52,18 @@ interface CompanyFormState {
   quoteFootnote: string;
   signatureInCollection: boolean;
   signatureInQuote: boolean;
+  letterheadAccentColor: string;
+  letterheadWorkOrderDocCode: string;
+  letterheadWorkOrderDocVersion: string;
+  letterheadWorkOrderDocDate: string;
+  letterheadQuoteDocCode: string;
+  letterheadQuoteDocVersion: string;
+  letterheadQuoteDocDate: string;
+  letterheadCollectionDocCode: string;
+  letterheadCollectionDocVersion: string;
+  letterheadCollectionDocDate: string;
+  letterheadFooterText: string;
+  letterheadShowFixtrackBranding: boolean;
 }
 
 function toFormState(company: Company): CompanyFormState {
@@ -79,6 +97,18 @@ function toFormState(company: Company): CompanyFormState {
     quoteFootnote: company.quoteFootnote ?? "",
     signatureInCollection: company.signatureInCollection,
     signatureInQuote: company.signatureInQuote,
+    letterheadAccentColor: company.letterheadAccentColor ?? DEFAULT_ACCENT_COLOR,
+    letterheadWorkOrderDocCode: company.letterheadWorkOrderDocCode ?? "",
+    letterheadWorkOrderDocVersion: company.letterheadWorkOrderDocVersion ?? "",
+    letterheadWorkOrderDocDate: company.letterheadWorkOrderDocDate ?? "",
+    letterheadQuoteDocCode: company.letterheadQuoteDocCode ?? "",
+    letterheadQuoteDocVersion: company.letterheadQuoteDocVersion ?? "",
+    letterheadQuoteDocDate: company.letterheadQuoteDocDate ?? "",
+    letterheadCollectionDocCode: company.letterheadCollectionDocCode ?? "",
+    letterheadCollectionDocVersion: company.letterheadCollectionDocVersion ?? "",
+    letterheadCollectionDocDate: company.letterheadCollectionDocDate ?? "",
+    letterheadFooterText: company.letterheadFooterText ?? "",
+    letterheadShowFixtrackBranding: company.letterheadShowFixtrackBranding,
   };
 }
 
@@ -255,6 +285,18 @@ export function CompanyForm({ company }: CompanyFormProps) {
       defaultValidityDays,
       quoteFollowUpDays,
       quoteFootnote: form.quoteFootnote.trim() || undefined,
+      letterheadAccentColor: form.letterheadAccentColor || undefined,
+      letterheadWorkOrderDocCode: form.letterheadWorkOrderDocCode.trim() || undefined,
+      letterheadWorkOrderDocVersion: form.letterheadWorkOrderDocVersion.trim() || undefined,
+      letterheadWorkOrderDocDate: form.letterheadWorkOrderDocDate.trim() || undefined,
+      letterheadQuoteDocCode: form.letterheadQuoteDocCode.trim() || undefined,
+      letterheadQuoteDocVersion: form.letterheadQuoteDocVersion.trim() || undefined,
+      letterheadQuoteDocDate: form.letterheadQuoteDocDate.trim() || undefined,
+      letterheadCollectionDocCode: form.letterheadCollectionDocCode.trim() || undefined,
+      letterheadCollectionDocVersion: form.letterheadCollectionDocVersion.trim() || undefined,
+      letterheadCollectionDocDate: form.letterheadCollectionDocDate.trim() || undefined,
+      letterheadFooterText: form.letterheadFooterText.trim() || undefined,
+      letterheadShowFixtrackBranding: form.letterheadShowFixtrackBranding,
     });
     setIsSaving(false);
 
@@ -423,6 +465,191 @@ export function CompanyForm({ company }: CompanyFormProps) {
               Aparece en el membrete de las órdenes que imprimes o compartes
               con tus clientes.
             </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Membrete de empresa</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <p className="text-xs text-muted-foreground">
+            Personaliza cómo se ven la orden de trabajo, la cotización y la
+            cuenta de cobro — distinto del formato que exige un cliente
+            puntual (Módulo de Formatos): si una orden se imprime con el
+            formato de un cliente, ese manda; esto aplica a todo lo demás.
+            Si no configuras nada acá, los documentos se ven exactamente
+            como hoy.
+          </p>
+
+          <LetterheadPreview
+            companyName={form.name}
+            slogan={form.slogan}
+            logoUrl={logoUrl}
+            accentColorInput={form.letterheadAccentColor}
+            footerText={form.letterheadFooterText}
+            showFixtrackBranding={form.letterheadShowFixtrackBranding}
+            website={form.website}
+            email={form.email}
+            phone={form.phone}
+            controlBoxes={{
+              workOrder: {
+                code: form.letterheadWorkOrderDocCode,
+                version: form.letterheadWorkOrderDocVersion,
+                date: form.letterheadWorkOrderDocDate,
+              },
+              quote: {
+                code: form.letterheadQuoteDocCode,
+                version: form.letterheadQuoteDocVersion,
+                date: form.letterheadQuoteDocDate,
+              },
+              collection: {
+                code: form.letterheadCollectionDocCode,
+                version: form.letterheadCollectionDocVersion,
+                date: form.letterheadCollectionDocDate,
+              },
+            }}
+          />
+
+          <div className="flex flex-col gap-1.5 border-t border-border pt-3">
+            <Label htmlFor="letterheadAccentColor">Color de acento</Label>
+            <div className="flex items-center gap-2">
+              <input
+                id="letterheadAccentColor"
+                type="color"
+                value={form.letterheadAccentColor || DEFAULT_ACCENT_COLOR}
+                onChange={updateField("letterheadAccentColor")}
+                className="h-9 w-14 shrink-0 cursor-pointer rounded-md border border-border bg-background p-1"
+              />
+              <Input
+                value={form.letterheadAccentColor}
+                onChange={updateField("letterheadAccentColor")}
+                placeholder="#2563EB"
+                className="max-w-32"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Reemplaza el azul de FixTrack en títulos de sección, franjas,
+              líneas divisorias y totales destacados. El texto sobre un
+              fondo pintado con este color se ajusta solo (blanco o gris
+              oscuro, el que mejor se lea) — puedes elegir cualquier color,
+              incluso uno claro.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-3 border-t border-border pt-3">
+            <p className="text-sm font-medium">Recuadro de control documental</p>
+            <p className="-mt-2 text-xs text-muted-foreground">
+              Código, versión y fecha de versión de cada documento, al
+              estilo de los sistemas de calidad. Deja los 3 campos vacíos
+              en un documento para que su recuadro no aparezca.
+            </p>
+
+            <div className="flex flex-col gap-2">
+              <p className="text-xs font-medium text-muted-foreground">Orden de trabajo</p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <Input
+                  aria-label="Código de la orden de trabajo"
+                  value={form.letterheadWorkOrderDocCode}
+                  onChange={updateField("letterheadWorkOrderDocCode")}
+                  placeholder="Código"
+                />
+                <Input
+                  aria-label="Versión de la orden de trabajo"
+                  value={form.letterheadWorkOrderDocVersion}
+                  onChange={updateField("letterheadWorkOrderDocVersion")}
+                  placeholder="Versión"
+                />
+                <Input
+                  aria-label="Fecha de versión de la orden de trabajo"
+                  value={form.letterheadWorkOrderDocDate}
+                  onChange={updateField("letterheadWorkOrderDocDate")}
+                  placeholder="Fecha (ej. 28/09/2019)"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <p className="text-xs font-medium text-muted-foreground">Cotización</p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <Input
+                  aria-label="Código de la cotización"
+                  value={form.letterheadQuoteDocCode}
+                  onChange={updateField("letterheadQuoteDocCode")}
+                  placeholder="Código"
+                />
+                <Input
+                  aria-label="Versión de la cotización"
+                  value={form.letterheadQuoteDocVersion}
+                  onChange={updateField("letterheadQuoteDocVersion")}
+                  placeholder="Versión"
+                />
+                <Input
+                  aria-label="Fecha de versión de la cotización"
+                  value={form.letterheadQuoteDocDate}
+                  onChange={updateField("letterheadQuoteDocDate")}
+                  placeholder="Fecha (ej. 28/09/2019)"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <p className="text-xs font-medium text-muted-foreground">{form.collectionDocTitle || "Cuenta de cobro"}</p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <Input
+                  aria-label="Código de la cuenta de cobro"
+                  value={form.letterheadCollectionDocCode}
+                  onChange={updateField("letterheadCollectionDocCode")}
+                  placeholder="Código"
+                />
+                <Input
+                  aria-label="Versión de la cuenta de cobro"
+                  value={form.letterheadCollectionDocVersion}
+                  onChange={updateField("letterheadCollectionDocVersion")}
+                  placeholder="Versión"
+                />
+                <Input
+                  aria-label="Fecha de versión de la cuenta de cobro"
+                  value={form.letterheadCollectionDocDate}
+                  onChange={updateField("letterheadCollectionDocDate")}
+                  placeholder="Fecha (ej. 28/09/2019)"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5 border-t border-border pt-3">
+            <Label htmlFor="letterheadFooterText">Pie de página</Label>
+            <Input
+              id="letterheadFooterText"
+              value={form.letterheadFooterText}
+              onChange={updateField("letterheadFooterText")}
+              placeholder="Ej. Tel. 300 000 0000 · info@tuempresa.com · www.tuempresa.com"
+            />
+            <p className="text-xs text-muted-foreground">
+              Reemplaza la línea de contacto automática (sitio, correo o
+              teléfono) al pie de los 3 documentos. Vacío = esa línea de
+              contacto, tal como hoy.
+            </p>
+          </div>
+
+          <div className="flex items-start gap-2 rounded-lg border border-border p-3">
+            <input
+              id="letterheadShowFixtrackBranding"
+              type="checkbox"
+              className="mt-0.5"
+              checked={form.letterheadShowFixtrackBranding}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  letterheadShowFixtrackBranding: event.target.checked,
+                }))
+              }
+            />
+            <Label htmlFor="letterheadShowFixtrackBranding" className="font-normal">
+              Mostrar &quot;Documento generado por FixTrack Pro&quot; en el pie
+            </Label>
           </div>
         </CardContent>
       </Card>

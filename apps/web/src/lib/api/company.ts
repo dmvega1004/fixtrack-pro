@@ -46,6 +46,25 @@ export interface Company {
   defaultValidityDays: number;
   quoteFollowUpDays: number;
   quoteFootnote: string | null;
+  /** Membrete de empresa (panel "Mi empresa") — distinto eje de
+   * Client.reportFormat* (formato que exige un CLIENTE). Color hexadecimal;
+   * null = azul de FixTrack, igual que hoy. */
+  letterheadAccentColor: string | null;
+  /** Recuadro de control documental, uno por tipo de documento. Vacíos los
+   * 3 de un tipo = ese recuadro no se muestra. */
+  letterheadWorkOrderDocCode: string | null;
+  letterheadWorkOrderDocVersion: string | null;
+  letterheadWorkOrderDocDate: string | null;
+  letterheadQuoteDocCode: string | null;
+  letterheadQuoteDocVersion: string | null;
+  letterheadQuoteDocDate: string | null;
+  letterheadCollectionDocCode: string | null;
+  letterheadCollectionDocVersion: string | null;
+  letterheadCollectionDocDate: string | null;
+  /** Pie de página propio, único para los 3 documentos. Null = línea de contacto automática de siempre. */
+  letterheadFooterText: string | null;
+  /** "Documento generado por FixTrack Pro" al pie. Default true = comportamiento de hoy. */
+  letterheadShowFixtrackBranding: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -80,6 +99,18 @@ export interface UpdateCompanyInput {
   defaultValidityDays?: number;
   quoteFollowUpDays?: number;
   quoteFootnote?: string;
+  letterheadAccentColor?: string;
+  letterheadWorkOrderDocCode?: string;
+  letterheadWorkOrderDocVersion?: string;
+  letterheadWorkOrderDocDate?: string;
+  letterheadQuoteDocCode?: string;
+  letterheadQuoteDocVersion?: string;
+  letterheadQuoteDocDate?: string;
+  letterheadCollectionDocCode?: string;
+  letterheadCollectionDocVersion?: string;
+  letterheadCollectionDocDate?: string;
+  letterheadFooterText?: string;
+  letterheadShowFixtrackBranding?: boolean;
 }
 
 export interface UpdateCompanyResult extends Company {

@@ -14,7 +14,10 @@ import { PrintDocumentFrame } from "@/components/shared/print-document-frame";
 import { PrintKeepTogether } from "@/components/shared/print-keep-together";
 import { PrintPhotoGrid } from "@/components/shared/print-photo-grid";
 import { QrCodeImage } from "@/components/equipment/qr-code-image";
-import { PrintLetterhead, PRINT_BRAND_BLUE as BRAND_BLUE } from "./print-letterhead";
+import { PrintLetterhead } from "./print-letterhead";
+import { PrintDocumentControlBox } from "@/components/shared/print-document-control-box";
+import { resolveAccentColor } from "@/lib/print/accent-color";
+import { buildPrintFooter } from "@/lib/print/footer";
 
 interface WorkOrderPrintDocumentProps {
   order: WorkOrder;
@@ -49,11 +52,17 @@ function MetaItem({ label, value }: { label: string; value: string }) {
   );
 }
 
-function SectionTitle({ children }: { children: string }) {
+function SectionTitle({
+  children,
+  accentColor,
+}: {
+  children: string;
+  accentColor: string;
+}) {
   return (
     <h2
-      className="break-after-avoid border-b pb-1 text-xs font-semibold tracking-wide uppercase"
-      style={{ color: BRAND_BLUE, borderColor: "#BFDBFE" }}
+      className="break-after-avoid border-b border-neutral-200 pb-1 text-xs font-semibold tracking-wide uppercase"
+      style={{ color: accentColor }}
     >
       {children}
     </h2>
@@ -134,26 +143,33 @@ export function WorkOrderPrintDocument({
 
   const clientMeta = documentLabel ? `${client.name} · ${documentLabel}` : client.name;
 
-  // Pie fijo de cada hoja impresa: sitio web (o correo/teléfono si no hay)
-  // + la atribución del producto. Nunca ambos vacíos: "Documento generado
-  // por FixTrack Pro" siempre está presente.
-  const footerContact = company.website || company.email || company.phone;
-  const printFooterText = footerContact
-    ? `${footerContact} · Documento generado por FixTrack Pro`
-    : "Documento generado por FixTrack Pro";
+  const accentColor = resolveAccentColor(company.letterheadAccentColor);
+  const footer = buildPrintFooter(company);
 
   return (
     <div className="mx-auto w-full max-w-[210mm] bg-white p-6 text-neutral-900 sm:p-10 print:w-full print:max-w-none print:p-0">
       <PrintDocumentFrame
         footer={
-          <p className="pt-2 text-center text-[10px] text-neutral-400">
-            {printFooterText}
-          </p>
+          footer.text ? (
+            <p
+              className="pt-2 text-center text-[10px]"
+              style={{ color: footer.useAccentColor ? accentColor : "#A3A3A3" }}
+            >
+              {footer.text}
+            </p>
+          ) : null
         }
       >
-        <PrintLetterhead company={company} />
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <PrintLetterhead company={company} accentColor={accentColor} />
+          <PrintDocumentControlBox
+            code={company.letterheadWorkOrderDocCode}
+            version={company.letterheadWorkOrderDocVersion}
+            date={company.letterheadWorkOrderDocDate}
+          />
+        </div>
 
-        <hr className="mt-4 border-t-4" style={{ borderColor: BRAND_BLUE }} />
+        <hr className="mt-4 border-t-4" style={{ borderColor: accentColor }} />
 
         <div className="mt-6 flex flex-wrap gap-x-8 gap-y-3 rounded-lg border border-neutral-200 bg-neutral-50 p-4 break-inside-avoid print:bg-transparent">
           <MetaItem
@@ -175,7 +191,7 @@ export function WorkOrderPrintDocument({
 
         {equipments.length === 1 && (
           <section className="mt-6 flex flex-col gap-3">
-            <SectionTitle>Equipo</SectionTitle>
+            <SectionTitle accentColor={accentColor}>Equipo</SectionTitle>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
               <Field label="Marca" value={equipments[0].brand} />
               <Field label="Modelo" value={equipments[0].model} />
@@ -200,7 +216,7 @@ export function WorkOrderPrintDocument({
 
         {equipments.length > 1 && (
           <section className="mt-6 flex flex-col gap-3">
-            <SectionTitle>{`Equipos (${equipments.length})`}</SectionTitle>
+            <SectionTitle accentColor={accentColor}>{`Equipos (${equipments.length})`}</SectionTitle>
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr className="break-after-avoid border-b border-neutral-400 text-left text-[11px] tracking-wide text-neutral-500 uppercase">
@@ -227,7 +243,7 @@ export function WorkOrderPrintDocument({
         )}
 
         <section className="mt-6 flex flex-col gap-4">
-          <SectionTitle>Servicio realizado</SectionTitle>
+          <SectionTitle accentColor={accentColor}>Servicio realizado</SectionTitle>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Técnico asignado" value={order.user?.name ?? null} />
             <Field label="Prioridad" value={PRIORITY_LABELS[order.priority]} />
@@ -267,7 +283,7 @@ export function WorkOrderPrintDocument({
             así que nunca deja una hoja en blanco. */}
         {photos.length > 0 && (
           <section className="mt-6 flex flex-col gap-3 break-before-page">
-            <SectionTitle>Archivo fotográfico</SectionTitle>
+            <SectionTitle accentColor={accentColor}>Archivo fotográfico</SectionTitle>
             <PrintPhotoGrid photos={photos} />
           </section>
         )}
