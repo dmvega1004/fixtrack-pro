@@ -8,6 +8,7 @@ import { PRIORITY_LABELS } from "@/components/shared/priority-badge";
 import { SERVICE_TYPE_LABELS } from "@/components/shared/service-type-badge";
 import { formatOrderNumber } from "@/lib/format/order-number";
 import { formatDate, formatTime, formatTimeOnly } from "@/lib/format/dates";
+import { formatDateOnly } from "@/lib/format/date-only";
 import { cn } from "@/lib/utils";
 import { SignatureLine } from "@/components/shared/signature-line";
 import { PrintDocumentFrame } from "@/components/shared/print-document-frame";
@@ -282,6 +283,8 @@ export function WorkOrderPrintDocument({
         return client.address;
       case "SERVICE_CITY":
         return order.serviceCity ?? client.city;
+      case "SERVICE_DATE":
+        return order.serviceDate ? formatDateOnly(order.serviceDate) : null;
       case "SERVICE_TIME":
         return order.serviceTime
           ? formatTimeOnly(order.serviceTime)
@@ -327,7 +330,18 @@ export function WorkOrderPrintDocument({
             label="Documento"
             value={`Orden de trabajo ${formatOrderNumber(order.orderNumber)}`}
           />
-          <MetaItem label="Fecha" value={formatDate(order.createdAt)} />
+          {/* Fecha de servicio (cuándo se hizo el trabajo) si existe; si no,
+              la de creación, exactamente como hoy — createdAt (hecho de
+              auditoría) nunca se edita, así que solo cambia la ETIQUETA
+              cuando hay una fecha de servicio real que mostrar en su lugar. */}
+          <MetaItem
+            label={order.serviceDate ? "Fecha de servicio" : "Fecha"}
+            value={
+              order.serviceDate
+                ? formatDateOnly(order.serviceDate)
+                : formatDate(order.createdAt)
+            }
+          />
           {useCustomHeader ? (
             // Configurado: EN EL ORDEN del arreglo — la empresa lo
             // controla desde el panel (checklist + mover arriba/abajo).

@@ -98,12 +98,17 @@ export async function saveSuggestionsAction(
 }
 
 /**
- * Cliente final, ciudad y hora del servicio se guardan juntos en un solo
- * PATCH — un bloque, un botón de guardar (ver ServiceLocationEditor).
+ * Cliente final, ciudad, hora y fecha del servicio se guardan juntos en un
+ * solo PATCH — un bloque, un botón de guardar (ver ServiceLocationEditor).
  */
 export async function saveServiceLocationAction(
   orderId: string,
-  input: { endClientName: string; serviceCity: string; serviceTime: string },
+  input: {
+    endClientName: string;
+    serviceCity: string;
+    serviceTime: string;
+    serviceDate: string;
+  },
 ): Promise<ActionResult> {
   return runMutation(orderId, () =>
     serverFetch(`/work-orders/${orderId}`, {

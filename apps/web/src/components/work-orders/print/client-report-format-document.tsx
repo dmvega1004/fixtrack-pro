@@ -3,6 +3,7 @@ import type { Client, ReportFormatSource } from "@/lib/api/clients";
 import type { Attachment } from "@/lib/api/attachments";
 import { formatOrderNumber } from "@/lib/format/order-number";
 import { formatDate, formatTime, formatTimeOnly } from "@/lib/format/dates";
+import { formatDateOnly } from "@/lib/format/date-only";
 import { cn } from "@/lib/utils";
 import { PrintDocumentFrame } from "@/components/shared/print-document-frame";
 import { PrintKeepTogether } from "@/components/shared/print-keep-together";
@@ -195,8 +196,15 @@ export function ClientReportFormatDocument({
   const showPhotos = client.reportFormatIncludePhotos && photos.length > 0;
   const photosLabel = client.reportFormatPhotosLabel?.trim() || "Registro fotográfico";
 
-  // Fecha → fecha de facturación; si no existe (orden aún no cerrada), la de creación.
-  const dateValue = formatDate(order.billedAt ?? order.createdAt);
+  // Fecha → fecha de servicio (cuándo se hizo el trabajo) si el usuario la
+  // capturó; si no, exactamente el respaldo de siempre: fecha de
+  // facturación, o de creación si la orden aún no está cerrada. createdAt
+  // (hecho de auditoría) nunca se edita, así que cuando hay fecha de
+  // servicio real es esa la que se muestra, con su propia etiqueta.
+  const dateLabel = order.serviceDate ? "Fecha de servicio" : "Fecha";
+  const dateValue = order.serviceDate
+    ? formatDateOnly(order.serviceDate)
+    : formatDate(order.billedAt ?? order.createdAt);
   // Hora → la que el usuario capturó (serviceTime); si no la cargó, la de
   // cierre (corregida a America/Bogota — ver formatTime); si la orden
   // sigue abierta, en blanco. Cerrar la orden es un acto administrativo
@@ -295,7 +303,7 @@ export function ClientReportFormatDocument({
           {/* 2. Fila de datos */}
           <div className="mt-5 break-inside-avoid">
             <div className="grid grid-cols-2 gap-2">
-              <DataCell label="Fecha" value={dateValue} accentColor={accentColor} />
+              <DataCell label={dateLabel} value={dateValue} accentColor={accentColor} />
               <DataCell label="Ciudad" value={cityValue} accentColor={accentColor} />
             </div>
             <div className="mt-2 grid grid-cols-2 gap-2">

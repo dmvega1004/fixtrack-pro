@@ -65,6 +65,7 @@ export function DetailsTab({
         initialEndClientName={order.endClientName}
         initialServiceCity={order.serviceCity}
         initialServiceTime={order.serviceTime}
+        initialServiceDate={order.serviceDate}
         isTerminal={isTerminal}
       />
 

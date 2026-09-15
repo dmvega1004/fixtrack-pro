@@ -7,6 +7,7 @@ import { ServiceTypeBadge } from "@/components/shared/service-type-badge";
 import { Button } from "@/components/ui/button";
 import { formatOrderNumber } from "@/lib/format/order-number";
 import { formatDate } from "@/lib/format/dates";
+import { formatDateOnly } from "@/lib/format/date-only";
 import { formatCurrency } from "@/lib/format/currency";
 import { isTerminalStatus } from "@/lib/dashboard/summary";
 import type { SyncWorkOrder } from "@/lib/sync/types";
@@ -146,9 +147,12 @@ export function OrderDetailOffline({
               isTerminal={isTerminal}
             />
 
-            {(order.endClientName || order.serviceCity || order.serviceTime) && (
-              <OfflineDisabledNotice label="Cliente final, ciudad y hora del servicio">
-                <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
+            {(order.endClientName ||
+              order.serviceCity ||
+              order.serviceDate ||
+              order.serviceTime) && (
+              <OfflineDisabledNotice label="Cliente final, ciudad, fecha y hora del servicio">
+                <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
                   {order.endClientName && (
                     <div>
                       <span className="text-xs text-muted-foreground">Cliente final</span>
@@ -159,6 +163,12 @@ export function OrderDetailOffline({
                     <div>
                       <span className="text-xs text-muted-foreground">Ciudad del servicio</span>
                       <p>{order.serviceCity}</p>
+                    </div>
+                  )}
+                  {order.serviceDate && (
+                    <div>
+                      <span className="text-xs text-muted-foreground">Fecha del servicio</span>
+                      <p>{formatDateOnly(order.serviceDate)}</p>
                     </div>
                   )}
                   {order.serviceTime && (

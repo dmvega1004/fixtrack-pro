@@ -10,6 +10,7 @@ import {
   Matches,
   MaxLength,
 } from 'class-validator';
+import { DATE_ONLY_PATTERN } from '../../common/date-only.util';
 
 /**
  * ADMIN, COORDINATOR y TECHNICIAN pueden crear órdenes (RBAC en el
@@ -75,6 +76,21 @@ export class CreateWorkOrderDto {
     message: 'serviceTime debe tener el formato HH:mm',
   })
   serviceTime?: string;
+
+  /**
+   * Fecha en que se EJECUTÓ el servicio (ver WorkOrder.serviceDate en el
+   * schema) — completa a serviceTime, nunca sustituye a createdAt (hecho
+   * de auditoría, no editable). No puede ser futura (validado en el
+   * service, mismo criterio que Equipment.lastMaintenanceAt). Opcional:
+   * cadena vacía permitida (limpia el campo, mismo patrón que
+   * serviceTime/serviceCity).
+   */
+  @IsOptional()
+  @IsString()
+  @Matches(new RegExp(`^$|${DATE_ONLY_PATTERN.source}`), {
+    message: 'serviceDate debe tener el formato YYYY-MM-DD',
+  })
+  serviceDate?: string;
 
   /**
    * Recomendaciones al cliente, separadas de `observations` (notas de lo

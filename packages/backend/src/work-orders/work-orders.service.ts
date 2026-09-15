@@ -30,6 +30,7 @@ import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import {
   addMonthsUTC,
   formatDateOnly,
+  parseDateOnly,
   todayDateOnly,
 } from '../common/date-only.util';
 import { EquipmentsService } from '../equipments/equipments.service';
@@ -276,6 +277,7 @@ export class WorkOrdersService {
           endClientName: dto.endClientName?.trim(),
           serviceCity: dto.serviceCity?.trim(),
           serviceTime: dto.serviceTime?.trim(),
+          serviceDate: this.resolveServiceDate(dto.serviceDate),
           priority: dto.priority, // undefined → default MEDIUM
           serviceType: dto.serviceType, // undefined → default CORRECTIVE
           clientId: dto.clientId,
@@ -619,6 +621,30 @@ export class WorkOrdersService {
     }
 
     return workOrder;
+  }
+
+  /**
+   * Resuelve el valor a escribir en WorkOrder.serviceDate a partir del
+   * string opcional del DTO — mismo patrón que
+   * EquipmentsService.resolveLastMaintenanceAt: `undefined` no toca el
+   * campo, "" lo limpia (null), y una fecha válida se valida contra "no
+   * futura" (mismo criterio que lastMaintenanceAt: la fecha en que se hizo
+   * el trabajo no puede ser mañana).
+   */
+  private resolveServiceDate(value: string | undefined): Date | null | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+    if (value === '') {
+      return null;
+    }
+
+    const serviceDate = parseDateOnly(value);
+    if (serviceDate.getTime() > todayDateOnly().getTime()) {
+      throw new BadRequestException('serviceDate no puede ser una fecha futura');
+    }
+
+    return serviceDate;
   }
 
   async update(
@@ -1475,6 +1501,7 @@ export class WorkOrdersService {
           endClientName: dto.endClientName?.trim(),
           serviceCity: dto.serviceCity?.trim(),
           serviceTime: dto.serviceTime?.trim(),
+          serviceDate: this.resolveServiceDate(dto.serviceDate),
           status: dto.status,
           priority: dto.priority,
           serviceType: dto.serviceType,

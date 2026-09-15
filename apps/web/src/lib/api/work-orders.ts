@@ -63,6 +63,15 @@ export interface WorkOrder {
    */
   serviceTime: string | null;
   /**
+   * Fecha en que se EJECUTÓ el servicio — completa a serviceTime, NUNCA
+   * sustituye a createdAt (hecho de auditoría, no editable). ISO
+   * "YYYY-MM-DDT00:00:00.000Z" (fecha de calendario, @db.Date — ver
+   * lib/format/date-only.ts, NUNCA lib/format/dates.ts para este campo) o
+   * null si no se capturó. Vacía: los documentos usan el mismo respaldo
+   * que hoy (billedAt/createdAt según el documento).
+   */
+  serviceDate: string | null;
+  /**
    * Firmas en sitio (Módulo de Firmas) — visibles para los TRES roles (no
    * son datos financieros). technicianName/technicianDocument/
    * technicianRole son FOTOGRAFÍAS tomadas de User.name/documentNumber y

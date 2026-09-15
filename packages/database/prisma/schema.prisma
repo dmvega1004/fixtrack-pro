@@ -484,6 +484,18 @@ model WorkOrder {
   /// problemas de zona horaria. Vacía: el formato de informe propio del
   /// cliente usa la hora de cierre (billedAt) como respaldo.
   serviceTime            String?
+  /// Fecha en que se EJECUTÓ el servicio — completa a serviceTime (una hora
+  /// sin fecha no dice mucho), NUNCA sustituye a createdAt: createdAt es un
+  /// hecho de auditoría (cuándo entró el registro al sistema) y no se
+  /// edita. Un servicio hecho el sábado puede registrarse el domingo, y esa
+  /// diferencia es información real que se conserva — serviceDate es el
+  /// dato aparte para reportar/mostrar "cuándo pasó" sin tocar la
+  /// auditoría. Fecha de calendario, no un instante (@db.Date, ancla
+  /// medianoche UTC — ver common/date-only.util.ts), mismo criterio que
+  /// Equipment.lastMaintenanceAt/nextMaintenanceAt: no hay zona horaria que
+  /// darle a "qué día" se hizo el trabajo. Vacía: los documentos usan el
+  /// mismo respaldo que hoy (billedAt/createdAt según el documento).
+  serviceDate            DateTime?            @db.Date
   /// Firmas en sitio (Módulo de Firmas): capturadas en la pestaña
   /// Detalles al terminar el servicio, para que salgan en el PDF del
   /// informe y del formato del cliente. technicianName/technicianDocument
