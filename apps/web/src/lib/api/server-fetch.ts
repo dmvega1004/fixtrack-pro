@@ -17,6 +17,8 @@ interface RequestOptions {
    * del formulario, no desloguear a alguien que sigue autenticado.
    */
   allowUnauthorized?: boolean;
+  /** Ver fetchWithResilience. */
+  timeoutMs?: number;
 }
 
 /**
@@ -48,6 +50,7 @@ export async function serverFetch<T>(
       method: options.method,
       body: options.body,
       headers: { Authorization: `Bearer ${token}` },
+      timeoutMs: options.timeoutMs,
     });
   } catch (error) {
     if (!options.allowUnauthorized && error instanceof HttpError && error.status === 401) {

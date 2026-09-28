@@ -21,7 +21,8 @@ export type ActivityAction =
   | "PAYMENT_REGISTERED"
   | "PAYMENT_DELETED"
   | "MAINTENANCE_UPDATED"
-  | "SIGNATURES_CAPTURED";
+  | "SIGNATURES_CAPTURED"
+  | "ASSISTED_TEXT_SAVED";
 
 // Debe reflejar exactamente el modelo ActivityLog de
 // packages/database/prisma/schema.prisma

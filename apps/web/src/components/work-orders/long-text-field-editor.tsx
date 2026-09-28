@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useOnlineStatus } from "@/hooks/use-online-status";
+import { findMissingInfoMarkers } from "@/lib/assisted-draft";
+import { cn } from "@/lib/utils";
 import type { ActionResult } from "@/app/(dashboard)/ordenes/[id]/actions";
 
 interface LongTextFieldEditorProps {
@@ -70,7 +72,14 @@ export function LongTextFieldEditor({
     setValue(event.target.value);
   }
 
+  // Marcas [FALTA: …] de la redacción asistida: mientras quede una, NO se
+  // puede guardar — ni con señal ni sin ella (este editor es el único
+  // camino de escritura de los cuatro campos). El backend las rechaza
+  // también; esto es para que el técnico lo vea antes de intentarlo.
+  const missingMarkers = findMissingInfoMarkers(value);
+
   async function handleSave() {
+    if (missingMarkers.length > 0) return;
     if (required && value.trim() === "") {
       toast.error(requiredErrorMessage ?? "Este campo no puede quedar vacío");
       return;
@@ -108,17 +117,48 @@ export function LongTextFieldEditor({
         disabled={isTerminal}
         rows={4}
         placeholder={placeholder}
-        className="w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 dark:bg-input/30"
+        aria-invalid={missingMarkers.length > 0}
+        aria-describedby={missingMarkers.length > 0 ? `${fieldId}-missing` : undefined}
+        className={cn(
+          "w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 dark:bg-input/30",
+          missingMarkers.length > 0 && "border-destructive ring-3 ring-destructive/30",
+        )}
       />
+      {missingMarkers.length > 0 && <MissingInfoAlert id={`${fieldId}-missing`} markers={missingMarkers} />}
       {!isTerminal && (
         <Button
           onClick={() => void handleSave()}
-          disabled={isSaving || !hasChanges}
+          disabled={isSaving || !hasChanges || missingMarkers.length > 0}
           className="self-start"
         >
           {isSaving ? savingButtonLabel : saveButtonLabel}
         </Button>
       )}
+    </div>
+  );
+}
+
+/**
+ * Aviso de marcas [FALTA: …] sin completar — también lo usa el panel de
+ * redacción asistida. Rojo y con cada marca a la vista: si una llega al
+ * PDF, la lee el cliente.
+ */
+export function MissingInfoAlert({ id, markers }: { id?: string; markers: string[] }) {
+  return (
+    <div
+      id={id}
+      role="alert"
+      className="flex flex-col gap-1 rounded-lg border-2 border-destructive bg-destructive/10 p-3 text-sm text-destructive"
+    >
+      <p className="font-semibold">
+        No se puede guardar: {markers.length === 1 ? "queda 1 dato" : `quedan ${markers.length} datos`} por completar.
+      </p>
+      <p>Completa o borra cada marca antes de guardar — si llega al informe, la ve el cliente.</p>
+      <ul className="list-disc pl-5 font-mono text-xs">
+        {markers.map((marker, index) => (
+          <li key={index}>{marker}</li>
+        ))}
+      </ul>
     </div>
   );
 }

@@ -83,6 +83,19 @@ enum ActivityAction {
   PAYMENT_DELETED
   MAINTENANCE_UPDATED
   SIGNATURES_CAPTURED
+  /// Un texto redactado con asistencia (AssistedDraftUsage) se guardó en un
+  /// campo de la orden. Solo trazabilidad interna: la bitácora nunca sale en
+  /// los documentos que recibe el cliente. Las generaciones descartadas NO
+  /// se registran acá — viven en AssistedDraftUsage.
+  ASSISTED_TEXT_SAVED
+}
+
+enum AssistedDraftStatus {
+  /// Cupo reservado, llamada al proveedor en curso. Cuenta para la cuota.
+  PENDING
+  SUCCEEDED
+  /// No cuenta para la cuota.
+  FAILED
 }
 
 model Company {
@@ -225,6 +238,9 @@ model Company {
   /// sigue su bloque original (Servicio realizado con Descripción adentro
   /// + los 3 recuadros de color de siempre), sin tocar.
   letterheadWorkOrderSections     Json                 @default("[]")
+  /// Tope mensual de generaciones de redacción asistida. Null = default de
+  /// la plataforma (env ASSIST_MONTHLY_LIMIT, 100 si no está definida).
+  assistedDraftMonthlyLimit       Int?
   createdAt                       DateTime             @default(now())
   updatedAt                       DateTime             @updatedAt
   users                           User[]
@@ -246,49 +262,53 @@ model Company {
   workOrderRetentions             WorkOrderRetention[]
   idempotencyKeys                 IdempotencyKey[]
   equipmentFiles                  EquipmentFile[]
+  assistedDraftUsages             AssistedDraftUsage[]
 }
 
 model User {
-  id                 String           @id @default(uuid())
-  email              String           @unique
-  password           String
-  name               String
-  role               Role             @default(TECHNICIAN)
+  id                  String               @id @default(uuid())
+  email               String               @unique
+  password            String
+  name                String
+  role                Role                 @default(TECHNICIAN)
   /// true = la contraseña actual fue asignada por un tercero (alta de
   /// empresa o restablecimiento por un administrador) y el usuario debe
   /// cambiarla antes de poder usar el sistema.
-  mustChangePassword Boolean          @default(false)
+  mustChangePassword  Boolean              @default(false)
   /// Cédula (u otro documento) de este usuario — se congela sobre la orden
   /// al capturar su firma como técnico (ver WorkOrder.technicianDocument).
-  documentNumber     String?
+  documentNumber      String?
   /// Rúbrica dibujada una sola vez en Perfil → "Mi firma" (Cloudinary,
   /// PNG transparente). Se reutiliza al firmar cualquier orden — el
   /// técnico no vuelve a dibujarla cada vez.
-  signatureImageUrl  String?
-  companyId          String
-  company            Company          @relation(fields: [companyId], references: [id])
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
-  workOrders         WorkOrder[]
+  signatureImageUrl   String?
+  companyId           String
+  company             Company              @relation(fields: [companyId], references: [id])
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  workOrders          WorkOrder[]
   /// Fotos que este usuario subió a órdenes; sobrevive a su eliminación
   /// (uploadedById queda en null, la foto y su orden no se tocan).
-  attachments        Attachment[]
+  attachments         Attachment[]
   /// Pagos que este usuario registró; sobrevive a su eliminación
   /// (registeredById queda en null, el pago no se toca).
-  payments           Payment[]
+  payments            Payment[]
   /// Eventos de bitácora de los que este usuario fue autor; sobrevive a su
   /// eliminación (userId queda en null, ActivityLog.userName conserva el
   /// nombre como snapshot).
-  activityLogs       ActivityLog[]
+  activityLogs        ActivityLog[]
   /// Cotizaciones que este usuario creó; sobrevive a su eliminación
   /// (createdById queda en null, la cotización no se toca).
-  quotesCreated      Quote[]
+  quotesCreated       Quote[]
   /// Llaves de idempotencia de operaciones que este usuario disparó;
   /// sobrevive a su eliminación (userId queda en null).
-  idempotencyKeys    IdempotencyKey[]
+  idempotencyKeys     IdempotencyKey[]
   /// Archivos de equipo que este usuario subió; sobrevive a su eliminación
   /// (uploadedById queda en null, el archivo no se toca).
-  equipmentFiles     EquipmentFile[]
+  equipmentFiles      EquipmentFile[]
+  /// Generaciones de redacción asistida que pidió; sobrevive a su
+  /// eliminación (userId queda en null, el costo medido no se pierde).
+  assistedDraftUsages AssistedDraftUsage[]
 
   @@index([companyId])
 }
@@ -546,6 +566,7 @@ model WorkOrder {
   activityLogs           ActivityLog[]
   /// Retenciones aplicadas a esta orden — ver modelo WorkOrderRetention.
   retentions             WorkOrderRetention[]
+  assistedDraftUsages    AssistedDraftUsage[]
 
   @@unique([companyId, orderNumber])
   @@unique([companyId, collectionNumber])
@@ -1049,4 +1070,39 @@ model IdempotencyKey {
 
   @@unique([companyId, key])
   @@index([createdAt])
+}
+
+/// Una fila por llamada al proveedor de redacción asistida: es a la vez la
+/// reserva de cuota mensual (PENDING/SUCCEEDED cuentan, FAILED no) y la
+/// medición del costo real — la primera función cuyo costo crece con el
+/// uso. Los tokens se guardan crudos para poder recalcular el costo si
+/// cambian los precios; estimatedCostUsd es el cálculo con los precios
+/// vigentes al momento de la llamada.
+model AssistedDraftUsage {
+  id               String              @id @default(uuid())
+  companyId        String
+  company          Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  /// SetNull: el costo medido sobrevive al borrado de la orden.
+  workOrderId      String?
+  workOrder        WorkOrder?          @relation(fields: [workOrderId], references: [id], onDelete: SetNull)
+  userId           String?
+  user             User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  provider         String
+  model            String
+  status           AssistedDraftStatus @default(PENDING)
+  inputTokens      Int                 @default(0)
+  outputTokens     Int                 @default(0)
+  cacheReadTokens  Int                 @default(0)
+  cacheWriteTokens Int                 @default(0)
+  estimatedCostUsd Decimal             @default(0) @db.Decimal(10, 6)
+  latencyMs        Int?
+  errorCode        String?
+  /// sha256 (abreviado) de docs/plantillas-redaccion.md usado en la llamada:
+  /// permite saber con qué versión de las plantillas se redactó cada texto.
+  templatesHash    String
+  createdAt        DateTime            @default(now())
+
+  /// Conteo de la cuota del mes en curso.
+  @@index([companyId, createdAt])
+  @@index([workOrderId])
 }

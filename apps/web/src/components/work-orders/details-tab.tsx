@@ -2,6 +2,7 @@ import type { WorkOrder } from "@/lib/api/work-orders";
 import type { Technician, MyProfile } from "@/lib/api/users";
 import { DescriptionEditor } from "./description-editor";
 import { DiagnosisEditor } from "./diagnosis-editor";
+import { AssistedDraftPanel } from "./assisted-draft-panel";
 import { ObservationsEditor } from "./observations-editor";
 import { SuggestionsEditor } from "./suggestions-editor";
 import { ServiceLocationEditor } from "./service-location-editor";
@@ -37,6 +38,16 @@ export function DetailsTab({
         userId={userId}
         initialDescription={order.description}
         isTerminal={isTerminal}
+      />
+
+      <AssistedDraftPanel
+        orderId={order.id}
+        isTerminal={isTerminal}
+        currentValues={{
+          diagnosis: order.diagnosis,
+          observations: order.observations,
+          suggestions: order.suggestions,
+        }}
       />
 
       <DiagnosisEditor

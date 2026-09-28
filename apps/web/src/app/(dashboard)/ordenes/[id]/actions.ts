@@ -7,6 +7,11 @@ import type { OrderStatus } from "@/components/shared/status-chip";
 import type { Priority } from "@/components/shared/priority-badge";
 import type { ServiceType } from "@/components/shared/service-type-badge";
 import type { PaymentMethod } from "@/lib/api/payments";
+import type {
+  AssistedDraftQuota,
+  AssistedDraftResult,
+  AssistedTextField,
+} from "@/lib/assisted-draft";
 
 export interface ActionResult {
   ok: boolean;
@@ -95,6 +100,61 @@ export async function saveSuggestionsAction(
       body: { suggestions },
     }),
   );
+}
+
+/**
+ * Guarda en un campo el texto de un borrador de redacción asistida —
+ * mismo PATCH que saveDiagnosisAction & cía., más `assistedFields` para
+ * que el backend deje ASSISTED_TEXT_SAVED en la bitácora.
+ */
+export async function saveAssistedFieldAction(
+  orderId: string,
+  field: AssistedTextField,
+  value: string,
+): Promise<ActionResult> {
+  return runMutation(orderId, () =>
+    serverFetch(`/work-orders/${orderId}`, {
+      method: "PATCH",
+      body: { [field]: value, assistedFields: [field] },
+    }),
+  );
+}
+
+/** El modelo tarda: 30s (escritura normal) no alcanza; el backend corta al proveedor a los 90s. */
+const ASSISTED_DRAFT_TIMEOUT_MS = 110_000;
+
+export type AssistedDraftActionResult =
+  | AssistedDraftResult
+  | { outcome: "ERROR"; message: string };
+
+/**
+ * Pide un BORRADOR — no escribe nada en la orden. Cualquier falla termina
+ * en un `outcome` que el panel traduce a un mensaje claro, nunca en un
+ * error técnico en pantalla.
+ */
+export async function generateAssistedDraftAction(
+  orderId: string,
+  notes: string,
+): Promise<AssistedDraftActionResult> {
+  try {
+    return await serverFetch<AssistedDraftResult>(`/work-orders/${orderId}/assisted-draft`, {
+      method: "POST",
+      body: { notes },
+      timeoutMs: ASSISTED_DRAFT_TIMEOUT_MS,
+    });
+  } catch (error) {
+    const message = toFriendlyActionMessage(error);
+    if (message) return { outcome: "ERROR", message };
+    return { outcome: "PROVIDER_ERROR" };
+  }
+}
+
+export async function getAssistedDraftQuotaAction(): Promise<AssistedDraftQuota | null> {
+  try {
+    return await serverFetch<AssistedDraftQuota>("/assisted-drafting/status");
+  } catch {
+    return null;
+  }
 }
 
 /**

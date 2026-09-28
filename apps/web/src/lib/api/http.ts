@@ -58,6 +58,8 @@ interface RequestOptions {
   method?: "GET" | "POST" | "PATCH" | "DELETE";
   body?: unknown;
   headers?: Record<string, string>;
+  /** Reemplaza el tiempo límite por defecto (lectura/escritura) — ej. la redacción asistida, que espera al modelo. */
+  timeoutMs?: number;
 }
 
 interface BackendErrorBody {
@@ -120,7 +122,7 @@ export async function fetchWithResilience<T>(
 ): Promise<T> {
   const method = options.method ?? "GET";
   const isRead = method === "GET";
-  const timeoutMs = isRead ? READ_TIMEOUT_MS : WRITE_TIMEOUT_MS;
+  const timeoutMs = options.timeoutMs ?? (isRead ? READ_TIMEOUT_MS : WRITE_TIMEOUT_MS);
 
   const init: RequestInit = {
     method,

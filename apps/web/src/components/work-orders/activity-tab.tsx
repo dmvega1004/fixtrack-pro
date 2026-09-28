@@ -64,6 +64,7 @@ function groupByDay(entries: ActivityLogEntry[]): DayGroup[] {
 function describeEvent({
   userName,
   action,
+  field,
   oldValue,
   newValue,
 }: ActivityLogEntry): ReactNode {
@@ -197,6 +198,13 @@ function describeEvent({
         <>
           {userName} capturó la{newValue?.includes(" y ") ? "s" : ""} firma
           {newValue ? <> de {newValue}</> : null}
+        </>
+      );
+    case "ASSISTED_TEXT_SAVED":
+      return (
+        <>
+          {userName} guardó {field ? <span className="font-medium">{field}</span> : "un campo"}{" "}
+          desde un borrador de redacción asistida
         </>
       );
     default:

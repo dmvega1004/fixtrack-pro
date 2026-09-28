@@ -6,6 +6,7 @@ import {
   IsArray,
   IsDateString,
   IsEnum,
+  IsIn,
   IsNumber,
   IsOptional,
   IsString,
@@ -16,6 +17,13 @@ import {
 } from 'class-validator';
 import { CreateWorkOrderDto } from './create-work-order.dto';
 import { WorkOrderItemInputDto } from './work-order-item.dto';
+
+const ASSISTED_TEXT_FIELDS = [
+  'diagnosis',
+  'observations',
+  'suggestions',
+] as const;
+export type AssistedTextField = (typeof ASSISTED_TEXT_FIELDS)[number];
 
 /**
  * Campos de creación (opcionales) + status para avanzar el ciclo de vida:
@@ -137,4 +145,26 @@ export class UpdateWorkOrderDto extends PartialType(CreateWorkOrderDto) {
     message: 'Cada retentionId debe ser un UUID válido',
   })
   retentionIds?: string[];
+
+  /**
+   * Campos de ESTE mismo PATCH cuyo texto viene de un borrador de
+   * redacción asistida (ver AssistedDraftingService). No cambia qué se
+   * guarda: solo deja el evento ASSISTED_TEXT_SAVED en la bitácora, para
+   * trazabilidad interna — la bitácora nunca sale en los documentos del
+   * cliente. Un campo listado acá que no viaje en el PATCH se ignora.
+   */
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsIn(ASSISTED_TEXT_FIELDS, {
+    each: true,
+    message: `assistedFields solo admite: ${ASSISTED_TEXT_FIELDS.join(', ')}`,
+  })
+  assistedFields?: AssistedTextField[];
 }
+
+export const ASSISTED_TEXT_FIELD_LABELS = {
+  diagnosis: 'Diagnóstico',
+  observations: 'Observaciones',
+  suggestions: 'Sugerencias y recomendaciones',
+} as const;

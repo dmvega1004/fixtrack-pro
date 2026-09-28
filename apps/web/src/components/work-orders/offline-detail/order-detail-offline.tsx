@@ -13,6 +13,7 @@ import { isTerminalStatus } from "@/lib/dashboard/summary";
 import type { SyncWorkOrder } from "@/lib/sync/types";
 import { DescriptionEditor } from "../description-editor";
 import { DiagnosisEditor } from "../diagnosis-editor";
+import { AssistedDraftPanel } from "../assisted-draft-panel";
 import { ObservationsEditor } from "../observations-editor";
 import { SuggestionsEditor } from "../suggestions-editor";
 import { OrderStatusChanger } from "../order-status-changer";
@@ -124,6 +125,16 @@ export function OrderDetailOffline({
               userId={userId}
               initialDescription={order.description}
               isTerminal={isTerminal}
+            />
+
+            <AssistedDraftPanel
+              orderId={order.id}
+              isTerminal={isTerminal}
+              currentValues={{
+                diagnosis: order.diagnosis,
+                observations: order.observations,
+                suggestions: order.suggestions,
+              }}
             />
 
             <DiagnosisEditor

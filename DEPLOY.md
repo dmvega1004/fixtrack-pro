@@ -41,6 +41,8 @@ Copia los nombres de `packages/backend/.env.example` y complétalos con valores 
 | `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | Cuenta de Cloudinary (imágenes: fotos de OT, logo del tenant) |
 | `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_STORAGE_BUCKET` | Documentos de equipo — ver "Bucket de documentos de equipo" más abajo |
 | `PROVISIONING_KEY` | Habilita `POST /auth/register` — ver "Alta de una empresa nueva" más abajo |
+| `ANTHROPIC_API_KEY` | Redacción asistida del informe — ver "Redacción asistida" más abajo. Sin ella la función queda deshabilitada |
+| `ASSIST_MODEL` / `ASSIST_EFFORT` / `ASSIST_MONTHLY_LIMIT` / `ASSIST_PRICE_*` | Opcionales, ver `packages/backend/.env.example` |
 
 `PORT` **no** se configura manualmente: Railway la inyecta automáticamente y `main.ts` ya la lee de `process.env.PORT`.
 
@@ -196,3 +198,31 @@ completo o por tabla) en `packages/database/README.md`.
 - **Cookie de sesión**: la cookie `fixtrack_session` la emite el propio Next.js (Route Handler `apps/web/src/app/api/auth/login/route.ts`), es `httpOnly`, `sameSite: "lax"` y `secure` en producción. Nunca viaja al dominio del backend — el servidor de Next.js la lee y reenvía el JWT como header `Authorization: Bearer` (`apps/web/src/lib/api/server-fetch.ts`). Por eso **no** se necesita `sameSite: "none"` aunque backend y frontend vivan en dominios distintos: la cookie es de un solo dominio (el de Vercel).
 - **Imágenes de Cloudinary**: se muestran con `<img>` plano (fotos de OT, logo del tenant), no con `next/image`. El único uso de `next/image` es un asset local estático (`/brand/logo-sm.png`). Por eso `next.config.ts` no necesita `remotePatterns` hoy — si en el futuro se migra alguna imagen de Cloudinary a `next/image`, habrá que agregar el patrón remoto ahí.
 - **Rate limiting**: `POST /auth/login` está limitado a 5 intentos por minuto por IP; `POST /auth/register` a 3 intentos por hora por IP (`@nestjs/throttler`, aplicado solo a esas rutas, no globalmente).
+
+
+---
+
+## Redacción asistida del informe técnico
+
+El backend lee las plantillas de `docs/plantillas-redaccion.md` **en tiempo
+de ejecución** — editar ese archivo y desplegar cambia cómo se redacta, sin
+tocar código. El build (Railpack) copia el repo completo a `/app`, así que
+el archivo llega al contenedor **siempre que esté versionado en Git**.
+
+**Falla cerrada:** si el archivo no aparece, o falta `ANTHROPIC_API_KEY`,
+la función queda deshabilitada y el arranque deja un error en los logs:
+
+```
+REDACCIÓN ASISTIDA DESHABILITADA: ...
+```
+
+Tras cada despliegue, confirma en los logs de arranque la línea:
+
+```
+Plantillas de redacción cargadas desde /app/docs/plantillas-redaccion.md (hash ...)
+```
+
+Costo y cuota: cada llamada queda en la tabla `AssistedDraftUsage` (tokens,
+costo estimado en USD, modelo, latencia). Tope por empresa: 100
+generaciones/mes por defecto (`ASSIST_MONTHLY_LIMIT`, o
+`Company.assistedDraftMonthlyLimit` para una empresa puntual).

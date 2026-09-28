@@ -44,7 +44,11 @@ import {
   type RetentionLineResult,
 } from './billing.util';
 import { CreateWorkOrderDto } from './dto/create-work-order.dto';
-import { UpdateWorkOrderDto } from './dto/update-work-order.dto';
+import {
+  ASSISTED_TEXT_FIELD_LABELS,
+  UpdateWorkOrderDto,
+} from './dto/update-work-order.dto';
+import { MISSING_INFO_MARKER } from '../assisted-drafting/drafting-prompt';
 
 /**
  * Relaciones que acompañan a cada orden en las respuestas. `client` es el
@@ -1205,6 +1209,19 @@ export class WorkOrdersService {
       throw new BadRequestException('La descripción no puede quedar vacía');
     }
 
+    // Una marca de faltante de la redacción asistida ("[FALTA: …]") jamás
+    // puede llegar al PDF de un cliente. El frontend ya impide guardar
+    // mientras quede una (online y sin señal); esto es la segunda barrera.
+    const fieldsWithMarker = (
+      ['description', 'diagnosis', 'observations', 'suggestions'] as const
+    ).filter((field) => dto[field]?.includes(MISSING_INFO_MARKER));
+    if (fieldsWithMarker.length > 0) {
+      throw new BadRequestException(
+        `El texto todavía tiene marcas ${MISSING_INFO_MARKER} …] sin completar ` +
+          `(${fieldsWithMarker.join(', ')}). Complétalas o bórralas antes de guardar.`,
+      );
+    }
+
     // Una orden entregada o cancelada queda sellada para todos
     if (TERMINAL_STATUSES.includes(workOrder.status)) {
       throw new ConflictException(
@@ -1725,6 +1742,24 @@ export class WorkOrdersService {
             userName: actorName,
             action: ActivityAction.OBSERVATIONS_UPDATED,
             field: 'Observaciones',
+            isFinancial: false,
+          },
+          tx,
+        );
+      }
+
+      // Trazabilidad interna de la redacción asistida: qué campo se guardó
+      // desde un borrador generado. Solo si el campo viaja en este PATCH.
+      for (const field of dto.assistedFields ?? []) {
+        if (dto[field] === undefined) continue;
+        await this.activityService.record(
+          {
+            companyId: user.companyId,
+            workOrderId: id,
+            userId: user.userId,
+            userName: actorName,
+            action: ActivityAction.ASSISTED_TEXT_SAVED,
+            field: ASSISTED_TEXT_FIELD_LABELS[field],
             isFinancial: false,
           },
           tx,

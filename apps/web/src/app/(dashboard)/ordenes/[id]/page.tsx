@@ -32,6 +32,13 @@ import { OrderDetailGate } from "@/components/work-orders/order-detail-gate";
 
 const TERMINAL_STATUSES = ["DELIVERED", "CANCELLED"];
 
+/**
+ * Las Server Actions de esta página heredan este tope. La redacción
+ * asistida espera al modelo hasta ~90 s (ver generateAssistedDraftAction);
+ * el tope por defecto de la plataforma de despliegue podría cortarla antes.
+ */
+export const maxDuration = 120;
+
 interface OrderDetailPageProps {
   params: Promise<{ id: string }>;
 }
