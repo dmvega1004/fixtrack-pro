@@ -14,6 +14,7 @@ interface ModelPrice {
  * corregir un precio sin desplegar código.
  */
 const KNOWN_PRICES: Record<string, ModelPrice> = {
+  'claude-sonnet-5-5': { input: 2, output: 10 },
   'claude-sonnet-5': { input: 2, output: 10 },
   'claude-opus-5': { input: 5, output: 25 },
   'claude-haiku-4-5': { input: 1, output: 5 },

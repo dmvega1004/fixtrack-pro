@@ -12,7 +12,7 @@ import {
  * dados, y la regla de no inventar la imponen las plantillas y la revisión
  * del técnico — no el tamaño del modelo. Cambiable con ASSIST_MODEL.
  */
-const DEFAULT_MODEL = 'claude-sonnet-5';
+const DEFAULT_MODEL = 'claude-sonnet-5-5';
 const DEFAULT_EFFORT = 'medium';
 const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
 type Effort = (typeof EFFORTS)[number];

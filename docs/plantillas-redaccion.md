@@ -56,11 +56,22 @@ Hallazgos de la inspección:
 - [estado del conexionado / encerramiento / montaje]
 
 Causa raíz: [conclusión, atribuida a un hallazgo concreto de los de
-arriba. Si no se puede concluir, decirlo.]
+arriba, nombrando en cuál se apoya. Si no se puede concluir, decirlo.]
 
 Declaración de mediciones no ejecutadas:
 [qué NO se midió y qué no es posible afirmar por esa razón]
 ```
+
+**Atribuir la causa cuando los hallazgos la sostienen.** Si los hallazgos
+registrados sostienen una causa, se atribuye, diciendo en qué hallazgo
+concreto se apoya: «los contactos de potencia del contactor presentaban
+picaduras y la bobina recibía tensión correcta; el desgaste de los
+contactos explica que el motor no arrancara». Si no la sostienen, se dice
+que no fue posible determinarla. Lo que no se vale es tener la evidencia y no
+concluir: no hace falta conocer el significado exacto de un código de
+falla, ni haber descartado toda causa concebible, para atribuir la que los
+hallazgos sí sostienen. Las mediciones no ejecutadas se declaran aparte;
+no anulan la conclusión que sí se puede sacar.
 
 La **declaración de mediciones no ejecutadas** es lo que más protege al
 técnico. Un informe que dice "no se realizó medición de aislamiento, por
@@ -139,6 +150,11 @@ cotización esperando a ser enviada. El mismo hallazgo escrito como
   calificar el trabajo de quien intervino antes.
 - **Recordar quién lee.** Estos textos llegan al cliente en el PDF:
   técnicos pero comprensibles.
+- **Separador decimal colombiano:** coma, no punto. «11,8 A», nunca
+  «11.8 A». Las cifras se copian exactas; solo cambia el separador.
+- **Respetar las expresiones del técnico.** Se corrige la redacción, no se
+  reescribe lo que dijo: si anotó «hora y media», el informe dice «hora y
+  media», no «1,5 horas» ni «90 minutos».
 
 ---
 
@@ -147,21 +163,37 @@ cotización esperando a ser enviada. El mismo hallazgo escrito como
 Estas reglas existen porque el informe lo firma el técnico y puede
 terminar en una discusión de garantía con un cliente.
 
-1. **No inventar mediciones.** Ninguna cifra, unidad, temperatura,
-   corriente, resistencia ni torque puede aparecer si no está en los
-   apuntes que entregó el técnico.
-2. **No inventar causas.** Si los apuntes no permiten concluir la causa
-   raíz, se dice que no fue posible determinarla con la información
-   disponible.
+1. **No inventar mediciones.** Ninguna cifra, temperatura, corriente,
+   resistencia ni torque puede aparecer si no está en los apuntes que
+   entregó el técnico. La unidad de una cifra que sí está en los apuntes
+   se puede escribir cuando la magnitud no deja duda (una corriente de
+   motor en amperios, una temperatura de tablero en grados); si la unidad
+   es ambigua, se deja como la dijo el técnico.
+2. **No inventar causas.** Si los hallazgos no sostienen una causa, se dice
+   que no fue posible determinarla con la información disponible. Si la
+   sostienen, se atribuye (ver «Atribuir la causa cuando los hallazgos la
+   sostienen» en el campo Diagnóstico).
 3. **No inventar marcas, modelos, referencias ni seriales.** Solo los que
    vengan del equipo registrado o de los apuntes.
 4. **No inventar pruebas.** Si el técnico no dijo que probó algo, no se
    afirma que se probó.
-5. **Señalar lo que falta.** Cuando un apartado no se puede redactar con
-   la información disponible, se indica qué dato haría falta, en vez de
-   rellenarlo con texto plausible.
+5. **Señalar solo lo que falta de verdad.** La marca [FALTA: …] es para
+   el dato ausente que **cambia la conclusión técnica o compromete a quien
+   firma**: una medición sin la cual no se puede sostener el diagnóstico,
+   la condición en que quedó el equipo cuando los apuntes no la dicen. Lo
+   que se deduce del contexto —una unidad obvia, el nombre de un
+   componente ya mencionado— no se marca. Lo que falta pero no es material
+   —un apartado de la plantilla sobre el que los apuntes no dicen nada y
+   que no cambia la conclusión— simplemente se omite, sin marca y sin
+   rellenarlo.
 6. **No exagerar el estado final.** Si los apuntes no confirman que el
    equipo quedó operando, no se afirma que quedó operando.
 
-Ante la duda entre escribir algo plausible y dejar un vacío señalado,
-**se deja el vacío señalado**.
+Criterio de cantidad: un borrador normal lleva entre cero y tres marcas.
+Si uno necesita más de tres o cuatro, probablemente se está marcando lo
+trivial; hay que revisar cuáles cambian de verdad la conclusión y quitar
+las demás.
+
+Ante la duda entre escribir algo plausible y no escribirlo, **no se
+escribe**. Omitir lo que no se sabe no es lo mismo que marcarlo: la marca
+se reserva para lo material.
