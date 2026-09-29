@@ -7,6 +7,7 @@ import type { OrderStatus } from "@/components/shared/status-chip";
 import type { Priority } from "@/components/shared/priority-badge";
 import type { ServiceType } from "@/components/shared/service-type-badge";
 import type { PaymentMethod } from "@/lib/api/payments";
+import type { LinkableQuote } from "@/lib/api/work-orders";
 import type {
   AssistedDraftQuota,
   AssistedDraftResult,
@@ -487,4 +488,45 @@ export async function deleteWorkOrderAction(orderId: string): Promise<ActionResu
 
   revalidatePath("/ordenes");
   return { ok: true };
+}
+
+export interface LinkableQuotesResult {
+  ok: boolean;
+  message?: string;
+  quotes?: LinkableQuote[];
+}
+
+/**
+ * Opciones del selector "Cotización que ejecuta" para un cliente. Los tres
+ * roles: el endpoint devuelve solo número, asunto, sede, estado y fecha —
+ * ningún monto (ver GET /work-orders/linkable-quotes en el backend).
+ */
+export async function listLinkableQuotesAction(
+  clientId: string,
+): Promise<LinkableQuotesResult> {
+  try {
+    const quotes = await serverFetch<LinkableQuote[]>(
+      `/work-orders/linkable-quotes?clientId=${encodeURIComponent(clientId)}`,
+    );
+    return { ok: true, quotes };
+  } catch (error) {
+    const message = toFriendlyActionMessage(error);
+    if (message) {
+      return { ok: false, message };
+    }
+    throw error;
+  }
+}
+
+/** Enlaza (quoteId) o desenlaza (null) la cotización que ejecuta la orden. */
+export async function changeQuoteLinkAction(
+  orderId: string,
+  quoteId: string | null,
+): Promise<ActionResult> {
+  return runMutation(orderId, () =>
+    serverFetch(`/work-orders/${orderId}`, {
+      method: "PATCH",
+      body: { quoteId },
+    }),
+  );
 }

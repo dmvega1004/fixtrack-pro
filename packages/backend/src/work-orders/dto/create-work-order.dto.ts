@@ -145,4 +145,13 @@ export class CreateWorkOrderDto {
       'serviceType debe ser CORRECTIVE, PREVENTIVE, INSPECTION o INSTALLATION',
   })
   serviceType?: ServiceType;
+
+  /**
+   * Cotización que esta orden ejecuta (opcional). Se valida en el service:
+   * de la misma empresa, del MISMO cliente de la orden y en estado SENT o
+   * ACCEPTED. En update, `null` desenlaza. Lo pueden enviar los tres roles.
+   */
+  @IsOptional()
+  @IsUUID('4', { message: 'quoteId debe ser un UUID válido' })
+  quoteId?: string | null;
 }

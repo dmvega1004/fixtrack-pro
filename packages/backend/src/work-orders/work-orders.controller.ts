@@ -28,6 +28,7 @@ import { UpdateWorkOrderDto } from './dto/update-work-order.dto';
 import {
   WorkOrderDashboardStats,
   WorkOrdersService,
+  LinkableQuote,
   WorkOrderView,
 } from './work-orders.service';
 
@@ -146,6 +147,23 @@ export class WorkOrdersController {
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<WorkOrderDashboardStats> {
     return this.workOrdersService.getStats(user);
+  }
+
+  /**
+   * GET /work-orders/linkable-quotes?clientId= — cotizaciones que una orden
+   * de ese cliente puede ejecutar (SENT/ACCEPTED, las aceptadas primero),
+   * para el selector de la orden. Los tres roles: por eso vive acá y no en
+   * QuotesController (que es solo ADMIN/COORDINATOR). Proyección recortada
+   * a propósito: número, asunto, sede, estado y fecha — NUNCA montos ni
+   * ítems, para no romper la redacción financiera del técnico.
+   */
+  @Roles(Role.ADMIN, Role.COORDINATOR, Role.TECHNICIAN)
+  @Get('linkable-quotes')
+  linkableQuotes(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('clientId', ParseUUIDPipe) clientId: string,
+  ): Promise<LinkableQuote[]> {
+    return this.workOrdersService.findLinkableQuotes(user, clientId);
   }
 
   /** GET /work-orders/:id — 404 si es de otra empresa o de otro técnico */

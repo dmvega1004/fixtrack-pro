@@ -567,6 +567,14 @@ model WorkOrder {
   /// Retenciones aplicadas a esta orden — ver modelo WorkOrderRetention.
   retentions             WorkOrderRetention[]
   assistedDraftUsages    AssistedDraftUsage[]
+  /// Cotización que esta orden EJECUTA (enlace hacia adelante; el de hacia
+  /// atrás es Quote.sourceWorkOrderId). Opcional: la mayoría de las órdenes
+  /// no vienen de cotización. Una cotización puede ejecutarse en varias
+  /// órdenes (ej. cinco portones en visitas distintas). Restrict: no se
+  /// borra una cotización que ya tiene órdenes ejecutándola. El candado de
+  /// empresa y de cliente lo valida WorkOrdersService, no la FK.
+  quoteId                String?
+  quote                  Quote?               @relation(fields: [quoteId], references: [id], onDelete: Restrict)
 
   @@unique([companyId, orderNumber])
   @@unique([companyId, collectionNumber])
@@ -578,6 +586,7 @@ model WorkOrder {
   @@index([companyId, priority])
   @@index([companyId, billedAt])
   @@index([companyId, paymentStatus])
+  @@index([companyId, quoteId])
 }
 
 model SparePart {
@@ -983,6 +992,8 @@ model Quote {
   updatedAt         DateTime         @updatedAt
   items             QuoteItem[]
   equipmentLinks    QuoteEquipment[]
+  /// Órdenes que ejecutan esta cotización (ver WorkOrder.quoteId).
+  workOrders        WorkOrder[]
 
   @@unique([companyId, quoteNumber])
   @@index([companyId])

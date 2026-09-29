@@ -58,12 +58,21 @@ más sólido que insinuar una causa.
 
 Cada rótulo de antecedentes se escribe solo si hay algo que poner en él.
 
+Cuando la orden ejecuta una cotización, el Diagnóstico abre con la línea
+«Alcance acordado:», que la cita por su número y su asunto. Es el
+compromiso firmado con el cliente, no un antecedente del cliente ni un
+hallazgo: si la descripción de la orden también la menciona, no se vuelve
+a citar como antecedente.
+
 ```
+[Solo si la orden ejecuta una cotización]
+Alcance acordado: cotización COT-XXXX — [asunto de la cotización].
+
 Antecedentes reportados por el cliente (no verificados en esta visita):
 [lo que el cliente contó, tal cual, sin validarlo]
 
 Antecedentes verificados por la empresa en órdenes anteriores:
-- [OT-XXXX del <fecha>]: [lo que esa orden estableció]
+- OT-XXXX del <fecha>: [lo que esa orden estableció]
 
 Hallazgos de la inspección:
 - [componente]: [estado observado, con datos medibles cuando los haya]
@@ -110,6 +119,30 @@ Pruebas realizadas: [qué se probó y qué se verificó].
 Estado final: [condición en que queda el EQUIPO. El estado del recinto
 o de lo que no se intervino va en Sugerencias, no aquí.]
 ```
+
+### Desviaciones respecto de lo cotizado
+
+Cuando la orden ejecuta una cotización, todo parámetro, componente o
+alcance que los apuntes registren DISTINTO de lo que la cotización
+prometió debe quedar escrito con su motivo. Ejemplos: una presión de
+calibración distinta de la ofertada, una referencia de repuesto que no es
+la cotizada, un trabajo del alcance que no se ejecutó, o uno que se
+ejecutó sin estar cotizado.
+
+Si los apuntes no dicen el motivo de la desviación, va marca [FALTA]: es
+información material por definición — la cotización es lo que el cliente
+tiene en la mano, y una diferencia sin explicar es exactamente lo que se
+discute en una garantía.
+
+Lo que coincide con lo cotizado no se comenta. Esta regla es solo para
+las diferencias.
+
+La regla aplica solo cuando se tiene el contenido de la cotización. Si la
+orden apenas la menciona por su número (por ejemplo en la descripción o
+en los apuntes) y su contenido no está disponible, no hay contra qué
+contrastar: no se supone que haya una diferencia, no se pone ninguna
+marca [FALTA] por lo cotizado y no se piden sus datos. Lo ejecutado se
+redacta tal como lo dicen los apuntes.
 
 ---
 

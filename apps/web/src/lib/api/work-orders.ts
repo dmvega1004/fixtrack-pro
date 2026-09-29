@@ -3,6 +3,7 @@ import type { OrderStatus } from "@/components/shared/status-chip";
 import type { Priority } from "@/components/shared/priority-badge";
 import type { ServiceType } from "@/components/shared/service-type-badge";
 import { serverFetch } from "./server-fetch";
+import type { QuoteStatus } from "./quotes";
 
 // Debe reflejar exactamente el shape de WORK_ORDER_INCLUDE en
 // packages/backend/src/work-orders/work-orders.service.ts
@@ -131,6 +132,35 @@ export interface WorkOrder {
   /** Vacío cuando la orden es un servicio locativo; puede tener varios equipos. */
   equipments: WorkOrderEquipment[];
   user: WorkOrderAssignee | null;
+  /**
+   * Cotización que esta orden ejecuta. Opcionales: una orden cacheada sin
+   * señal antes de este campo no los trae. Nunca incluye montos.
+   */
+  quoteId?: string | null;
+  quote?: WorkOrderQuoteSummary | null;
+}
+
+/** Cotización que ejecuta la orden, tal como la ve cualquier rol: sin montos. */
+export interface WorkOrderQuoteSummary {
+  id: string;
+  quoteNumber: number | null;
+  title: string;
+  status: QuoteStatus;
+}
+
+/**
+ * Opción del selector "Cotización que ejecuta" (GET
+ * /work-orders/linkable-quotes): SENT/ACCEPTED del cliente, aceptadas
+ * primero. Proyección cerrada en el backend — jamás montos ni ítems.
+ */
+export interface LinkableQuote {
+  id: string;
+  quoteNumber: number | null;
+  title: string;
+  siteName: string | null;
+  status: QuoteStatus;
+  /** Decisión (ACCEPTED) o envío (SENT). */
+  date: string | null;
 }
 
 export interface WorkOrderFilters {

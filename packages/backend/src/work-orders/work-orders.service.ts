@@ -12,6 +12,7 @@ import {
   PaymentStatus,
   Prisma,
   Priority,
+  QuoteStatus,
   Role,
   ServiceType,
   WorkOrder,
@@ -74,11 +75,55 @@ const WORK_ORDER_INCLUDE = {
     },
   },
   user: { select: { id: true, name: true, email: true } },
+  // Solo identificación de la cotización que ejecuta: NINGÚN monto — esta
+  // vista le llega también al técnico (redacción financiera en toView()).
+  quote: {
+    select: { id: true, quoteNumber: true, title: true, status: true },
+  },
 } as const;
 
 type WorkOrderWithRelations = Prisma.WorkOrderGetPayload<{
   include: typeof WORK_ORDER_INCLUDE;
 }>;
+
+/** Cotización que ejecuta la orden, como la ve cualquier rol: sin montos. */
+export interface WorkOrderQuoteSummary {
+  id: string;
+  quoteNumber: number | null;
+  title: string;
+  status: QuoteStatus;
+}
+
+/**
+ * Opción del selector "Cotización que ejecuta" (GET
+ * /work-orders/linkable-quotes). Proyección cerrada: jamás montos ni ítems.
+ * `date` = fecha de la decisión si la hubo (ACCEPTED), si no la de envío.
+ */
+export interface LinkableQuote {
+  id: string;
+  quoteNumber: number | null;
+  title: string;
+  siteName: string | null;
+  status: QuoteStatus;
+  date: Date | null;
+}
+
+/** Estados en los que una cotización se puede ejecutar. Un borrador no. */
+const LINKABLE_QUOTE_STATUSES: QuoteStatus[] = [
+  QuoteStatus.SENT,
+  QuoteStatus.ACCEPTED,
+];
+
+const QUOTE_STATUS_LABELS: Record<QuoteStatus, string> = {
+  DRAFT: 'en borrador',
+  SENT: 'enviada',
+  ACCEPTED: 'aceptada',
+  REJECTED: 'rechazada',
+};
+
+function formatQuoteNumber(n: number | null): string {
+  return n === null ? 'sin número' : `COT-${String(n).padStart(4, '0')}`;
+}
 
 export interface WorkOrderEquipmentSummary {
   id: string;
@@ -141,6 +186,7 @@ export type WorkOrderView = Omit<
   client: { id: string; name: string };
   user: { id: string; name: string; email: string } | null;
   equipments: WorkOrderEquipmentSummary[];
+  quote: WorkOrderQuoteSummary | null;
 };
 
 /** Estados terminales: una orden entregada o cancelada queda sellada. */
@@ -249,6 +295,11 @@ export class WorkOrdersService {
       );
     }
 
+    // Cotización que ejecuta: misma empresa, mismo cliente, SENT/ACCEPTED.
+    if (dto.quoteId) {
+      await this.ensureQuoteLinkable(user.companyId, dto.quoteId, dto.clientId);
+    }
+
     // RBAC: un Técnico que crea una orden queda SIEMPRE autoasignado, sin
     // importar qué userId haya mandado en el body (no puede asignar a otros).
     const assignedUserId =
@@ -286,6 +337,7 @@ export class WorkOrdersService {
           serviceType: dto.serviceType, // undefined → default CORRECTIVE
           clientId: dto.clientId,
           userId: assignedUserId,
+          quoteId: dto.quoteId || null,
           companyId: user.companyId, // candado
           // status: toda orden nace PENDING (default de Prisma)
           equipmentLinks:
@@ -347,7 +399,11 @@ export class WorkOrdersService {
           companyId: user.companyId, // candado
           retention: { active: true },
         },
-        include: { retention: { select: { id: true, name: true, rate: true, position: true } } },
+        include: {
+          retention: {
+            select: { id: true, name: true, rate: true, position: true },
+          },
+        },
       });
 
       if (clientRetentions.length > 0) {
@@ -635,7 +691,9 @@ export class WorkOrdersService {
    * futura" (mismo criterio que lastMaintenanceAt: la fecha en que se hizo
    * el trabajo no puede ser mañana).
    */
-  private resolveServiceDate(value: string | undefined): Date | null | undefined {
+  private resolveServiceDate(
+    value: string | undefined,
+  ): Date | null | undefined {
     if (value === undefined) {
       return undefined;
     }
@@ -645,7 +703,9 @@ export class WorkOrdersService {
 
     const serviceDate = parseDateOnly(value);
     if (serviceDate.getTime() > todayDateOnly().getTime()) {
-      throw new BadRequestException('serviceDate no puede ser una fecha futura');
+      throw new BadRequestException(
+        'serviceDate no puede ser una fecha futura',
+      );
     }
 
     return serviceDate;
@@ -1229,10 +1289,12 @@ export class WorkOrdersService {
       );
     }
 
-    // RBAC fino: el técnico solo puede tocar status, description, diagnosis
-    // y observations — description tiene el mismo permiso que diagnosis y
-    // observations porque el alcance real de la orden muchas veces solo se
-    // conoce al llegar al sitio.
+    // RBAC fino: el técnico solo puede tocar status, description, diagnosis,
+    // observations y quoteId — description tiene el mismo permiso que
+    // diagnosis y observations porque el alcance real de la orden muchas
+    // veces solo se conoce al llegar al sitio; quoteId porque enlazar la
+    // cotización que se ejecuta es parte de documentar el trabajo (el
+    // selector no le muestra ningún monto, ver findLinkableQuotes).
     if (user.role === Role.TECHNICIAN) {
       const forbiddenFields: string[] = [];
       if (dto.priority !== undefined) forbiddenFields.push('priority');
@@ -1248,14 +1310,13 @@ export class WorkOrdersService {
       if (dto.discountAmount !== undefined)
         forbiddenFields.push('discountAmount');
       if (dto.items !== undefined) forbiddenFields.push('items');
-      if (dto.retentionIds !== undefined)
-        forbiddenFields.push('retentionIds');
+      if (dto.retentionIds !== undefined) forbiddenFields.push('retentionIds');
       // billedAt no aparece acá: si llegó hasta este punto ya no está
       // presente en el dto (el bloque de arriba lo maneja o lo rechaza).
 
       if (forbiddenFields.length > 0) {
         throw new ForbiddenException(
-          `Como técnico solo puedes modificar status, description, diagnosis y observations. ` +
+          `Como técnico solo puedes modificar status, description, diagnosis, observations y la cotización que ejecuta (quoteId). ` +
             `Campos no permitidos: ${forbiddenFields.join(', ')}`,
         );
       }
@@ -1302,6 +1363,30 @@ export class WorkOrdersService {
     }
     if (dto.userId) {
       await this.ensureUserBelongsToCompany(user.companyId, dto.userId);
+    }
+
+    // Enlace a la cotización que se ejecuta. Nunca se limpia solo: si el
+    // cambio de cliente dejaría la orden apuntando a la cotización de otro
+    // cliente, se rechaza y se dice cuál desenlazar primero.
+    const targetClientId = dto.clientId ?? workOrder.clientId;
+    const clientChanges = targetClientId !== workOrder.clientId;
+    if (dto.quoteId) {
+      if (dto.quoteId !== workOrder.quoteId || clientChanges) {
+        await this.ensureQuoteLinkable(
+          user.companyId,
+          dto.quoteId,
+          targetClientId,
+        );
+      }
+    } else if (
+      dto.quoteId === undefined &&
+      clientChanges &&
+      workOrder.quote !== null
+    ) {
+      throw new ConflictException(
+        `La orden ejecuta la cotización ${formatQuoteNumber(workOrder.quote.quoteNumber)} del cliente actual. ` +
+          `Desenlaza esa cotización antes de cambiar el cliente de la orden.`,
+      );
     }
 
     // Congelamiento contable: al (re)pasar la orden a COMPLETED se
@@ -1446,7 +1531,12 @@ export class WorkOrdersService {
     // (ver WorkOrderPartsService.listParts), así que lo guardado acá no
     // se usa para mostrar nada: solo registra QUÉ está marcado.
     let retentionsToWrite:
-      | { retentionId: string; name: string; rate: Prisma.Decimal; amount: Prisma.Decimal }[]
+      | {
+          retentionId: string;
+          name: string;
+          rate: Prisma.Decimal;
+          amount: Prisma.Decimal;
+        }[]
       | undefined;
 
     if (freeze) {
@@ -1524,6 +1614,7 @@ export class WorkOrdersService {
           serviceType: dto.serviceType,
           clientId: dto.clientId,
           userId: dto.userId,
+          quoteId: dto.quoteId, // undefined = sin cambio, null = desenlazar
           laborAmount: dto.laborAmount,
           additionalAmount: dto.additionalAmount,
           additionalDescription: dto.additionalDescription?.trim(),
@@ -2078,6 +2169,93 @@ export class WorkOrdersService {
     });
 
     return this.toView(updated, user.role);
+  }
+
+  /**
+   * GET /work-orders/linkable-quotes — cotizaciones SENT/ACCEPTED del
+   * cliente, las aceptadas primero. `select` CERRADO a propósito: ningún
+   * monto ni ítem sale por acá, lo consume también el técnico.
+   */
+  async findLinkableQuotes(
+    user: AuthenticatedUser,
+    clientId: string,
+  ): Promise<LinkableQuote[]> {
+    await this.ensureClientBelongsToCompany(user.companyId, clientId);
+
+    const quotes = await this.prisma.quote.findMany({
+      where: {
+        companyId: user.companyId, // candado
+        clientId,
+        status: { in: LINKABLE_QUOTE_STATUSES },
+      },
+      select: {
+        id: true,
+        quoteNumber: true,
+        title: true,
+        siteName: true,
+        status: true,
+        sentAt: true,
+        decidedAt: true,
+      },
+    });
+
+    return quotes
+      .map(({ sentAt, decidedAt, ...quote }) => ({
+        ...quote,
+        date: decidedAt ?? sentAt,
+      }))
+      .sort((a, b) => {
+        const byStatus =
+          Number(b.status === QuoteStatus.ACCEPTED) -
+          Number(a.status === QuoteStatus.ACCEPTED);
+        if (byStatus !== 0) return byStatus;
+        return (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0);
+      });
+  }
+
+  /**
+   * Una orden solo puede ejecutar una cotización de su MISMA empresa, de su
+   * MISMO cliente y en estado SENT o ACCEPTED. Cada condición falla con su
+   * propio mensaje.
+   */
+  private async ensureQuoteLinkable(
+    companyId: string,
+    quoteId: string,
+    clientId: string,
+  ): Promise<void> {
+    const quote = await this.prisma.quote.findFirst({
+      where: { id: quoteId, companyId }, // candado
+      select: {
+        quoteNumber: true,
+        title: true,
+        status: true,
+        clientId: true,
+        client: { select: { name: true } },
+      },
+    });
+
+    if (!quote) {
+      throw new NotFoundException(
+        `Cotización ${quoteId} no encontrada en tu empresa`,
+      );
+    }
+
+    const label =
+      quote.quoteNumber !== null
+        ? formatQuoteNumber(quote.quoteNumber)
+        : `«${quote.title}»`;
+
+    if (quote.clientId !== clientId) {
+      throw new BadRequestException(
+        `La cotización ${label} es del cliente ${quote.client.name}: una orden solo puede ejecutar cotizaciones de su mismo cliente`,
+      );
+    }
+
+    if (!LINKABLE_QUOTE_STATUSES.includes(quote.status)) {
+      throw new BadRequestException(
+        `La cotización ${label} está ${QUOTE_STATUS_LABELS[quote.status]}: solo se pueden ejecutar cotizaciones enviadas o aceptadas`,
+      );
+    }
   }
 
   /** Validación cruzada multi-tenant de la relación WorkOrder → Client. */

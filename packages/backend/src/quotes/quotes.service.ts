@@ -21,7 +21,13 @@ const QUOTE_INCLUDE = {
   equipmentLinks: {
     select: {
       equipment: {
-        select: { id: true, brand: true, model: true, serialNumber: true, location: true },
+        select: {
+          id: true,
+          brand: true,
+          model: true,
+          serialNumber: true,
+          location: true,
+        },
       },
     },
   },
@@ -29,7 +35,9 @@ const QUOTE_INCLUDE = {
   createdBy: { select: { id: true, name: true } },
 } as const;
 
-type QuoteWithRelations = Prisma.QuoteGetPayload<{ include: typeof QUOTE_INCLUDE }>;
+type QuoteWithRelations = Prisma.QuoteGetPayload<{
+  include: typeof QUOTE_INCLUDE;
+}>;
 
 export interface QuoteEquipmentSummary {
   id: string;
@@ -61,7 +69,12 @@ export interface QuoteBilling {
 }
 
 export type QuoteView = Omit<Quote, 'items'> & {
-  client: { id: string; name: string; documentType: string | null; documentNumber: string | null };
+  client: {
+    id: string;
+    name: string;
+    documentType: string | null;
+    documentNumber: string | null;
+  };
   equipments: QuoteEquipmentSummary[];
   items: QuoteItemView[];
   createdBy: { id: string; name: string } | null;
@@ -101,7 +114,11 @@ export class QuotesService {
     await this.ensureClientBelongsToCompany(companyId, dto.clientId);
 
     if (dto.equipmentIds && dto.equipmentIds.length > 0) {
-      await this.ensureEquipmentsBelongToClient(companyId, dto.equipmentIds, dto.clientId);
+      await this.ensureEquipmentsBelongToClient(
+        companyId,
+        dto.equipmentIds,
+        dto.clientId,
+      );
     }
     await this.ensureSparePartsBelongToCompany(companyId, dto.items);
 
@@ -134,7 +151,8 @@ export class QuotesService {
         discountAmount: dto.discountAmount ?? 0,
         paymentTerms: dto.paymentTerms?.trim() ?? company.defaultPaymentTerms,
         deliveryTime: dto.deliveryTime?.trim() ?? company.defaultDeliveryTime,
-        warrantyTerms: dto.warrantyTerms?.trim() ?? company.defaultWarrantyTerms,
+        warrantyTerms:
+          dto.warrantyTerms?.trim() ?? company.defaultWarrantyTerms,
         exclusions: dto.exclusions?.trim() ?? company.defaultExclusions,
         observations: dto.observations?.trim(),
         validityDays: dto.validityDays ?? company.defaultValidityDays,
@@ -170,12 +188,17 @@ export class QuotesService {
     return this.toView(created, company.taxRate);
   }
 
-  async findAll(companyId: string, filters: QuoteFindAllFilters = {}): Promise<QuoteView[]> {
+  async findAll(
+    companyId: string,
+    filters: QuoteFindAllFilters = {},
+  ): Promise<QuoteView[]> {
     // FOLLOW_UP se ordena de más antigua a más reciente (sentAt asc): la
     // primera fila es a quien hay que llamar primero. El resto del listado
     // mantiene el orden por creación más reciente de siempre.
     const orderBy: Prisma.QuoteOrderByWithRelationInput[] =
-      filters.status === 'FOLLOW_UP' ? [{ sentAt: 'asc' }] : [{ createdAt: 'desc' }];
+      filters.status === 'FOLLOW_UP'
+        ? [{ sentAt: 'asc' }]
+        : [{ createdAt: 'desc' }];
 
     const [quotes, company] = await Promise.all([
       this.prisma.quote.findMany({
@@ -194,8 +217,13 @@ export class QuotesService {
     return quotes.map((quote) => this.toView(quote, company.taxRate));
   }
 
-  count(companyId: string, filters: Omit<QuoteFindAllFilters, 'take' | 'skip'> = {}): Promise<number> {
-    return this.prisma.quote.count({ where: this.buildWhere(companyId, filters) });
+  count(
+    companyId: string,
+    filters: Omit<QuoteFindAllFilters, 'take' | 'skip'> = {},
+  ): Promise<number> {
+    return this.prisma.quote.count({
+      where: this.buildWhere(companyId, filters),
+    });
   }
 
   /** Ver GET /work-orders/stats — reutiliza count()/buildWhere para no duplicar el where. */
@@ -231,7 +259,11 @@ export class QuotesService {
    *   enviar, ni ítems ni valores ni condiciones se pueden tocar — para eso
    *   existe duplicar.
    */
-  async update(companyId: string, id: string, dto: UpdateQuoteDto): Promise<QuoteView> {
+  async update(
+    companyId: string,
+    id: string,
+    dto: UpdateQuoteDto,
+  ): Promise<QuoteView> {
     const current = await this.requireQuote(companyId, id);
 
     if (current.status !== QuoteStatus.DRAFT) {
@@ -249,7 +281,11 @@ export class QuotesService {
     }
     const effectiveClientId = dto.clientId ?? current.clientId;
     if (dto.equipmentIds !== undefined && dto.equipmentIds.length > 0) {
-      await this.ensureEquipmentsBelongToClient(companyId, dto.equipmentIds, effectiveClientId);
+      await this.ensureEquipmentsBelongToClient(
+        companyId,
+        dto.equipmentIds,
+        effectiveClientId,
+      );
     }
     if (dto.items !== undefined) {
       await this.ensureSparePartsBelongToCompany(companyId, dto.items);
@@ -352,10 +388,16 @@ export class QuotesService {
    * pidió más tiempo (si no, quedaría marcada como pendiente de
    * seguimiento indefinidamente).
    */
-  async postponeFollowUp(companyId: string, id: string, dto: PostponeFollowUpDto): Promise<QuoteView> {
+  async postponeFollowUp(
+    companyId: string,
+    id: string,
+    dto: PostponeFollowUpDto,
+  ): Promise<QuoteView> {
     const current = await this.requireQuote(companyId, id);
     if (current.status !== QuoteStatus.SENT) {
-      throw new ConflictException('Solo se puede posponer el seguimiento de una cotización enviada');
+      throw new ConflictException(
+        'Solo se puede posponer el seguimiento de una cotización enviada',
+      );
     }
 
     const company = await this.prisma.company.findUniqueOrThrow({
@@ -385,17 +427,25 @@ export class QuotesService {
     const current = await this.requireQuote(companyId, id);
 
     if (current.status !== QuoteStatus.DRAFT) {
-      throw new ConflictException('Solo se puede enviar una cotización en borrador');
+      throw new ConflictException(
+        'Solo se puede enviar una cotización en borrador',
+      );
     }
     if (current.items.length === 0) {
-      throw new ConflictException('La cotización no tiene ítems: agrega al menos uno antes de enviarla');
+      throw new ConflictException(
+        'La cotización no tiene ítems: agrega al menos uno antes de enviarla',
+      );
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const company = await tx.company.update({
         where: { id: companyId },
         data: { nextQuoteNumber: { increment: 1 } },
-        select: { nextQuoteNumber: true, taxRate: true, quoteFollowUpDays: true },
+        select: {
+          nextQuoteNumber: true,
+          taxRate: true,
+          quoteFollowUpDays: true,
+        },
       });
 
       const itemsTotal = current.items.reduce(
@@ -435,18 +485,29 @@ export class QuotesService {
    * después si se perdió por precio, por tiempo de entrega o por falta de
    * seguimiento — el dato que hace valioso este módulo.
    */
-  async decide(companyId: string, id: string, dto: DecideQuoteDto): Promise<QuoteView> {
-    if (dto.status !== QuoteStatus.ACCEPTED && dto.status !== QuoteStatus.REJECTED) {
+  async decide(
+    companyId: string,
+    id: string,
+    dto: DecideQuoteDto,
+  ): Promise<QuoteView> {
+    if (
+      dto.status !== QuoteStatus.ACCEPTED &&
+      dto.status !== QuoteStatus.REJECTED
+    ) {
       throw new BadRequestException('status debe ser ACCEPTED o REJECTED');
     }
 
     const current = await this.requireQuote(companyId, id);
     if (current.status !== QuoteStatus.SENT) {
-      throw new ConflictException('Solo se puede decidir una cotización enviada');
+      throw new ConflictException(
+        'Solo se puede decidir una cotización enviada',
+      );
     }
 
     if (dto.status === QuoteStatus.REJECTED && !dto.rejectionReason?.trim()) {
-      throw new BadRequestException('rejectionReason es obligatorio para marcar la cotización como rechazada');
+      throw new BadRequestException(
+        'rejectionReason es obligatorio para marcar la cotización como rechazada',
+      );
     }
 
     const company = await this.prisma.company.findUniqueOrThrow({
@@ -459,7 +520,10 @@ export class QuotesService {
       data: {
         status: dto.status,
         decidedAt: new Date(),
-        rejectionReason: dto.status === QuoteStatus.REJECTED ? dto.rejectionReason!.trim() : null,
+        rejectionReason:
+          dto.status === QuoteStatus.REJECTED
+            ? dto.rejectionReason!.trim()
+            : null,
       },
       include: QUOTE_INCLUDE,
     });
@@ -473,7 +537,11 @@ export class QuotesService {
    * una cotización ya enviada: se propone una versión nueva, la anterior
    * queda intacta como lo que el cliente de verdad recibió.
    */
-  async duplicate(companyId: string, userId: string, id: string): Promise<QuoteView> {
+  async duplicate(
+    companyId: string,
+    userId: string,
+    id: string,
+  ): Promise<QuoteView> {
     const source = await this.requireQuote(companyId, id);
 
     const company = await this.prisma.company.findUniqueOrThrow({
@@ -535,9 +603,31 @@ export class QuotesService {
    * (incluso SENT/ACCEPTED/REJECTED) no es evidencia contable — el
    * frontend advierte del hueco que deja en el consecutivo si ya tiene
    * quoteNumber asignado, pero no bloquea.
+   *
+   * Excepción: si alguna orden la EJECUTA (WorkOrder.quoteId) no se borra —
+   * la FK es Restrict — y se responde 409 diciendo qué órdenes desenlazar,
+   * en vez de dejar escapar el error crudo de la FK.
    */
   async remove(companyId: string, id: string): Promise<QuoteView> {
     const current = await this.requireQuote(companyId, id);
+
+    const executingOrders = await this.prisma.workOrder.findMany({
+      where: { companyId, quoteId: id }, // candado
+      select: { orderNumber: true },
+      orderBy: { orderNumber: 'asc' },
+    });
+    if (executingOrders.length > 0) {
+      const quoteLabel =
+        current.quoteNumber !== null
+          ? `COT-${String(current.quoteNumber).padStart(4, '0')}`
+          : 'Esta cotización';
+      const orders = executingOrders
+        .map((o) => `OT-${String(o.orderNumber).padStart(4, '0')}`)
+        .join(', ');
+      throw new ConflictException(
+        `${quoteLabel} la ejecuta${executingOrders.length > 1 ? 'n' : ''} ${orders}; desenlázala de ${executingOrders.length > 1 ? 'esas órdenes' : 'esa orden'} primero`,
+      );
+    }
 
     const company = await this.prisma.company.findUniqueOrThrow({
       where: { id: companyId },
@@ -550,7 +640,10 @@ export class QuotesService {
   }
 
   /** Carga la cotización con candado companyId, 404 si no existe o es de otra empresa. */
-  private async requireQuote(companyId: string, id: string): Promise<QuoteWithRelations> {
+  private async requireQuote(
+    companyId: string,
+    id: string,
+  ): Promise<QuoteWithRelations> {
     const quote = await this.prisma.quote.findFirst({
       where: { id, companyId },
       include: QUOTE_INCLUDE,
@@ -603,7 +696,9 @@ export class QuotesService {
    * Buscador de una sola casilla: número de cotización, nombre/documento
    * del cliente y título. Términos de menos de 2 caracteres se ignoran.
    */
-  private buildSearchCondition(search: string | undefined): Prisma.QuoteWhereInput | null {
+  private buildSearchCondition(
+    search: string | undefined,
+  ): Prisma.QuoteWhereInput | null {
     const term = search?.trim();
     if (!term || term.length < 2) {
       return null;
@@ -629,13 +724,18 @@ export class QuotesService {
   }
 
   /** Validación cruzada multi-tenant de la relación Quote → Client. */
-  private async ensureClientBelongsToCompany(companyId: string, clientId: string): Promise<void> {
+  private async ensureClientBelongsToCompany(
+    companyId: string,
+    clientId: string,
+  ): Promise<void> {
     const client = await this.prisma.client.findFirst({
       where: { id: clientId, companyId },
       select: { id: true },
     });
     if (!client) {
-      throw new NotFoundException(`Cliente ${clientId} no encontrado en tu empresa`);
+      throw new NotFoundException(
+        `Cliente ${clientId} no encontrado en tu empresa`,
+      );
     }
   }
 
@@ -653,7 +753,9 @@ export class QuotesService {
     const foundIds = new Set(equipments.map((e) => e.id));
     const missingIds = equipmentIds.filter((id) => !foundIds.has(id));
     if (missingIds.length > 0) {
-      throw new NotFoundException(`Equipo(s) no encontrado(s) en tu empresa: ${missingIds.join(', ')}`);
+      throw new NotFoundException(
+        `Equipo(s) no encontrado(s) en tu empresa: ${missingIds.join(', ')}`,
+      );
     }
 
     const mismatched = equipments.filter((e) => e.clientId !== clientId);
@@ -673,7 +775,11 @@ export class QuotesService {
     companyId: string,
     items: { sparePartId?: string }[],
   ): Promise<void> {
-    const sparePartIds = [...new Set(items.map((i) => i.sparePartId).filter((id): id is string => !!id))];
+    const sparePartIds = [
+      ...new Set(
+        items.map((i) => i.sparePartId).filter((id): id is string => !!id),
+      ),
+    ];
     if (sparePartIds.length === 0) return;
 
     const found = await this.prisma.sparePart.findMany({
@@ -683,11 +789,16 @@ export class QuotesService {
     const foundIds = new Set(found.map((p) => p.id));
     const missingIds = sparePartIds.filter((id) => !foundIds.has(id));
     if (missingIds.length > 0) {
-      throw new NotFoundException(`Repuesto(s) no encontrado(s) en tu empresa: ${missingIds.join(', ')}`);
+      throw new NotFoundException(
+        `Repuesto(s) no encontrado(s) en tu empresa: ${missingIds.join(', ')}`,
+      );
     }
   }
 
-  private buildBilling(quote: QuoteWithRelations, companyTaxRate: Prisma.Decimal): QuoteBilling {
+  private buildBilling(
+    quote: QuoteWithRelations,
+    companyTaxRate: Prisma.Decimal,
+  ): QuoteBilling {
     const isFrozen = quote.totalAmount !== null;
     const taxRate = isFrozen ? quote.taxRateApplied! : companyTaxRate;
 
@@ -703,7 +814,9 @@ export class QuotesService {
     });
 
     return {
-      subtotal: isFrozen ? quote.subtotalAmount!.toFixed(2) : subtotal.toFixed(2),
+      subtotal: isFrozen
+        ? quote.subtotalAmount!.toFixed(2)
+        : subtotal.toFixed(2),
       discountAmount: quote.discountAmount.toFixed(2),
       base: base.toFixed(2),
       taxRate: taxRate.toFixed(2),
@@ -713,11 +826,17 @@ export class QuotesService {
     };
   }
 
-  private toView(quote: QuoteWithRelations, companyTaxRate: Prisma.Decimal): QuoteView {
+  private toView(
+    quote: QuoteWithRelations,
+    companyTaxRate: Prisma.Decimal,
+  ): QuoteView {
     const { items, equipmentLinks, ...rest } = quote;
 
     const today = todayDateOnly();
-    const isExpired = quote.status === QuoteStatus.SENT && quote.validUntil !== null && quote.validUntil < today;
+    const isExpired =
+      quote.status === QuoteStatus.SENT &&
+      quote.validUntil !== null &&
+      quote.validUntil < today;
 
     return {
       ...rest,

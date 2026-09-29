@@ -6,6 +6,7 @@ import { DOCUMENT_TYPE_LABELS, type DocumentType } from "@/lib/document-type";
 import { ORDER_STATUS_LABELS } from "@/components/shared/status-chip";
 import { PRIORITY_LABELS } from "@/components/shared/priority-badge";
 import { SERVICE_TYPE_LABELS } from "@/components/shared/service-type-badge";
+import { formatQuoteNumber } from "@/lib/format/quote-number";
 import { formatOrderNumber } from "@/lib/format/order-number";
 import { formatDate, formatTime, formatTimeOnly } from "@/lib/format/dates";
 import { formatDateOnly } from "@/lib/format/date-only";
@@ -342,6 +343,16 @@ export function WorkOrderPrintDocument({
                 : formatDate(order.createdAt)
             }
           />
+          {/* Cotización que la orden ejecuta, junto a número y fecha. Mismo
+              MetaItem que los demás campos del encabezado: hereda el
+              formato de la plantilla de la empresa (membrete o no), sin
+              colores propios. Sin enlace, la fila no aparece. */}
+          {order.quote && (
+            <MetaItem
+              label="Ejecuta cotización"
+              value={formatQuoteNumber(order.quote.quoteNumber)}
+            />
+          )}
           {useCustomHeader ? (
             // Configurado: EN EL ORDEN del arreglo — la empresa lo
             // controla desde el panel (checklist + mover arriba/abajo).

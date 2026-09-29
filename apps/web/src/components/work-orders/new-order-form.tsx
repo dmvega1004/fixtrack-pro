@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { X } from "lucide-react";
@@ -28,6 +28,10 @@ import {
 } from "@/components/shared/service-type-badge";
 import { formatOrderNumber } from "@/lib/format/order-number";
 import { createWorkOrderChainedAction } from "@/app/(dashboard)/ordenes/nueva/actions";
+import { listLinkableQuotesAction } from "@/app/(dashboard)/ordenes/[id]/actions";
+import { useOnlineStatus } from "@/hooks/use-online-status";
+import type { LinkableQuote } from "@/lib/api/work-orders";
+import { formatLinkableQuoteLabel } from "@/lib/format/linkable-quote";
 
 const PRIORITIES = Object.keys(PRIORITY_LABELS) as Priority[];
 const SERVICE_TYPES = Object.keys(SERVICE_TYPE_LABELS) as ServiceType[];
@@ -119,6 +123,12 @@ export function NewOrderForm({
     initialServiceType ?? "CORRECTIVE",
   );
   const [assignedUserId, setAssignedUserId] = useState(UNASSIGNED_VALUE);
+  const [quoteId, setQuoteId] = useState("");
+  const [linkableQuotes, setLinkableQuotes] = useState<{
+    clientId: string;
+    quotes: LinkableQuote[];
+  } | null>(null);
+  const isOnline = useOnlineStatus();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -131,6 +141,29 @@ export function NewOrderForm({
         newClient.phone.trim() !== "";
 
   const activeClientId = clientMode === "existing" ? selectedClientId : null;
+
+  // Cotizaciones enlazables del cliente elegido. Solo con señal: sin
+  // conexión no hay cómo consultarlas y el selector no se muestra.
+  useEffect(() => {
+    if (!activeClientId || !isOnline) return;
+    let cancelled = false;
+    void listLinkableQuotesAction(activeClientId).then((result) => {
+      if (cancelled || !result.ok) return;
+      setLinkableQuotes({ clientId: activeClientId, quotes: result.quotes ?? [] });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeClientId, isOnline]);
+
+  // Las opciones (y la elegida) solo valen para el cliente con que se
+  // consultaron: al cambiar de cliente, la elección anterior se descarta.
+  const quotesForClient =
+    linkableQuotes && linkableQuotes.clientId === activeClientId
+      ? linkableQuotes.quotes
+      : null;
+  const effectiveQuoteId =
+    quotesForClient?.some((quote) => quote.id === quoteId) ? quoteId : "";
 
   const equipmentsForClient = useMemo(
     () =>
@@ -298,6 +331,7 @@ export function NewOrderForm({
       priority,
       serviceType,
       userId: canAssign && assignedUserId ? assignedUserId : undefined,
+      quoteId: isOnline && effectiveQuoteId ? effectiveQuoteId : undefined,
     });
 
     setIsSubmitting(false);
@@ -625,6 +659,25 @@ export function NewOrderForm({
               </select>
             </div>
           </div>
+
+          {activeClientId && isOnline && quotesForClient && quotesForClient.length > 0 && (
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <Label htmlFor="quoteId">Cotización que ejecuta (opcional)</Label>
+              <select
+                id="quoteId"
+                value={effectiveQuoteId}
+                onChange={(event) => setQuoteId(event.target.value)}
+                className="h-9 w-full min-w-0 truncate rounded-lg border border-border bg-background px-2.5 text-sm text-foreground"
+              >
+                <option value="">Ninguna</option>
+                {quotesForClient.map((quote) => (
+                  <option key={quote.id} value={quote.id}>
+                    {formatLinkableQuoteLabel(quote)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {canAssign && (
             <div className="flex flex-col gap-1.5">

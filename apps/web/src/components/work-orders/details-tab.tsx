@@ -9,6 +9,7 @@ import { ServiceLocationEditor } from "./service-location-editor";
 import { ReassignTechnician } from "./reassign-technician";
 import { PriorityEditor } from "./priority-editor";
 import { ServiceTypeEditor } from "./service-type-editor";
+import { QuoteLinkEditor } from "./quote-link-editor";
 import { SignaturesSection } from "./signatures-section";
 import { DeleteOrderButton } from "./delete-order-button";
 
@@ -77,6 +78,15 @@ export function DetailsTab({
         initialServiceCity={order.serviceCity}
         initialServiceTime={order.serviceTime}
         initialServiceDate={order.serviceDate}
+        isTerminal={isTerminal}
+      />
+
+      {/* Los tres roles: enlazar la cotización que se ejecuta es parte de
+          documentar el trabajo (el selector no muestra montos). */}
+      <QuoteLinkEditor
+        orderId={order.id}
+        clientId={order.client.id}
+        currentQuote={order.quote ?? null}
         isTerminal={isTerminal}
       />
 

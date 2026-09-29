@@ -48,6 +48,11 @@ export interface CreateOrderInput {
   /** Opcional: si se omite, el backend aplica el default CORRECTIVE. */
   serviceType?: ServiceType;
   userId?: string;
+  /**
+   * Cotización que la orden ejecuta. Solo con cliente existente: un
+   * cliente recién creado no tiene cotizaciones.
+   */
+  quoteId?: string;
 }
 
 export interface CreateOrderResult {
@@ -108,6 +113,7 @@ export async function createWorkOrderChainedAction(
         ...(equipmentIds.length > 0 ? { equipmentIds } : {}),
         ...(input.userId ? { userId: input.userId } : {}),
         ...(input.serviceType ? { serviceType: input.serviceType } : {}),
+        ...(input.quoteId ? { quoteId: input.quoteId } : {}),
       },
     });
 

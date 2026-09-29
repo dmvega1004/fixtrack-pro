@@ -47,6 +47,14 @@ const HISTORY_PER_EQUIPMENT = 3;
  * con 2.400 a 60/40 (cola de 960) el margen era de apenas 139.
  */
 const HISTORY_TEXT_MAX_CHARS = 2_400;
+/**
+ * Presupuesto por campo de texto de la cotización que ejecuta la orden,
+ * mismo corte cabeza-cola. Más alto que el del historial: el alcance es
+ * donde están los parámetros prometidos (en la COT-0131, 3.289 caracteres,
+ * con los "80 psi" en la posición 1.189 — a mitad del texto, justo donde
+ * corta un presupuesto chico).
+ */
+const QUOTE_TEXT_MAX_CHARS = 3_500;
 
 /** Colombia no tiene horario de verano: UTC-5 fijo (ver activity-labels.ts). */
 const BOGOTA_UTC_OFFSET_HOURS = 5;
@@ -360,7 +368,10 @@ export class AssistedDraftingService implements OnModuleInit {
 
   /**
    * Lo que el sistema ya sabe de la orden. Solo nombres y cantidades de
-   * repuestos — ningún precio ni costo sale hacia el proveedor.
+   * repuestos — ningún precio ni costo sale hacia el proveedor. De la
+   * cotización que ejecuta la orden, igual: SOLO sus textos (número,
+   * asunto, sede, alcance, metodología, exclusiones, observaciones); nunca
+   * sus ítems ni ningún monto (subtotal, total, descuento, IVA).
    */
   private async buildContext(
     companyId: string,
@@ -389,6 +400,18 @@ export class AssistedDraftingService implements OnModuleInit {
         parts: {
           select: { quantity: true, sparePart: { select: { name: true } } },
           orderBy: { createdAt: 'asc' },
+        },
+        // select CERRADO: ningún campo monetario ni `items`.
+        quote: {
+          select: {
+            quoteNumber: true,
+            title: true,
+            siteName: true,
+            scope: true,
+            methodology: true,
+            exclusions: true,
+            observations: true,
+          },
         },
       },
     });
@@ -453,6 +476,27 @@ export class AssistedDraftingService implements OnModuleInit {
         name: part.sparePart.name,
         quantity: part.quantity,
       })),
+      quote: order.quote && {
+        quoteNumber:
+          order.quote.quoteNumber === null
+            ? 'sin número'
+            : `COT-${String(order.quote.quoteNumber).padStart(4, '0')}`,
+        title: order.quote.title,
+        siteName: order.quote.siteName,
+        scope: truncateHeadTail(order.quote.scope, QUOTE_TEXT_MAX_CHARS) ?? '',
+        methodology: truncateHeadTail(
+          order.quote.methodology,
+          QUOTE_TEXT_MAX_CHARS,
+        ),
+        exclusions: truncateHeadTail(
+          order.quote.exclusions,
+          QUOTE_TEXT_MAX_CHARS,
+        ),
+        observations: truncateHeadTail(
+          order.quote.observations,
+          QUOTE_TEXT_MAX_CHARS,
+        ),
+      },
       history,
     };
   }
