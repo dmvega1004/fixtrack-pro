@@ -41,14 +41,29 @@ va a intervenir. [Si aplica] Lo que NO se contempló.
 
 ### Regla profesional innegociable
 
-Separar siempre **lo que dijo el cliente** de **lo que verificó el
-técnico**. Presentar un antecedente ajeno como hallazgo propio compromete
+Separar siempre tres fuentes: **lo que dijo el cliente**, **lo que la
+empresa verificó en órdenes anteriores** y **lo que se verificó en esta
+visita**. Presentar un antecedente ajeno como hallazgo propio compromete
 la responsabilidad de quien firma. Cuando no se midió algo, declararlo es
 más sólido que insinuar una causa.
+
+- **Antecedentes del cliente:** lo que el cliente contó o solicitó. No
+  está verificado y no sostiene ninguna conclusión por sí solo.
+- **Antecedentes verificados por la empresa:** lo que quedó documentado
+  en una orden anterior de la propia empresa, ejecutada y firmada. Se
+  cita **siempre** con el número de orden y la fecha de la que viene, y
+  **sí** puede sostener una conclusión, incluida la causa raíz. Lo que no
+  puede es presentarse como hallazgo de la visita de hoy. Una orden
+  anterior nunca se clasifica como antecedente del cliente.
+
+Cada rótulo de antecedentes se escribe solo si hay algo que poner en él.
 
 ```
 Antecedentes reportados por el cliente (no verificados en esta visita):
 [lo que el cliente contó, tal cual, sin validarlo]
+
+Antecedentes verificados por la empresa en órdenes anteriores:
+- [OT-XXXX del <fecha>]: [lo que esa orden estableció]
 
 Hallazgos de la inspección:
 - [componente]: [estado observado, con datos medibles cuando los haya]
@@ -56,7 +71,8 @@ Hallazgos de la inspección:
 - [estado del conexionado / encerramiento / montaje]
 
 Causa raíz: [conclusión, atribuida a un hallazgo concreto de los de
-arriba, nombrando en cuál se apoya. Si no se puede concluir, decirlo.]
+arriba, nombrando en cuál se apoya, o citada de la orden anterior que la
+estableció. Si no se puede concluir, decirlo.]
 
 Declaración de mediciones no ejecutadas:
 [qué NO se midió y qué no es posible afirmar por esa razón]
@@ -91,7 +107,8 @@ Trabajos ejecutados:
 
 Pruebas realizadas: [qué se probó y qué se verificó].
 
-Estado final: [condición en que queda el equipo].
+Estado final: [condición en que queda el EQUIPO. El estado del recinto
+o de lo que no se intervino va en Sugerencias, no aquí.]
 ```
 
 ---
@@ -125,7 +142,7 @@ cotización esperando a ser enviada. El mismo hallazgo escrito como
 
 | Tipo | Qué enfatizar |
 |---|---|
-| **Correctivo** | La **causa raíz** de la falla, no solo el síntoma. «El piñón giraba libre por ausencia de la chaveta» dice más que «el portón no subía». |
+| **Correctivo** | La **causa raíz** de la falla, no solo el síntoma. «El piñón giraba libre por ausencia de la chaveta» dice más que «el portón no subía». Si el correctivo ejecuta un alcance ya diagnosticado en una orden anterior, la causa raíz se **cita** de esa orden («Causa raíz, establecida en la OT-XXXX del <fecha>: …») y no se vuelve a derivar desde los apuntes de hoy ni se declara indeterminable; los apuntes de una ejecución hablan de lo que se montó, no de lo que se encontró. En ese caso el bloque de hallazgos se rotula «Estado encontrado al intervenir:», no «Hallazgos de la inspección:». Si no queda claro cuál orden anterior se está ejecutando, no se supone. |
 | **Preventivo** | La **lista completa de actividades** ejecutadas por equipo, y los hallazgos que aún no son falla pero lo serán. Es lo que justifica el siguiente contrato. |
 | **Inspección** | Declarar explícitamente que **no se ejecutaron trabajos correctivos** y qué mediciones no se hicieron. Es una visita de diagnóstico, no una reparación. |
 | **Instalación** | Los **parámetros de montaje** —cotas, alineación, torques, configuración— y las pruebas de puesta en marcha. Son la evidencia si más adelante se discute la garantía. |
@@ -154,7 +171,12 @@ cotización esperando a ser enviada. El mismo hallazgo escrito como
   «11.8 A». Las cifras se copian exactas; solo cambia el separador.
 - **Respetar las expresiones del técnico.** Se corrige la redacción, no se
   reescribe lo que dijo: si anotó «hora y media», el informe dice «hora y
-  media», no «1,5 horas» ni «90 minutos».
+  media», no «1,5 horas» ni «90 minutos»; si anotó «alrededor de» o
+  «aproximado», la aproximación se conserva.
+- **Unidades con su símbolo** detrás de la cifra: «220 V», «7 A»,
+  «480 MΩ», «50 psi», aunque el técnico las haya escrito con palabras. Es
+  corrección de redacción, no cambio de lo dicho: la cifra y su
+  aproximación no se tocan.
 
 ---
 

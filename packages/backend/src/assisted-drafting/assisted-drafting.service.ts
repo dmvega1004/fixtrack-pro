@@ -38,7 +38,15 @@ const STALE_PENDING_MS = 10 * 60 * 1000;
 
 /** Órdenes anteriores del mismo equipo que se envían como contexto. */
 const HISTORY_PER_EQUIPMENT = 3;
-const HISTORY_TEXT_MAX_CHARS = 600;
+/**
+ * Presupuesto por campo (diagnóstico, observaciones) de cada orden
+ * anterior. Con el corte cabeza-cola, la mitad final (1.200) alcanza para
+ * el cierre de un informe completo con margen: "Causa raíz" + "Declaración
+ * de mediciones no ejecutadas" de la OT-0083 miden 821 desde el final. Con
+ * 1.800 a 60/40 (cola de 720) el rótulo de la causa raíz quedaba afuera, y
+ * con 2.400 a 60/40 (cola de 960) el margen era de apenas 139.
+ */
+const HISTORY_TEXT_MAX_CHARS = 2_400;
 
 /** Colombia no tiene horario de verano: UTC-5 fijo (ver activity-labels.ts). */
 const BOGOTA_UTC_OFFSET_HOURS = 5;
@@ -77,9 +85,43 @@ function formatOrderNumber(n: number): string {
   return `OT-${String(n).padStart(4, '0')}`;
 }
 
-function truncate(text: string | null, max: number): string | null {
-  if (!text) return text;
-  return text.length > max ? `${text.slice(0, max)}…` : text;
+const HEAD_SHARE = 0.5;
+/** Cuánto puede moverse cada corte para caer en un salto de línea. */
+const LINE_SNAP_SHARE = 0.25;
+
+/**
+ * Recorta conservando cabeza y cola a partes iguales. Las plantillas ponen
+ * la conclusión al FINAL de cada campo (Causa raíz, Declaración de
+ * mediciones no ejecutadas, Estado final, No contempla): un corte solo
+ * por la cabeza pierde siempre lo más importante. Cada corte se corre a
+ * un salto de línea, si lo hay a tiro, para no partir frases: la cabeza
+ * hacia atrás (se acorta), la cola hacia atrás (se alarga).
+ */
+export function truncateHeadTail(
+  text: string | null,
+  max: number,
+): string | null {
+  if (!text || text.length <= max) return text;
+
+  const headBudget = Math.floor(max * HEAD_SHARE);
+  const tailBudget = max - headBudget;
+
+  let headEnd = text.lastIndexOf('\n', headBudget);
+  if (headEnd < headBudget * (1 - LINE_SNAP_SHARE)) headEnd = headBudget;
+
+  // La cola se corre HACIA ATRÁS, al inicio de su línea: nunca queda más
+  // corta que su presupuesto, porque ahí está la conclusión. El total
+  // puede pasarse del tope hasta LINE_SNAP_SHARE de la cola.
+  const naiveTailStart = text.length - tailBudget;
+  let tailStart = text.lastIndexOf('\n', naiveTailStart);
+  if (
+    tailStart <= headEnd ||
+    tailStart < naiveTailStart - tailBudget * LINE_SNAP_SHARE
+  ) {
+    tailStart = naiveTailStart;
+  }
+
+  return `${text.slice(0, headEnd).trimEnd()}\n[…]\n${text.slice(tailStart).trimStart()}`;
 }
 
 /** Primer instante del mes calendario en curso, hora de Bogotá. */
@@ -384,8 +426,11 @@ export class AssistedDraftingService implements OnModuleInit {
               .slice(0, 10),
             serviceType: past.serviceType,
             equipment: `${equipment.brand} ${equipment.model}`,
-            diagnosis: truncate(past.diagnosis, HISTORY_TEXT_MAX_CHARS),
-            observations: truncate(past.observations, HISTORY_TEXT_MAX_CHARS),
+            diagnosis: truncateHeadTail(past.diagnosis, HISTORY_TEXT_MAX_CHARS),
+            observations: truncateHeadTail(
+              past.observations,
+              HISTORY_TEXT_MAX_CHARS,
+            ),
           }));
         }),
       )
