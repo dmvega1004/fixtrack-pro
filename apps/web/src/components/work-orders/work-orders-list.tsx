@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { StatusChip } from "@/components/shared/status-chip";
 import { PriorityBadge } from "@/components/shared/priority-badge";
-import { formatDateCompact } from "@/lib/format/dates";
+import { formatOrderDateCompact } from "@/lib/format/order-date";
 import { formatOrderNumber } from "@/lib/format/order-number";
 import { formatCollectionNumber } from "@/lib/format/collection-number";
 import { WorkOrderCard } from "./work-order-card";
@@ -92,7 +92,7 @@ export function WorkOrdersList({ workOrders }: WorkOrdersListProps) {
                     href={href}
                     className="block whitespace-nowrap px-4 py-3 text-muted-foreground"
                   >
-                    {formatDateCompact(order.createdAt)}
+                    {formatOrderDateCompact(order)}
                   </Link>
                 </td>
               </tr>

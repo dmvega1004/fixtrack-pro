@@ -45,14 +45,19 @@ export function formatTime(date: string | Date, locale = "es-CO"): string {
  * work-orders-list.tsx). No usar donde sí hay espacio para el formato
  * largo: detalle de la orden, documentos de impresión.
  */
-export function formatDateCompact(date: string | Date, locale = "es-CO"): string {
+export function formatDateCompact(
+  date: string | Date,
+  locale = "es-CO",
+  /** "UTC" solo para fechas @db.Date — ver formatOrderDateCompact en ./order-date. */
+  timeZone = BOGOTA_TIME_ZONE,
+): string {
   const value = typeof date === "string" ? new Date(date) : date;
 
   const parts = new Intl.DateTimeFormat(locale, {
     day: "2-digit",
     month: "short",
     year: "numeric",
-    timeZone: BOGOTA_TIME_ZONE,
+    timeZone,
   }).formatToParts(value);
 
   const part = (type: string) => parts.find((p) => p.type === type)?.value ?? "";

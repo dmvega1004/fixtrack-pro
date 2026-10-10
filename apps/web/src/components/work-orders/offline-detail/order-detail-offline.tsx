@@ -80,7 +80,7 @@ export function OrderDetailOffline({
             )}
           </div>
         </div>
-        <p className="text-xs text-muted-foreground">{formatDate(order.createdAt)}</p>
+        <p className="text-xs text-muted-foreground">Registrada el {formatDate(order.createdAt)}</p>
 
         <div className="flex flex-col gap-1 rounded-lg border border-border bg-card p-4 text-sm">
           <span className="font-medium">{order.client.name}</span>

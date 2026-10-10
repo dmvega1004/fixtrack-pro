@@ -147,7 +147,7 @@ export default async function OrdenDetallePage({
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
-            {formatDate(order.createdAt)}
+            Registrada el {formatDate(order.createdAt)}
           </p>
           <p className="line-clamp-2 text-sm">{order.description}</p>
 

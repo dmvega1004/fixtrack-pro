@@ -13,6 +13,7 @@ import { MaintenancePlanSection } from "@/components/equipment/maintenance-plan-
 import { QrCodeImage } from "@/components/equipment/qr-code-image";
 import { DeleteEquipmentButton } from "@/components/equipment/delete-equipment-button";
 import { OrderHistorySection } from "@/components/shared/order-history-section";
+import { compareOrdersByEffectiveDateDesc } from "@/lib/format/order-date";
 import { EquipmentFilesSection } from "@/components/equipment/equipment-files-section";
 import { formatDate } from "@/lib/format/dates";
 
@@ -42,9 +43,7 @@ export default async function EquipoDetallePage({
   const [client, history, session] = await Promise.all([
     getClient(equipment.clientId),
     getWorkOrders({ equipmentId: equipment.id }).then((orders) =>
-      [...orders].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      ),
+      [...orders].sort(compareOrdersByEffectiveDateDesc),
     ),
     getSession(),
   ]);

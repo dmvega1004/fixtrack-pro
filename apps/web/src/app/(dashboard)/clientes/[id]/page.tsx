@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ActivateMaintenanceDialog } from "@/components/client/activate-maintenance-dialog";
 import { EquipmentStatusBadge } from "@/components/equipment/equipment-status-badge";
 import { OrderHistorySection } from "@/components/shared/order-history-section";
+import { compareOrdersByEffectiveDateDesc } from "@/lib/format/order-date";
 import { DOCUMENT_TYPE_LABELS, type DocumentType } from "@/lib/document-type";
 import { formatCurrency } from "@/lib/format/currency";
 
@@ -49,9 +50,7 @@ export default async function ClienteDetallePage({ params }: ClienteDetallePageP
   const [clientEquipments, history, company, clientBalances] = await Promise.all([
     getEquipments({ clientId: client.id }),
     getWorkOrders({ clientId: client.id }).then((orders) =>
-      [...orders].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      ),
+      [...orders].sort(compareOrdersByEffectiveDateDesc),
     ),
     isAdmin ? getCompany() : Promise.resolve(null),
     isAdmin ? getClientBalances() : Promise.resolve([]),

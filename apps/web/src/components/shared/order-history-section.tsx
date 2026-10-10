@@ -8,7 +8,7 @@ import { StatusChip } from "@/components/shared/status-chip";
 import { PaymentStatusChip } from "@/components/shared/payment-status-chip";
 import { formatOrderNumber } from "@/lib/format/order-number";
 import { formatEquipmentSummary } from "@/lib/format/equipment-summary";
-import { formatDate } from "@/lib/format/dates";
+import { formatOrderDate } from "@/lib/format/order-date";
 import { formatCurrency } from "@/lib/format/currency";
 import type { WorkOrder } from "@/lib/api/work-orders";
 
@@ -82,7 +82,7 @@ function OrderRow({ order, isAdmin, currency, estimatedValue }: OrderEntryProps)
         {isAdmin && order.paymentStatus && <PaymentStatusChip status={order.paymentStatus} />}
         <StatusChip status={order.status} />
         <span className="text-xs whitespace-nowrap text-muted-foreground">
-          {formatDate(order.createdAt)}
+          {formatOrderDate(order)}
         </span>
       </span>
     </Link>
@@ -104,7 +104,7 @@ function OrderCard({ order, isAdmin, currency, estimatedValue }: OrderEntryProps
       <div className="flex items-center justify-between gap-2">
         <span className="font-medium">{formatOrderNumber(order.orderNumber)}</span>
         <span className="shrink-0 text-xs whitespace-nowrap text-muted-foreground">
-          {formatDate(order.createdAt)}
+          {formatOrderDate(order)}
         </span>
       </div>
       <span className="text-xs text-muted-foreground">

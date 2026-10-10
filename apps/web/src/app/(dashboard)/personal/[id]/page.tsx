@@ -14,6 +14,7 @@ import { StatusChip } from "@/components/shared/status-chip";
 import { formatOrderNumber } from "@/lib/format/order-number";
 import { formatEquipmentSummary } from "@/lib/format/equipment-summary";
 import { formatDate } from "@/lib/format/dates";
+import { compareOrdersByEffectiveDateDesc, formatOrderDate } from "@/lib/format/order-date";
 
 interface EmpleadoDetallePageProps {
   params: Promise<{ id: string }>;
@@ -42,9 +43,7 @@ export default async function EmpleadoDetallePage({ params }: EmpleadoDetallePag
   // resultado a sus órdenes (ver RBAC de TECHNICIAN en el service).
   const assignedOrders =
     employee.role === "TECHNICIAN"
-      ? (await getWorkOrders({ userId: employee.id })).sort(
-          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-        )
+      ? (await getWorkOrders({ userId: employee.id })).sort(compareOrdersByEffectiveDateDesc)
       : [];
 
   return (
@@ -113,7 +112,7 @@ export default async function EmpleadoDetallePage({ params }: EmpleadoDetallePag
                     <span className="flex items-center gap-3">
                       <StatusChip status={order.status} />
                       <span className="text-xs text-muted-foreground">
-                        {formatDate(order.createdAt)}
+                        {formatOrderDate(order)}
                       </span>
                     </span>
                   </Link>
