@@ -6,6 +6,7 @@ import { toPng } from "html-to-image";
 import { toast } from "sonner";
 import { ArrowLeft, Printer, Download, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { printDocument } from "@/lib/native-print";
 
 interface PrintLabelActionsProps {
   equipmentId: string;
@@ -83,7 +84,7 @@ export function PrintLabelActions({
       </Button>
       <Button
         type="button"
-        onClick={() => window.print()}
+        onClick={() => void printDocument()}
         className="max-w-64 flex-1 gap-1.5"
       >
         <Printer className="size-4" />
