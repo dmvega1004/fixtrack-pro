@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { ArrowLeft, Printer, Download, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { printDocument } from "@/lib/native-print";
+import { saveImage } from "@/lib/native-share";
 
 interface PrintLabelActionsProps {
   equipmentId: string;
@@ -48,10 +49,13 @@ export function PrintLabelActions({
       const reference = qrCode.slice(0, 8).toUpperCase();
       const filename = `Etiqueta-${slugifyForFilename(brand)}-${slugifyForFilename(model)}-${reference}.png`;
 
-      const link = document.createElement("a");
-      link.href = dataUrl;
-      link.download = filename;
-      link.click();
+      const result = await saveImage(dataUrl, filename);
+      if (result === "app-update-required") {
+        toast.info(
+          "Para compartir la etiqueta necesitas actualizar la aplicación. Mientras tanto puedes usar Imprimir / Guardar PDF.",
+          { duration: 8000 },
+        );
+      }
     } catch {
       toast.error("No se pudo generar la imagen de la etiqueta");
     } finally {
