@@ -1932,107 +1932,131 @@ export class WorkOrdersService {
           (link) => link.equipment.id,
         );
 
-        if (linkedEquipmentIds.length > 0) {
-          // Solo los equipos CON PLAN ACTIVO — uno sin plan dentro de la
-          // misma orden preventiva no se toca (no hay intervalo con qué
-          // recalcular, y no fue el usuario quien pidió vigilarlo).
-          const eligibleEquipments = await tx.equipment.findMany({
-            where: {
-              id: { in: linkedEquipmentIds },
-              companyId: user.companyId,
-              maintenanceEnabled: true,
-            },
-            select: {
-              id: true,
-              brand: true,
-              model: true,
-              location: true,
-              maintenanceIntervalMonths: true,
-              lastMaintenanceAt: true,
-            },
-          });
+        // Fecha EFECTIVA del servicio, no la del cierre: el plan se
+        // reinicia desde cuándo se hizo el trabajo. Cerrar la orden días
+        // después no debe correr el ciclo (el corrimiento se acumula en
+        // cada periodo). Mismo criterio de día calendario que las
+        // listas/historiales: serviceDate (ya @db.Date) y, si no se
+        // capturó, el día de Bogotá en que se registró la orden. `result`
+        // ya trae un serviceDate que venga en esta misma llamada junto con
+        // el cierre.
+        const effectiveServiceDate =
+          result.serviceDate ?? bogotaDateOnly(result.createdAt);
 
-          if (eligibleEquipments.length > 0) {
-            // Fecha EFECTIVA del servicio, no la del cierre: el plan se
-            // reinicia desde cuándo se hizo el trabajo. Cerrar la orden
-            // días después no debe correr el ciclo (el corrimiento se
-            // acumula en cada periodo). Mismo criterio de día calendario
-            // que las listas/historiales: serviceDate (ya @db.Date) y, si
-            // no se capturó, el día de Bogotá en que se registró la orden.
-            // `result` ya trae un serviceDate que venga en esta misma
-            // llamada junto con el cierre.
-            const effectiveServiceDate =
-              result.serviceDate ?? bogotaDateOnly(result.createdAt);
-            const equipmentLines: string[] = [];
+        // Toda orden preventiva que se cierra deja UNA entrada en la
+        // bitácora, se haya movido algún plan o no: un "no pasó nada"
+        // silencioso es indistinguible de una función que no corrió.
+        const lines: string[] = [];
 
-            for (const equipment of eligibleEquipments) {
-              const label = equipment.location
-                ? `${equipment.brand} ${equipment.model} — ${equipment.location}`
-                : `${equipment.brand} ${equipment.model}`;
-
-              // Solo AVANZA, nunca retrocede: cerrar una orden vieja (ej.
-              // historial cargado después) no debe devolver el plan a una
-              // fecha anterior al último mantenimiento ya registrado. Igual
-              // fecha = ya contada (reabrir y volver a cerrar). Corregir una
-              // fecha mal digitada tiene su propio camino: editar
-              // lastMaintenanceAt en el equipo. El omitido se deja en la
-              // bitácora — un "no se movió" silencioso parece una falla.
-              if (
-                equipment.lastMaintenanceAt &&
-                effectiveServiceDate.getTime() <=
-                  equipment.lastMaintenanceAt.getTime()
-              ) {
-                const last = formatDateOnly(equipment.lastMaintenanceAt);
-                equipmentLines.push(
-                  effectiveServiceDate.getTime() ===
-                    equipment.lastMaintenanceAt.getTime()
-                    ? `${label}: sin cambio, ya tenía registrado el mantenimiento del ${last}`
-                    : `${label}: sin cambio, ya tiene un mantenimiento posterior (${last})`,
-                );
-                continue;
-              }
-
-              // Invariante garantizada por EquipmentsService: si
-              // maintenanceEnabled=true, el intervalo siempre está seteado.
-              const nextMaintenanceAt = addMonthsUTC(
-                effectiveServiceDate,
-                equipment.maintenanceIntervalMonths!,
-              );
-
-              await tx.equipment.update({
-                where: { id: equipment.id },
-                data: {
-                  lastMaintenanceAt: effectiveServiceDate,
-                  nextMaintenanceAt,
+        // Todos los equipos de la orden, con y sin plan — los sin plan no
+        // se tocan (no hay intervalo con qué recalcular, y no fue el
+        // usuario quien pidió vigilarlos), pero se nombran.
+        const linkedEquipments =
+          linkedEquipmentIds.length > 0
+            ? await tx.equipment.findMany({
+                where: {
+                  id: { in: linkedEquipmentIds },
+                  companyId: user.companyId,
                 },
-              });
+                select: {
+                  id: true,
+                  brand: true,
+                  model: true,
+                  location: true,
+                  maintenanceEnabled: true,
+                  maintenanceIntervalMonths: true,
+                  lastMaintenanceAt: true,
+                },
+              })
+            : [];
 
-              equipmentLines.push(
-                `${label}: próxima ${formatDateOnly(nextMaintenanceAt)}`,
-              );
+        if (linkedEquipments.length === 0) {
+          lines.push(
+            'no se actualizó ningún plan: la orden no tiene equipos vinculados',
+          );
+        } else if (!linkedEquipments.some((e) => e.maintenanceEnabled)) {
+          lines.push(
+            'no se actualizó ningún plan: ningún equipo de la orden tiene plan de mantenimiento (' +
+              linkedEquipments
+                .map((e) => this.formatEquipmentLabel(e))
+                .join('; ') +
+              ')',
+          );
+        } else {
+          // Cada equipo se recalcula con SU PROPIO intervalo (nunca uno
+          // común): tres equipos con ciclos de 3, 4 y 6 meses en la misma
+          // orden deben quedar con tres próximas fechas distintas.
+          for (const equipment of linkedEquipments) {
+            const label = this.formatEquipmentLabel(equipment);
+
+            if (!equipment.maintenanceEnabled) {
+              lines.push(`${label}: sin plan de mantenimiento, no se tocó`);
+              continue;
             }
 
-            // De dónde salió la fecha base, siempre a la vista — sobre todo
-            // cuando hubo que caer al respaldo de la fecha de registro.
-            const dateSource = result.serviceDate
-              ? `fecha base: servicio del ${formatDateOnly(effectiveServiceDate)}`
-              : `fecha base: registro del ${formatDateOnly(effectiveServiceDate)} (la orden no tiene fecha de servicio)`;
+            // Solo AVANZA, nunca retrocede: cerrar una orden vieja (ej.
+            // historial cargado después) no debe devolver el plan a una
+            // fecha anterior al último mantenimiento ya registrado. Igual
+            // fecha = ya contada (reabrir y volver a cerrar). Corregir una
+            // fecha mal digitada tiene su propio camino: editar
+            // lastMaintenanceAt en el equipo.
+            if (
+              equipment.lastMaintenanceAt &&
+              effectiveServiceDate.getTime() <=
+                equipment.lastMaintenanceAt.getTime()
+            ) {
+              const last = formatDateOnly(equipment.lastMaintenanceAt);
+              lines.push(
+                effectiveServiceDate.getTime() ===
+                  equipment.lastMaintenanceAt.getTime()
+                  ? `${label}: sin cambio, ya tenía registrado el mantenimiento del ${last}`
+                  : `${label}: sin cambio, ya tiene un mantenimiento posterior (${last})`,
+              );
+              continue;
+            }
 
-            await this.activityService.record(
-              {
-                companyId: user.companyId,
-                workOrderId: id,
-                userId: user.userId,
-                userName: actorName,
-                action: ActivityAction.MAINTENANCE_UPDATED,
-                field: 'Mantenimiento',
-                newValue: `${equipmentLines.join('; ')} — ${dateSource}`,
-                isFinancial: false,
+            // Invariante garantizada por EquipmentsService: si
+            // maintenanceEnabled=true, el intervalo siempre está seteado.
+            const nextMaintenanceAt = addMonthsUTC(
+              effectiveServiceDate,
+              equipment.maintenanceIntervalMonths!,
+            );
+
+            await tx.equipment.update({
+              where: { id: equipment.id },
+              data: {
+                lastMaintenanceAt: effectiveServiceDate,
+                nextMaintenanceAt,
               },
-              tx,
+            });
+
+            lines.push(
+              `${label}: próxima ${formatDateOnly(nextMaintenanceAt)}`,
             );
           }
+
+          // De dónde salió la fecha base, siempre a la vista — sobre todo
+          // cuando hubo que caer al respaldo de la fecha de registro.
+          lines.push(
+            result.serviceDate
+              ? `fecha base: servicio del ${formatDateOnly(effectiveServiceDate)}`
+              : `fecha base: registro del ${formatDateOnly(effectiveServiceDate)} (la orden no tiene fecha de servicio)`,
+          );
         }
+
+        await this.activityService.record(
+          {
+            companyId: user.companyId,
+            workOrderId: id,
+            userId: user.userId,
+            userName: actorName,
+            action: ActivityAction.MAINTENANCE_UPDATED,
+            field: 'Mantenimiento',
+            newValue: lines.join('; '),
+            isFinancial: false,
+          },
+          tx,
+        );
       }
 
       return result;
