@@ -1948,6 +1948,7 @@ export class WorkOrdersService {
               model: true,
               location: true,
               maintenanceIntervalMonths: true,
+              lastMaintenanceAt: true,
             },
           });
 
@@ -1962,9 +1963,35 @@ export class WorkOrdersService {
             // llamada junto con el cierre.
             const effectiveServiceDate =
               result.serviceDate ?? bogotaDateOnly(result.createdAt);
-            const updatedLabels: string[] = [];
+            const equipmentLines: string[] = [];
 
             for (const equipment of eligibleEquipments) {
+              const label = equipment.location
+                ? `${equipment.brand} ${equipment.model} — ${equipment.location}`
+                : `${equipment.brand} ${equipment.model}`;
+
+              // Solo AVANZA, nunca retrocede: cerrar una orden vieja (ej.
+              // historial cargado después) no debe devolver el plan a una
+              // fecha anterior al último mantenimiento ya registrado. Igual
+              // fecha = ya contada (reabrir y volver a cerrar). Corregir una
+              // fecha mal digitada tiene su propio camino: editar
+              // lastMaintenanceAt en el equipo. El omitido se deja en la
+              // bitácora — un "no se movió" silencioso parece una falla.
+              if (
+                equipment.lastMaintenanceAt &&
+                effectiveServiceDate.getTime() <=
+                  equipment.lastMaintenanceAt.getTime()
+              ) {
+                const last = formatDateOnly(equipment.lastMaintenanceAt);
+                equipmentLines.push(
+                  effectiveServiceDate.getTime() ===
+                    equipment.lastMaintenanceAt.getTime()
+                    ? `${label}: sin cambio, ya tenía registrado el mantenimiento del ${last}`
+                    : `${label}: sin cambio, ya tiene un mantenimiento posterior (${last})`,
+                );
+                continue;
+              }
+
               // Invariante garantizada por EquipmentsService: si
               // maintenanceEnabled=true, el intervalo siempre está seteado.
               const nextMaintenanceAt = addMonthsUTC(
@@ -1980,13 +2007,16 @@ export class WorkOrdersService {
                 },
               });
 
-              const label = equipment.location
-                ? `${equipment.brand} ${equipment.model} — ${equipment.location}`
-                : `${equipment.brand} ${equipment.model}`;
-              updatedLabels.push(
+              equipmentLines.push(
                 `${label}: próxima ${formatDateOnly(nextMaintenanceAt)}`,
               );
             }
+
+            // De dónde salió la fecha base, siempre a la vista — sobre todo
+            // cuando hubo que caer al respaldo de la fecha de registro.
+            const dateSource = result.serviceDate
+              ? `fecha base: servicio del ${formatDateOnly(effectiveServiceDate)}`
+              : `fecha base: registro del ${formatDateOnly(effectiveServiceDate)} (la orden no tiene fecha de servicio)`;
 
             await this.activityService.record(
               {
@@ -1996,7 +2026,7 @@ export class WorkOrdersService {
                 userName: actorName,
                 action: ActivityAction.MAINTENANCE_UPDATED,
                 field: 'Mantenimiento',
-                newValue: updatedLabels.join('; '),
+                newValue: `${equipmentLines.join('; ')} — ${dateSource}`,
                 isFinancial: false,
               },
               tx,
