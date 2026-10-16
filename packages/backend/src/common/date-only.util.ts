@@ -56,6 +56,32 @@ export function todayDateOnly(): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 }
 
+/**
+ * Colombia no tiene horario de verano: UTC-5 fijo. ÚNICA definición del
+ * backend — el frontend (apps/web/src/lib/format/dates.ts) usa la zona
+ * nombrada "America/Bogota"; si una cambia, la otra también.
+ */
+export const BOGOTA_UTC_OFFSET_HOURS = 5;
+
+/**
+ * Día calendario (ancla medianoche UTC) en que cae un INSTANTE según la
+ * hora de Bogotá — ej. una orden registrada el 10 a las 9 p. m. (02:00 UTC
+ * del 11) es del día 10. Es el puente para comparar un timestamp como
+ * createdAt contra columnas @db.Date como serviceDate.
+ */
+export function bogotaDateOnly(instant: Date): Date {
+  const bogota = new Date(
+    instant.getTime() - BOGOTA_UTC_OFFSET_HOURS * 3_600_000,
+  );
+  return new Date(
+    Date.UTC(
+      bogota.getUTCFullYear(),
+      bogota.getUTCMonth(),
+      bogota.getUTCDate(),
+    ),
+  );
+}
+
 /** Cantidad de días en un mes/año dado (mes 0-based, como Date.UTC). */
 function daysInMonth(year: number, month: number): number {
   // Día 0 del mes siguiente = último día de `month`.

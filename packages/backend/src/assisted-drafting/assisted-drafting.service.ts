@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { AssistedDraftStatus, OrderStatus } from 'database';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
+import { BOGOTA_UTC_OFFSET_HOURS } from '../common/date-only.util';
 import { PrismaService } from '../prisma.service';
 import { WorkOrdersService } from '../work-orders/work-orders.service';
 import { estimateCostUsd } from './drafting-pricing';
@@ -55,9 +56,6 @@ const HISTORY_TEXT_MAX_CHARS = 2_400;
  * corta un presupuesto chico).
  */
 const QUOTE_TEXT_MAX_CHARS = 3_500;
-
-/** Colombia no tiene horario de verano: UTC-5 fijo (ver activity-labels.ts). */
-const BOGOTA_UTC_OFFSET_HOURS = 5;
 
 const TERMINAL_STATUSES: OrderStatus[] = [
   OrderStatus.DELIVERED,

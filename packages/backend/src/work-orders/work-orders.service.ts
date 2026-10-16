@@ -30,6 +30,7 @@ import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import {
   addMonthsUTC,
+  bogotaDateOnly,
   formatDateOnly,
   parseDateOnly,
   todayDateOnly,
@@ -1951,21 +1952,30 @@ export class WorkOrdersService {
           });
 
           if (eligibleEquipments.length > 0) {
-            const closureDate = todayDateOnly();
+            // Fecha EFECTIVA del servicio, no la del cierre: el plan se
+            // reinicia desde cuándo se hizo el trabajo. Cerrar la orden
+            // días después no debe correr el ciclo (el corrimiento se
+            // acumula en cada periodo). Mismo criterio de día calendario
+            // que las listas/historiales: serviceDate (ya @db.Date) y, si
+            // no se capturó, el día de Bogotá en que se registró la orden.
+            // `result` ya trae un serviceDate que venga en esta misma
+            // llamada junto con el cierre.
+            const effectiveServiceDate =
+              result.serviceDate ?? bogotaDateOnly(result.createdAt);
             const updatedLabels: string[] = [];
 
             for (const equipment of eligibleEquipments) {
               // Invariante garantizada por EquipmentsService: si
               // maintenanceEnabled=true, el intervalo siempre está seteado.
               const nextMaintenanceAt = addMonthsUTC(
-                closureDate,
+                effectiveServiceDate,
                 equipment.maintenanceIntervalMonths!,
               );
 
               await tx.equipment.update({
                 where: { id: equipment.id },
                 data: {
-                  lastMaintenanceAt: closureDate,
+                  lastMaintenanceAt: effectiveServiceDate,
                   nextMaintenanceAt,
                 },
               });

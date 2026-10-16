@@ -13,7 +13,7 @@
  *
  * OJO: es una de DOS definiciones de la hora de Bogotá. El backend usa un
  * desplazamiento fijo, BOGOTA_UTC_OFFSET_HOURS = 5 (ver
- * packages/backend/src/assisted-drafting/assisted-drafting.service.ts);
+ * packages/backend/src/common/date-only.util.ts);
  * acá es la zona nombrada, que depende de la base de zonas horarias del
  * navegador/Node. Hoy coinciden porque Colombia no tiene horario de
  * verano. Si una cambia, la otra también — o divergen en silencio.
