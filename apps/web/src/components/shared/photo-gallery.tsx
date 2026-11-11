@@ -53,6 +53,12 @@ interface PhotoGalleryProps<T extends GalleryPhoto> {
   renderPhotoOverlay?: (photo: T) => ReactNode;
   /** Contenedor; por defecto el padding de la pestaña de la orden. */
   className?: string;
+  /**
+   * Cupo restante (ej. tope de 10 fotos por equipo). Una tanda que no cabe
+   * se rechaza ENTERA antes de subir nada, con `describe(elegidas)` como
+   * mensaje — mismo criterio que MAX_BATCH_SIZE. Sin esto, no hay cupo.
+   */
+  uploadLimit?: { remaining: number; describe: (selected: number) => string };
 }
 
 interface UploadErrorBody {
@@ -68,11 +74,24 @@ interface FailedUpload {
   id: string;
   file: File;
   message: string;
+  /** false: reintentar no puede funcionar (ver isRetryableStatus); no se ofrece. */
+  retryable: boolean;
 }
 
 type UploadOutcome<T> =
   | { ok: true; photo: T }
-  | { ok: false; message: string };
+  | { ok: false; message: string; retryable: boolean };
+
+/**
+ * Solo vale la pena reintentar lo que puede cambiar solo: la red, un 5xx,
+ * un timeout (408) o un límite de frecuencia (429). Un 4xx es una
+ * respuesta definitiva sobre ESA foto o ESE estado (formato no soportado,
+ * tope de fotos, orden cerrada, sin permiso): reintentarla da lo mismo, y
+ * un botón que nunca puede funcionar es una trampa para el técnico.
+ */
+function isRetryableStatus(status: number): boolean {
+  return status >= 500 || status === 408 || status === 429;
+}
 
 /** Debe reflejar MAX_IMAGE_SIZE_BYTES en packages/backend/src/cloudinary/image-upload.constants.ts */
 const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024;
@@ -102,6 +121,7 @@ export function PhotoGallery<T extends GalleryPhoto>({
   onPhotoUploaded,
   renderPhotoOverlay,
   className = "p-4 md:p-6",
+  uploadLimit,
 }: PhotoGalleryProps<T>) {
   const router = useRouter();
   const [isUploading, setIsUploading] = useState(false);
@@ -142,7 +162,7 @@ export function PhotoGallery<T extends GalleryPhoto>({
         const message =
           "La foto es demasiado grande incluso después de comprimirla (máx. 10MB). Prueba con otra foto.";
         if (!silent) toast.error(message);
-        return { ok: false, message };
+        return { ok: false, message, retryable: false };
       }
 
       const formData = new FormData();
@@ -161,7 +181,7 @@ export function PhotoGallery<T extends GalleryPhoto>({
         const message =
           "No se pudo subir la foto: sin conexión a internet o el servidor no respondió. Intenta de nuevo.";
         if (!silent) toast.error(message);
-        return { ok: false, message };
+        return { ok: false, message, retryable: true };
       }
 
       const data: unknown = await response.json().catch(() => null);
@@ -174,7 +194,7 @@ export function PhotoGallery<T extends GalleryPhoto>({
         );
         const message = backendMessage ?? "No se pudo subir la foto. Intenta de nuevo.";
         if (!silent) toast.error(message);
-        return { ok: false, message };
+        return { ok: false, message, retryable: isRetryableStatus(response.status) };
       }
 
       if (!silent) toast.success("Foto agregada");
@@ -183,7 +203,7 @@ export function PhotoGallery<T extends GalleryPhoto>({
       console.error("Error inesperado al subir la foto:", error);
       const message = "No se pudo subir la foto. Intenta de nuevo.";
       if (!silent) toast.error(message);
-      return { ok: false, message };
+      return { ok: false, message, retryable: true };
     }
   }
 
@@ -220,7 +240,12 @@ export function PhotoGallery<T extends GalleryPhoto>({
         setPhotos((current) => [outcome.photo, ...current]);
         onPhotoUploaded?.(outcome.photo);
       } else {
-        failures.push({ id, file, message: outcome.message });
+        failures.push({
+          id,
+          file,
+          message: outcome.message,
+          retryable: outcome.retryable,
+        });
       }
     }
 
@@ -240,7 +265,11 @@ export function PhotoGallery<T extends GalleryPhoto>({
         toast.error(`No se pudo subir ninguna de las ${queue.length} fotos.`);
       } else {
         toast.error(
-          `Se subieron ${successCount} de ${queue.length} fotos. ${failures.length} fallaron — puedes reintentarlas abajo.`,
+          `Se subieron ${successCount} de ${queue.length} fotos. ${failures.length} fallaron — ${
+            failures.some((failed) => failed.retryable)
+              ? "puedes reintentarlas abajo."
+              : "el motivo está abajo."
+          }`,
         );
       }
     }
@@ -255,6 +284,11 @@ export function PhotoGallery<T extends GalleryPhoto>({
     const files = Array.from(event.target.files ?? []);
     event.target.value = ""; // permite volver a elegir el mismo archivo después
     if (files.length === 0) return;
+
+    if (uploadLimit && files.length > uploadLimit.remaining) {
+      toast.error(uploadLimit.describe(files.length));
+      return;
+    }
 
     if (files.length > MAX_BATCH_SIZE) {
       toast.error(
@@ -272,7 +306,9 @@ export function PhotoGallery<T extends GalleryPhoto>({
   }
 
   async function handleRetryFailed() {
-    const queue: QueuedPhoto[] = failedUploads.map(({ id, file }) => ({ id, file }));
+    const queue: QueuedPhoto[] = failedUploads
+      .filter((failed) => failed.retryable)
+      .map(({ id, file }) => ({ id, file }));
     await runUploadBatch(queue);
   }
 
@@ -299,6 +335,7 @@ export function PhotoGallery<T extends GalleryPhoto>({
   }
 
   const isEmpty = photos.length === 0 && !isUploading;
+  const retryableCount = failedUploads.filter((failed) => failed.retryable).length;
   const uploadLabel = uploadProgress
     ? `Subiendo ${uploadProgress.current} de ${uploadProgress.total}...`
     : isUploading
@@ -381,16 +418,18 @@ export function PhotoGallery<T extends GalleryPhoto>({
                   </li>
                 ))}
               </ul>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => void handleRetryFailed()}
-                disabled={isUploading || uploadBlocked}
-                className="self-start"
-              >
-                Reintentar{failedUploads.length > 1 ? ` (${failedUploads.length})` : ""}
-              </Button>
+              {retryableCount > 0 && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void handleRetryFailed()}
+                  disabled={isUploading || uploadBlocked}
+                  className="self-start"
+                >
+                  Reintentar{retryableCount > 1 ? ` (${retryableCount})` : ""}
+                </Button>
+              )}
             </div>
           )}
 

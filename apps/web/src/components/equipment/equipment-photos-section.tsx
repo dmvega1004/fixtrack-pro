@@ -82,6 +82,15 @@ export function EquipmentPhotosSection({
         setPhotos={setPhotos}
         photoAlt="Foto del equipo"
         uploadDisabledReason={uploadDisabledReason}
+        uploadLimit={{
+          remaining: MAX_PHOTOS_PER_EQUIPMENT - photos.length,
+          describe: (selected) => {
+            const remaining = MAX_PHOTOS_PER_EQUIPMENT - photos.length;
+            return `Elegiste ${selected} fotos y solo ${
+              remaining === 1 ? "cabe 1 más" : `caben ${remaining} más`
+            } (máximo ${MAX_PHOTOS_PER_EQUIPMENT} por equipo). Selecciona menos e inténtalo de nuevo.`;
+          },
+        }}
         onPhotoUploaded={(photo) => {
           if (photo.isCover) setCoverPhotoId(photo.id);
         }}
