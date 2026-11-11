@@ -34,6 +34,8 @@ export interface Equipment {
   client: EquipmentClient;
   /** Solo presente en la respuesta de getEquipments() (findAll). */
   orderCount?: number;
+  /** Solo en getEquipments() (findAll): portada para la miniatura; null sin fotos. */
+  coverPhoto?: { url: string } | null;
 }
 
 export interface CreateEquipmentInput {

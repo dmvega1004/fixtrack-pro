@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { Camera, Printer, Pencil, Plus } from "lucide-react";
+import { Printer, Pencil, Plus } from "lucide-react";
 import { getEquipment } from "@/lib/api/equipments";
 import { getClient } from "@/lib/api/clients";
 import { getWorkOrders } from "@/lib/api/work-orders";
@@ -17,8 +17,8 @@ import { compareOrdersByEffectiveDateDesc } from "@/lib/format/order-date";
 import { EquipmentFilesSection } from "@/components/equipment/equipment-files-section";
 import { formatDate } from "@/lib/format/dates";
 import { EquipmentPhotosSection } from "@/components/equipment/equipment-photos-section";
+import { EquipmentCover } from "@/components/equipment/equipment-cover";
 import { getEquipmentPhotos } from "@/lib/api/equipment-photos";
-import { cloudinaryUrl } from "@/lib/image/cloudinary-url";
 
 interface EquipoDetallePageProps {
   params: Promise<{ id: string }>;
@@ -66,43 +66,48 @@ export default async function EquipoDetallePage({
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          {/* Portada: la identidad del equipo cuando el QR falla. Sin foto,
-              un marcador neutro del mismo tamaño para no descuadrar. */}
-          {coverPhoto ? (
-            <a
-              href={coverPhoto.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="size-16 shrink-0 overflow-hidden rounded-lg border border-border bg-muted"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element -- foto remota en Cloudinary, sin dominio fijo que declarar */}
-              <img
-                src={cloudinaryUrl(coverPhoto.url, "thumbnail")}
-                alt={`Foto de ${equipment.brand} ${equipment.model}`}
-                className="h-full w-full object-cover"
-              />
-            </a>
-          ) : (
-            <div
-              className="flex size-16 shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground"
-              aria-label="Equipo sin foto"
-              role="img"
-            >
-              <Camera className="size-6" aria-hidden="true" />
-            </div>
-          )}
-          <div className="min-w-0">
-            <h1 className="text-2xl font-semibold">
-              {equipment.brand} {equipment.model}
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              {equipment.serialNumber ?? "Sin número de serie"}
-            </p>
+      {/* La foto es la identidad del equipo (lo que queda cuando el QR
+          falla): tamaño fijo y a la izquierda, y el texto vive en su propia
+          columna sin rodearla. El título se recorta a 3 líneas — el nombre
+          completo está íntegro en «Datos del equipo». */}
+      <div className="flex items-start gap-4">
+        {coverPhoto ? (
+          <a
+            href={coverPhoto.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="shrink-0"
+            aria-label="Ver la foto de portada en grande"
+          >
+            <EquipmentCover
+              url={coverPhoto.url}
+              alt={`Foto de ${equipment.brand} ${equipment.model}`}
+              sizeClassName="size-28"
+              loading="eager"
+            />
+          </a>
+        ) : (
+          <EquipmentCover
+            url={null}
+            alt=""
+            sizeClassName="size-28"
+            iconClassName="size-8"
+          />
+        )}
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <h1
+            className="line-clamp-3 text-xl font-semibold break-words"
+            title={`${equipment.brand} ${equipment.model}`}
+          >
+            {equipment.brand} {equipment.model}
+          </h1>
+          <p className="truncate text-sm text-muted-foreground">
+            {equipment.serialNumber ?? "Sin número de serie"}
+          </p>
+          <div>
+            <EquipmentStatusBadge status={equipment.status} />
           </div>
         </div>
-        <EquipmentStatusBadge status={equipment.status} />
       </div>
 
       <div className="flex flex-wrap gap-2">

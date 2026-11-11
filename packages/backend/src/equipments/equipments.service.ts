@@ -27,9 +27,16 @@ const CLIENT_SUMMARY = {
   client: { select: { id: true, name: true } },
 } as const;
 
-/** findAll además trae el conteo de órdenes (agregado en SQL, no un fetch a contar). */
+/**
+ * findAll además trae el conteo de órdenes (agregado en SQL, no un fetch a
+ * contar) y la URL de la portada para la miniatura de la lista. La portada
+ * entra por include: Prisma la resuelve con UNA consulta para todos los
+ * equipos (WHERE id IN (...)), no una por equipo. Solo `url`: la miniatura
+ * se deriva en el cliente con el preset de cloudinary-url.ts.
+ */
 const CLIENT_SUMMARY_WITH_COUNT = {
   ...CLIENT_SUMMARY,
+  coverPhoto: { select: { url: true } },
   _count: { select: { workOrderEquipment: true } },
 } as const;
 
@@ -38,6 +45,8 @@ export type EquipmentView = Equipment & {
   /** Cuántas órdenes de trabajo incluyen este equipo — reemplaza el fetch
    * completo de /work-orders que hacía /equipos para contar en JS. */
   orderCount: number;
+  /** Portada para la miniatura de la lista; null si el equipo no tiene fotos. */
+  coverPhoto: { url: string } | null;
 };
 
 /** Una fila de GET /equipments/maintenance-due — la alerta es POR EQUIPO. */
