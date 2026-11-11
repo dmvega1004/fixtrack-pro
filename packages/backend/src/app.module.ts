@@ -14,6 +14,7 @@ import { ClientsModule } from './clients/clients.module';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { CompanyModule } from './company/company.module';
 import { EquipmentFilesModule } from './equipment-files/equipment-files.module';
+import { EquipmentPhotosModule } from './equipment-photos/equipment-photos.module';
 import { EquipmentsModule } from './equipments/equipments.module';
 import { PaymentsModule } from './payments/payments.module';
 import { PrismaModule } from './prisma.module';
@@ -41,6 +42,7 @@ import { WorkOrdersModule } from './work-orders/work-orders.module';
     CompanyModule,
     EquipmentsModule,
     EquipmentFilesModule,
+    EquipmentPhotosModule,
     PaymentsModule,
     ProfitabilityModule,
     QuotesModule,

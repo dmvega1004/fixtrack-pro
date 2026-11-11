@@ -262,6 +262,7 @@ model Company {
   workOrderRetentions             WorkOrderRetention[]
   idempotencyKeys                 IdempotencyKey[]
   equipmentFiles                  EquipmentFile[]
+  equipmentPhotos                 EquipmentPhoto[]
   assistedDraftUsages             AssistedDraftUsage[]
 }
 
@@ -306,6 +307,7 @@ model User {
   /// Archivos de equipo que este usuario subió; sobrevive a su eliminación
   /// (uploadedById queda en null, el archivo no se toca).
   equipmentFiles      EquipmentFile[]
+  equipmentPhotos     EquipmentPhoto[]
   /// Generaciones de redacción asistida que pidió; sobrevive a su
   /// eliminación (userId queda en null, el costo medido no se pierde).
   assistedDraftUsages AssistedDraftUsage[]
@@ -422,6 +424,19 @@ model Equipment {
   /// Documentos adjuntos al equipo (manuales, certificaciones, planos). Ver
   /// modelo EquipmentFile — el binario vive en Supabase Storage, no acá.
   files                     EquipmentFile[]
+  /// Galería de identificación del equipo (tope de 10, lo impone
+  /// EquipmentPhotosService). Fotos en Cloudinary, independientes de las
+  /// fotos de órdenes (Attachment) — ver modelo EquipmentPhoto.
+  photos                    EquipmentPhoto[]     @relation("EquipmentPhotos")
+  /// Portada: la foto que identifica al equipo cuando el QR falla. Un solo
+  /// campo garantiza por construcción una portada por equipo; @unique,
+  /// además, que una foto no sea portada de dos equipos. SetNull: borrar
+  /// la foto deja la portada en null sin tocar la fila del equipo (el
+  /// servicio, en la misma transacción, asigna la más reciente que quede).
+  /// Lo que la FK NO garantiza —que la foto sea DE este equipo— lo defiende
+  /// EquipmentPhotosService, el único que escribe este campo.
+  coverPhotoId              String?              @unique
+  coverPhoto                EquipmentPhoto?      @relation("EquipmentCoverPhoto", fields: [coverPhotoId], references: [id], onDelete: SetNull)
 
   @@index([companyId])
   @@index([clientId])
@@ -838,6 +853,33 @@ model EquipmentFile {
 /// (siguiente entrega) se apoya en esta tabla para calcular saldos; por
 /// ahora solo se registra el pago — WorkOrder.paymentStatus se actualiza
 /// en el mismo flujo.
+/// Foto de identificación de un equipo. Modelo propio y no Attachment:
+/// Attachment está atado a la orden (cascade) y el borrado de una orden
+/// destruye en Cloudinary cada publicId de sus adjuntos — una fila
+/// compartida tendría que esquivar ese borrado. Cuando una foto viene de
+/// una orden, se COPIA el recurso en Cloudinary (publicId propio).
+model EquipmentPhoto {
+  id           String     @id @default(uuid())
+  url          String
+  /// @unique: un recurso de Cloudinary pertenece a una sola foto de equipo.
+  publicId     String     @unique
+  equipmentId  String
+  equipment    Equipment  @relation("EquipmentPhotos", fields: [equipmentId], references: [id], onDelete: Cascade)
+  /// Lado inverso de Equipment.coverPhoto (Prisma lo exige; no es columna).
+  coverOf      Equipment? @relation("EquipmentCoverPhoto")
+  /// Candado multi-tenant, redundante con equipment.companyId a propósito —
+  /// mismo patrón que Attachment / EquipmentFile.
+  companyId    String
+  company      Company    @relation(fields: [companyId], references: [id])
+  uploadedById String?
+  uploadedBy   User?      @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime   @default(now())
+
+  @@index([companyId])
+  /// Listado de la galería y «la más reciente que quede» al borrar la portada.
+  @@index([equipmentId, createdAt])
+}
+
 model Payment {
   id             String        @id @default(uuid())
   workOrderId    String

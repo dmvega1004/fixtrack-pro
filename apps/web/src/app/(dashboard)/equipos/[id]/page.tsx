@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { Printer, Pencil, Plus } from "lucide-react";
+import { Camera, Printer, Pencil, Plus } from "lucide-react";
 import { getEquipment } from "@/lib/api/equipments";
 import { getClient } from "@/lib/api/clients";
 import { getWorkOrders } from "@/lib/api/work-orders";
@@ -16,6 +16,9 @@ import { OrderHistorySection } from "@/components/shared/order-history-section";
 import { compareOrdersByEffectiveDateDesc } from "@/lib/format/order-date";
 import { EquipmentFilesSection } from "@/components/equipment/equipment-files-section";
 import { formatDate } from "@/lib/format/dates";
+import { EquipmentPhotosSection } from "@/components/equipment/equipment-photos-section";
+import { getEquipmentPhotos } from "@/lib/api/equipment-photos";
+import { cloudinaryUrl } from "@/lib/image/cloudinary-url";
 
 interface EquipoDetallePageProps {
   params: Promise<{ id: string }>;
@@ -40,19 +43,23 @@ export default async function EquipoDetallePage({
   // rol actual y se filtraba acá. Sigue trayendo órdenes que abarcan varios
   // equipos (ej. un proyecto sobre 5 portones): el filtro es del lado del
   // backend sobre la tabla puente WorkOrderEquipment.
-  const [client, history, session] = await Promise.all([
+  const [client, history, session, photos] = await Promise.all([
     getClient(equipment.clientId),
     getWorkOrders({ equipmentId: equipment.id }).then((orders) =>
       [...orders].sort(compareOrdersByEffectiveDateDesc),
     ),
     getSession(),
+    getEquipmentPhotos(equipment.id),
   ]);
+  const coverPhoto = photos.find((photo) => photo.isCover) ?? null;
 
   // Configurar el plan de mantenimiento es solo ADMIN/COORDINATOR (RBAC en
   // el backend); el TECHNICIAN ve la sección en modo lectura.
   const canManageMaintenance =
     session?.role === "ADMIN" || session?.role === "COORDINATOR";
   const isAdmin = session?.role === "ADMIN";
+  // Borrar fotos: ADMIN y COORDINATOR (una borrada por error en campo no se recupera).
+  const canDeletePhotos = canManageMaintenance;
   const itemLabel = `el equipo ${equipment.brand} ${equipment.model}${
     equipment.location ? ` — ${equipment.location}` : ""
   }`;
@@ -60,13 +67,40 @@ export default async function EquipoDetallePage({
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">
-            {equipment.brand} {equipment.model}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {equipment.serialNumber ?? "Sin número de serie"}
-          </p>
+        <div className="flex items-center gap-3">
+          {/* Portada: la identidad del equipo cuando el QR falla. Sin foto,
+              un marcador neutro del mismo tamaño para no descuadrar. */}
+          {coverPhoto ? (
+            <a
+              href={coverPhoto.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="size-16 shrink-0 overflow-hidden rounded-lg border border-border bg-muted"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element -- foto remota en Cloudinary, sin dominio fijo que declarar */}
+              <img
+                src={cloudinaryUrl(coverPhoto.url, "thumbnail")}
+                alt={`Foto de ${equipment.brand} ${equipment.model}`}
+                className="h-full w-full object-cover"
+              />
+            </a>
+          ) : (
+            <div
+              className="flex size-16 shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground"
+              aria-label="Equipo sin foto"
+              role="img"
+            >
+              <Camera className="size-6" aria-hidden="true" />
+            </div>
+          )}
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold">
+              {equipment.brand} {equipment.model}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {equipment.serialNumber ?? "Sin número de serie"}
+            </p>
+          </div>
         </div>
         <EquipmentStatusBadge status={equipment.status} />
       </div>
@@ -167,6 +201,16 @@ export default async function EquipoDetallePage({
       <Card>
         <CardContent>
           <EquipmentFilesSection equipmentId={equipment.id} canDelete={isAdmin} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent>
+          <EquipmentPhotosSection
+            equipmentId={equipment.id}
+            initialPhotos={photos}
+            canDelete={canDeletePhotos}
+          />
         </CardContent>
       </Card>
 
