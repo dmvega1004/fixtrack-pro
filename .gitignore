@@ -35,6 +35,9 @@ pnpm-debug.log*
 # --- Documentos internos (costos, márgenes, precios: nunca a git) ---
 FixTrack_Pro_Precios_y_Monetizacion.pdf
 
+# --- Material comercial (prospectos, datos de empresas: nunca a git) ---
+/comercial/
+
 # --- Firma digital y llave de firma de la app (nunca a git) ---
 firma_*.png
 *.jks
