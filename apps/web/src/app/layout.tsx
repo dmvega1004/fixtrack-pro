@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Toaster } from "@/components/ui/sonner";
 import { ServiceWorkerRegister } from "@/components/shared/service-worker-register";
 import "./globals.css";
@@ -33,6 +34,7 @@ export default function RootLayout({
         {children}
         <Toaster />
         <ServiceWorkerRegister />
+        <SpeedInsights />
       </body>
     </html>
   );
