@@ -179,6 +179,19 @@ self.addEventListener("activate", (event) => {
           .filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME)
           .map((key) => caches.delete(key)),
       );
+      // Navigation Preload: el navegador lanza la petición de la navegación
+      // EN PARALELO con el arranque de este service worker, en vez de
+      // esperar a que arranque para que el fetch() de navigateNetworkFirst
+      // recién salga. En producción se midió ~160 ms de arranque en
+      // escritorio antes de que saliera la petición; en un Android de gama
+      // baja es bastante más, y se paga en CADA navegación. No cambia la
+      // estrategia: navigateNetworkFirst consume event.preloadResponse en
+      // lugar de su propio fetch y le aplica exactamente los mismos
+      // candados. Sin soporte (navegadores viejos) no pasa nada: se queda
+      // el fetch() de siempre.
+      if (self.registration.navigationPreload) {
+        await self.registration.navigationPreload.enable();
+      }
       await self.clients.claim();
     })(),
   );
@@ -190,10 +203,10 @@ self.addEventListener("fetch", (event) => {
   if (request.mode !== "navigate") return;
   if (new URL(request.url).origin !== self.location.origin) return;
 
-  event.respondWith(navigateNetworkFirst(request));
+  event.respondWith(navigateNetworkFirst(request, event.preloadResponse));
 });
 
-async function navigateNetworkFirst(request) {
+async function navigateNetworkFirst(request, preloadResponse) {
   const cache = await caches.open(CACHE_NAME);
 
   try {
@@ -203,7 +216,17 @@ async function navigateNetworkFirst(request) {
     // excepción — y una excepción sin capturar dentro de un fetch handler
     // hace que el navegador falle la navegación entera con ERR_FAILED en
     // vez de mostrar cualquier respuesta.
-    const response = await fetch(request.clone());
+    //
+    // preloadResponse (Navigation Preload, ver "activate"): la respuesta de
+    // la petición que el navegador ya lanzó mientras este worker arrancaba.
+    // Resuelve a undefined si el preload no está activo (primera
+    // navegación antes de activarse, navegador sin soporte) → se cae al
+    // fetch() de siempre. Si la red falla, RECHAZA igual que fetch(): cae
+    // al mismo catch de abajo, con la misma lectura de caché. La respuesta
+    // pasa por los mismos candados que la del fetch().
+    const response =
+      (preloadResponse && (await preloadResponse)) ||
+      (await fetch(request.clone()));
 
     // Mismo par de candados que en precacheShellUrl:
     //  1. `!response.redirected` — una navegación real (ej. el token
