@@ -6,7 +6,8 @@ import { getWorkOrder } from "@/lib/api/work-orders";
 import { getClient } from "@/lib/api/clients";
 import { getWorkOrderParts } from "@/lib/api/work-order-parts";
 import { getSpareParts } from "@/lib/api/spare-parts";
-import { getMyProfile, getTechnicians } from "@/lib/api/users";
+import { getTechnicians } from "@/lib/api/users";
+import { getCurrentUser } from "@/lib/api/auth";
 import { getEquipments } from "@/lib/api/equipments";
 import { getPhotos } from "@/lib/api/attachments";
 import { getCompany } from "@/lib/api/company";
@@ -94,8 +95,9 @@ export default async function OrdenDetallePage({
     isAdmin ? getRetentions() : Promise.resolve([]),
     // Los tres roles: el bloque "Firmas" necesita SU firma de perfil
     // (SignaturesSection) — el administrador y el coordinador también
-    // firman órdenes.
-    getMyProfile(),
+    // firman órdenes. Sale de GET /auth/me, que el layout ya pidió en esta
+    // misma petición (getCurrentUser está en cache()): no es otra llamada.
+    getCurrentUser(),
   ]);
 
   return (

@@ -69,6 +69,9 @@ export class AuthController {
    * a la pantalla de cambio obligatorio. @SkipPasswordCheck() porque esa
    * misma pantalla necesita poder llamarlo — si MustChangePasswordGuard
    * lo bloqueara, no habría forma de saber por qué está bloqueado.
+   *
+   * Incluye documentNumber/signatureImageUrl (ver AuthenticatedUser): el
+   * detalle de la orden los toma de aquí en vez de llamar a GET /users/me.
    */
   @SkipPasswordCheck()
   @Get('me')

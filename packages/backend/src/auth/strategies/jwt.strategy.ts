@@ -46,6 +46,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         role: true,
         companyId: true,
         mustChangePassword: true,
+        documentNumber: true,
+        signatureImageUrl: true,
       },
     });
 
@@ -60,6 +62,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       role: user.role,
       companyId: user.companyId,
       mustChangePassword: user.mustChangePassword,
+      documentNumber: user.documentNumber,
+      signatureImageUrl: user.signatureImageUrl,
     };
   }
 }

@@ -1,5 +1,6 @@
 import type { WorkOrder } from "@/lib/api/work-orders";
-import type { Technician, MyProfile } from "@/lib/api/users";
+import type { Technician } from "@/lib/api/users";
+import type { CurrentUser } from "@/lib/api/auth";
 import { DescriptionEditor } from "./description-editor";
 import { DiagnosisEditor } from "./diagnosis-editor";
 import { AssistedDraftPanel } from "./assisted-draft-panel";
@@ -20,7 +21,7 @@ interface DetailsTabProps {
   isAdmin: boolean;
   technicians: Technician[];
   isTerminal: boolean;
-  myProfile: MyProfile;
+  myProfile: Pick<CurrentUser, "name" | "documentNumber" | "signatureImageUrl">;
 }
 
 export function DetailsTab({

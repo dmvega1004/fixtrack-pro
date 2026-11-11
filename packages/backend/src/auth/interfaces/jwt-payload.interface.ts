@@ -35,4 +35,13 @@ export interface AuthenticatedUser {
   role: Role;
   companyId: string;
   mustChangePassword: boolean;
+  /**
+   * Datos con los que el usuario firma una orden. Salen GRATIS de la misma
+   * consulta de JwtStrategy (misma fila) y los devuelve GET /auth/me: así el
+   * detalle de la orden no paga una segunda llamada HTTP a GET /users/me
+   * solo para esto (el layout del dashboard ya llama a /auth/me en cada
+   * pantalla). No se usan para autorización.
+   */
+  documentNumber: string | null;
+  signatureImageUrl: string | null;
 }

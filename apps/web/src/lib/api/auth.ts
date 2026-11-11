@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { apiFetch } from "./http";
 import { serverFetch } from "./server-fetch";
 
@@ -37,6 +38,9 @@ export interface CurrentUser {
    * restablecimiento por un ADMIN) y debe cambiarla antes de continuar.
    */
   mustChangePassword: boolean;
+  /** Datos con los que firma una orden (bloque "Firmas" del detalle). */
+  documentNumber: string | null;
+  signatureImageUrl: string | null;
 }
 
 /**
@@ -46,7 +50,14 @@ export interface CurrentUser {
  * contraseña de alguien mientras su sesión sigue abierta), así que el
  * valor del JWT firmado quedaría desactualizado. Server-only (usa la
  * cookie httpOnly vía serverFetch).
+ *
+ * Envuelta en cache() de React: el layout del dashboard y la página la
+ * comparten en la MISMA petición — una sola llamada al backend aunque ambos
+ * la pidan. El detalle de la orden la usa para los datos de firma en vez de
+ * pagar una llamada aparte a GET /users/me. cache() vive solo durante el
+ * render de una petición: no hay estado compartido entre usuarios ni entre
+ * navegaciones.
  */
-export function getCurrentUser(): Promise<CurrentUser> {
-  return serverFetch<CurrentUser>("/auth/me");
-}
+export const getCurrentUser = cache(
+  (): Promise<CurrentUser> => serverFetch<CurrentUser>("/auth/me"),
+);
