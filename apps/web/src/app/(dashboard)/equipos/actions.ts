@@ -9,6 +9,10 @@ import {
   type CreateEquipmentInput,
   type UpdateEquipmentInput,
 } from "@/lib/api/equipments";
+import {
+  deleteEquipmentPhoto,
+  setEquipmentCoverPhoto,
+} from "@/lib/api/equipment-photos";
 
 export interface EquipmentActionResult {
   ok: boolean;
@@ -65,4 +69,47 @@ export async function deleteEquipmentAction(id: string): Promise<EquipmentAction
 
   revalidatePath("/equipos");
   return { ok: true };
+}
+
+export interface EquipmentCoverActionResult {
+  ok: boolean;
+  message?: string;
+  /** Portada resultante (al borrar la portada, pasa a la más reciente o a null). */
+  coverPhotoId?: string | null;
+}
+
+/** PATCH /equipments/:id/photos/:photoId/cover — los tres roles. */
+export async function setEquipmentCoverPhotoAction(
+  equipmentId: string,
+  photoId: string,
+): Promise<EquipmentCoverActionResult> {
+  try {
+    const { coverPhotoId } = await setEquipmentCoverPhoto(equipmentId, photoId);
+    revalidatePath(`/equipos/${equipmentId}`);
+    return { ok: true, coverPhotoId };
+  } catch (error) {
+    const message = toFriendlyActionMessage(error);
+    if (message) {
+      return { ok: false, message };
+    }
+    throw error;
+  }
+}
+
+/** DELETE /equipments/:id/photos/:photoId — solo ADMIN/COORDINATOR (RBAC en el backend). */
+export async function deleteEquipmentPhotoAction(
+  equipmentId: string,
+  photoId: string,
+): Promise<EquipmentCoverActionResult> {
+  try {
+    const { coverPhotoId } = await deleteEquipmentPhoto(equipmentId, photoId);
+    revalidatePath(`/equipos/${equipmentId}`);
+    return { ok: true, coverPhotoId };
+  } catch (error) {
+    const message = toFriendlyActionMessage(error);
+    if (message) {
+      return { ok: false, message };
+    }
+    throw error;
+  }
 }

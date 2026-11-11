@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { Equipment, Prisma, Role } from 'database';
@@ -13,6 +14,7 @@ import {
   parseDateOnly,
   todayDateOnly,
 } from '../common/date-only.util';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { PrismaService } from '../prisma.service';
 import { SupabaseStorageService } from '../supabase/supabase-storage.service';
 import { ActivateMaintenanceBatchDto } from './dto/activate-maintenance-batch.dto';
@@ -59,9 +61,12 @@ export interface MaintenanceDueItem {
  */
 @Injectable()
 export class EquipmentsService {
+  private readonly logger = new Logger(EquipmentsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: SupabaseStorageService,
+    private readonly cloudinary: CloudinaryService,
   ) {}
 
   async create(companyId: string, dto: CreateEquipmentDto): Promise<Equipment> {
@@ -378,6 +383,12 @@ export class EquipmentsService {
       where: { equipmentId: id, companyId },
       select: { storagePath: true },
     });
+    // Igual con las fotos de la galería: el cascade borra las filas
+    // EquipmentPhoto, no los recursos en Cloudinary.
+    const photos = await this.prisma.equipmentPhoto.findMany({
+      where: { equipmentId: id, companyId },
+      select: { publicId: true },
+    });
 
     let deleted: Equipment;
     try {
@@ -396,9 +407,17 @@ export class EquipmentsService {
       throw error;
     }
 
-    await Promise.all(
-      files.map((file) => this.storage.remove(file.storagePath)),
-    );
+    await Promise.all([
+      ...files.map((file) => this.storage.remove(file.storagePath)),
+      ...photos.map(async ({ publicId }) => {
+        if (!(await this.cloudinary.tryDestroy(publicId))) {
+          this.logger.error(
+            `CLOUDINARY_ORPHAN publicId=${publicId} equipo=${id}: ` +
+              'no se pudo borrar el recurso en Cloudinary; quedó huérfano, limpiarlo a mano.',
+          );
+        }
+      }),
+    ]);
 
     return deleted;
   }

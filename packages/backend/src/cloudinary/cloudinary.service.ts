@@ -133,6 +133,24 @@ export class CloudinaryService implements OnModuleInit {
   }
 
   /**
+   * Como destroy, pero dice si funcionó: false si Cloudinary lanzó o
+   * respondió algo distinto de 'ok' / 'not found' (ya no existe = no hay
+   * huérfano). Para quien necesita dejar en el registro un recurso que
+   * quedó huérfano; destroy sigue igual para no cambiar a sus llamadores.
+   */
+  async tryDestroy(publicId: string): Promise<boolean> {
+    try {
+      this.ensureConfigured();
+      const response = (await cloudinary.uploader.destroy(publicId, {
+        resource_type: 'image',
+      })) as { result?: string };
+      return response.result === 'ok' || response.result === 'not found';
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Extrae el public_id de una URL de Cloudinary generada por ESTA cuenta.
    * Devuelve null si la URL no es de Cloudinary (ej. una ruta local legacy
    * como "/tenant/logo.png") — el llamador debe tratarlo como "no borrable".
