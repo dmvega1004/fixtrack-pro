@@ -7,6 +7,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { Role } from 'database';
 import { PrismaService } from '../prisma.service';
+import { AuthUserCache } from './auth-user-cache';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -55,6 +56,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly authUserCache: AuthUserCache,
   ) {}
 
   /**
@@ -190,6 +192,10 @@ export class AuthService {
       where: { id: user.userId },
       data: { password: passwordHash, mustChangePassword: false },
     });
+    // mustChangePassword acaba de pasar a false: sin esto, la caché del
+    // guardia lo seguiría viendo en true y MustChangePasswordGuard lo
+    // bloquearía hasta 30 s después de haber cambiado la contraseña.
+    this.authUserCache.invalidate(user.userId);
   }
 
   private buildAuthResponse(user: PublicUser): AuthResponse {

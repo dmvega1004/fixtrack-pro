@@ -14,6 +14,7 @@ import {
   CloudinaryService,
 } from '../cloudinary/cloudinary.service';
 import { validateImageFile } from '../cloudinary/validate-image-file';
+import { AuthUserCache } from '../auth/auth-user-cache';
 import { PrismaService } from '../prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateMyProfileDto } from './dto/update-my-profile.dto';
@@ -79,6 +80,7 @@ export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cloudinary: CloudinaryService,
+    private readonly authUserCache: AuthUserCache,
   ) {}
 
   /** GET /users/me — los tres roles: su propio perfil, incluida su firma. */
@@ -90,15 +92,18 @@ export class UsersService {
   }
 
   /** PATCH /users/me — los tres roles: hoy solo documentNumber (ver UpdateMyProfileDto). */
-  updateMe(
+  async updateMe(
     user: AuthenticatedUser,
     dto: UpdateMyProfileDto,
   ): Promise<MyProfile> {
-    return this.prisma.user.update({
+    const updated = await this.prisma.user.update({
       where: { id: user.userId },
       data: { documentNumber: dto.documentNumber?.trim() },
       select: MY_PROFILE_SELECT,
     });
+    // documentNumber viaja en request.user (firma de la orden, /auth/me).
+    this.authUserCache.invalidate(user.userId);
+    return updated;
   }
 
   /**
@@ -142,6 +147,8 @@ export class UsersService {
       data: { signatureImageUrl: uploaded.secure_url },
       select: MY_PROFILE_SELECT,
     });
+    // signatureImageUrl viaja en request.user (firma de la orden, /auth/me).
+    this.authUserCache.invalidate(user.userId);
 
     if (current.signatureImageUrl) {
       const oldPublicId = this.cloudinary.extractPublicId(
@@ -246,7 +253,7 @@ export class UsersService {
     const mustChangePassword =
       dto.password && id !== user.userId ? true : undefined;
 
-    return this.prisma.user.update({
+    const updated = await this.prisma.user.update({
       where: { id },
       data: {
         name: dto.name?.trim(),
@@ -256,6 +263,10 @@ export class UsersService {
       },
       select: PUBLIC_USER_SELECT,
     });
+    // Rol y mustChangePassword deciden la autorización: el cambio tiene que
+    // surtir efecto en la PRÓXIMA petición del usuario, no 30 s después.
+    this.authUserCache.invalidate(id);
+    return updated;
   }
 
   async remove(user: AuthenticatedUser, id: string): Promise<PublicUser> {
@@ -274,12 +285,17 @@ export class UsersService {
     }
 
     // Las órdenes asignadas al eliminado quedan sin asignar automáticamente
-    // (FK WorkOrder.userId con ON DELETE SET NULL) y su sesión muere en el
-    // próximo request (la JwtStrategy re-consulta la BD).
-    return this.prisma.user.delete({
+    // (FK WorkOrder.userId con ON DELETE SET NULL).
+    const deleted = await this.prisma.user.delete({
       where: { id },
       select: PUBLIC_USER_SELECT,
     });
+    // ÚNICO mecanismo de revocación del sistema (no hay campo de activo):
+    // sin esta línea, la sesión del eliminado seguiría viva hasta 30 s
+    // desde la caché de JwtStrategy. Con ella muere en su próxima
+    // petición — mientras haya UNA instancia (ver auth-user-cache.ts).
+    this.authUserCache.invalidate(id);
+    return deleted;
   }
 
   /** Bloquea la operación si solo queda un administrador en la empresa. */
