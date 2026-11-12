@@ -420,6 +420,9 @@ export class EquipmentsService {
       ...files.map((file) => this.storage.remove(file.storagePath)),
       ...photos.map(async ({ publicId }) => {
         if (!(await this.cloudinary.tryDestroy(publicId))) {
+          // Antes de borrarlo a mano, comprobar que el recurso EXISTE: puede
+          // ser un falso positivo (ver destroyOrLogOrphan en
+          // EquipmentPhotosService).
           this.logger.error(
             `CLOUDINARY_ORPHAN publicId=${publicId} equipo=${id}: ` +
               'no se pudo borrar el recurso en Cloudinary; quedó huérfano, limpiarlo a mano.',

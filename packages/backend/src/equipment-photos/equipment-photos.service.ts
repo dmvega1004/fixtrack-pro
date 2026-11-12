@@ -274,6 +274,11 @@ export class EquipmentPhotosService {
     const ok = await this.cloudinary.tryDestroy(publicId);
     if (!ok) {
       // Prefijo fijo para encontrarlo en los logs de Railway y limpiarlo.
+      // ANTES DE BORRAR A MANO: comprobar que el recurso EXISTE. tryDestroy
+      // devuelve false también cuando Cloudinary sí borró pero la respuesta
+      // no llegó (timeout, red cortada, equipo suspendido): falsos
+      // positivos reales — 2 de 3 en la limpieza del 2026-11-11 ya no
+      // estaban. Consultar con cloudinary.api.resource(publicId) primero.
       this.logger.error(
         `CLOUDINARY_ORPHAN publicId=${publicId} equipo=${equipmentId}: ` +
           'no se pudo borrar el recurso en Cloudinary; quedó huérfano, limpiarlo a mano.',

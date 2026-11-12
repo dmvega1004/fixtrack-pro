@@ -135,7 +135,9 @@ export class CloudinaryService implements OnModuleInit {
   /**
    * Como destroy, pero dice si funcionó: false si Cloudinary lanzó o
    * respondió algo distinto de 'ok' / 'not found' (ya no existe = no hay
-   * huérfano). Para quien necesita dejar en el registro un recurso que
+   * huérfano).
+   * OJO: false NO garantiza que el recurso siga ahí — si la red se corta
+   * después de que Cloudinary borró, también da false. Para quien necesita dejar en el registro un recurso que
    * quedó huérfano; destroy sigue igual para no cambiar a sus llamadores.
    */
   async tryDestroy(publicId: string): Promise<boolean> {
