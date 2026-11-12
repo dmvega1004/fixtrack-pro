@@ -28,6 +28,15 @@ Orden de despliegue: **backend primero, luego frontend, luego actualizar `FRONTE
   Railway no tiene una fase de "release" separada en todos los planes, así que las migraciones se aplican **encadenadas al comando de arranque**, antes de levantar el servidor. `migrate:deploy` ejecuta `prisma migrate deploy` — aplica migraciones ya generadas contra la base de producción, es idempotente (no hace nada si no hay migraciones pendientes) y **nunca** genera ni pide migraciones nuevas como sí haría `migrate dev`. Si falla (ej. migración rota), el comando corta con código de error y Railway no levanta el proceso viejo con schema desactualizado.
 - **Healthcheck Path**: `/health` (devuelve `200 { "status": "ok" }`, público, sin JWT — configúralo en Railway para que el servicio se marque "healthy" y los reinicios/deploys esperen esa señal).
 
+### ⚠️ Una sola instancia — leer ANTES de subir «Replicas» en Railway
+
+El backend **supone que corre en UNA sola instancia** (Railway → Settings → Deploy → Replicas = 1). Escalarlo a dos o más no da ningún error: degrada la seguridad en silencio.
+
+- **Revocación de usuarios (lo grave).** `JwtStrategy` guarda en memoria la fila del usuario autenticado durante 30 s (`packages/backend/src/auth/auth-user-cache.ts`). Cuando un ADMIN borra o degrada a alguien, solo se limpia la memoria de la instancia que atendió esa petición. Como el sistema no tiene un estado de «inactivo», **borrar al usuario es la única forma de quitarle el acceso**. Con varias réplicas, un usuario borrado o degradado sigue entrando hasta 30 s por las demás réplicas.
+- **Límite de intentos de login.** `@nestjs/throttler` también cuenta en memoria. Con N réplicas, el límite de 5 intentos por minuto pasa a ser 5 por réplica.
+
+Antes de escalar hay que hacer una de dos cosas: compartir la invalidación entre instancias (Redis pub/sub o `LISTEN/NOTIFY` de Postgres) o quitar la caché. Para el límite de login, un almacenamiento compartido para el throttler. Cada vez que arranca, el backend lo recuerda en sus logs con la línea «Caché de usuario autenticado activa … Supone UNA sola instancia».
+
 ### Variables de entorno (Railway → Settings → Variables)
 
 Copia los nombres de `packages/backend/.env.example` y complétalos con valores reales de producción:
