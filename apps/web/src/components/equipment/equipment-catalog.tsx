@@ -73,6 +73,7 @@ export function EquipmentCatalog({ equipments }: EquipmentCatalogProps) {
                             url={equipment.coverPhoto?.url}
                             alt={`Foto de ${equipment.brand} ${equipment.model}`}
                             sizeClassName="size-10"
+                            preset="listThumbnail"
                             iconClassName="size-4"
                           />
                           <span className="flex min-w-0 flex-col">
@@ -136,6 +137,7 @@ export function EquipmentCatalog({ equipments }: EquipmentCatalogProps) {
                   url={equipment.coverPhoto?.url}
                   alt={`Foto de ${equipment.brand} ${equipment.model}`}
                   sizeClassName="size-16"
+                  preset="listThumbnail"
                 />
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="line-clamp-2 min-h-10 text-sm font-medium break-words">

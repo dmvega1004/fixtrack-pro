@@ -83,6 +83,7 @@ export default async function EquipoDetallePage({
               url={coverPhoto.url}
               alt={`Foto de ${equipment.brand} ${equipment.model}`}
               sizeClassName="size-28"
+              preset="thumbnail"
               loading="eager"
             />
           </a>
@@ -91,6 +92,7 @@ export default async function EquipoDetallePage({
             url={null}
             alt=""
             sizeClassName="size-28"
+              preset="thumbnail"
             iconClassName="size-8"
           />
         )}

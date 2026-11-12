@@ -1,5 +1,5 @@
 import { Camera } from "lucide-react";
-import { cloudinaryUrl } from "@/lib/image/cloudinary-url";
+import { cloudinaryUrl, type CloudinaryPreset } from "@/lib/image/cloudinary-url";
 import { cn } from "@/lib/utils";
 
 interface EquipmentCoverProps {
@@ -17,12 +17,17 @@ interface EquipmentCoverProps {
    * nunca). "eager" para lo que siempre está arriba (encabezado del detalle).
    */
   loading?: "lazy" | "eager";
+  /**
+   * "listThumbnail" (192 px) en los listados; "thumbnail" (320 px) donde el
+   * hueco es grande (portada del detalle). Nunca el original.
+   */
+  preset: Extract<CloudinaryPreset, "thumbnail" | "listThumbnail">;
 }
 
 /**
- * Portada del equipo en tamaño fijo. SIEMPRE con el preset `thumbnail`
- * (c_fill,w_320,h_320,q_auto,f_auto): nunca el original, ni siquiera en el
- * encabezado — 320 px cubren un cuadro de ~110 px en pantallas 3x.
+ * Portada del equipo en tamaño fijo, SIEMPRE con un preset de miniatura y
+ * nunca el original: `listThumbnail` (192 px) en los listados, `thumbnail`
+ * (320 px) en el encabezado del detalle (cuadro de 112 px a densidad 3×).
  *
  * Sin foto: marcador neutro del MISMO tamaño, para que la tarjeta o la fila
  * nunca cambien de forma por tener o no portada.
@@ -33,6 +38,7 @@ export function EquipmentCover({
   sizeClassName,
   iconClassName = "size-5",
   loading = "lazy",
+  preset,
 }: EquipmentCoverProps) {
   const box = cn(
     "shrink-0 overflow-hidden rounded-lg border border-border bg-muted",
@@ -55,12 +61,12 @@ export function EquipmentCover({
     <div className={box}>
       {/* eslint-disable-next-line @next/next/no-img-element -- foto remota en Cloudinary, sin dominio fijo que declarar */}
       <img
-        src={cloudinaryUrl(url, "thumbnail")}
+        src={cloudinaryUrl(url, preset)}
         alt={alt}
         loading={loading}
         decoding="async"
-        width={320}
-        height={320}
+        width={preset === "listThumbnail" ? 192 : 320}
+        height={preset === "listThumbnail" ? 192 : 320}
         className="h-full w-full object-cover"
       />
     </div>
