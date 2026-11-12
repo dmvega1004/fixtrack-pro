@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   InternalServerErrorException,
@@ -13,6 +14,7 @@ import {
 } from '../cloudinary/cloudinary.service';
 import { validateImageFile } from '../cloudinary/validate-image-file';
 import { EquipmentsService } from '../equipments/equipments.service';
+import { WorkOrdersService } from '../work-orders/work-orders.service';
 import { PrismaService } from '../prisma.service';
 
 /**
@@ -58,6 +60,7 @@ export class EquipmentPhotosService {
     private readonly prisma: PrismaService,
     private readonly equipmentsService: EquipmentsService,
     private readonly cloudinary: CloudinaryService,
+    private readonly workOrdersService: WorkOrdersService,
   ) {}
 
   async list(
@@ -158,6 +161,163 @@ export class EquipmentPhotosService {
       await this.destroyOrLogOrphan(uploaded.public_id, equipmentId);
       throw error;
     }
+  }
+
+  /**
+   * «Usar como portada del equipo» desde la pestaña Fotos de la orden. El
+   * técnico ya fotografía el equipo en cada orden: en vez de pedirle una
+   * subida aparte, se COPIA esa foto a la galería del equipo y queda como
+   * portada.
+   *
+   * Copia, no referencia: Cloudinary crea un recurso nuevo con su propio
+   * public_id (uploadFromUrl). Borrar la orden destruye en Cloudinary los
+   * publicId de sus adjuntos; con un publicId compartido se llevaría
+   * también la foto del equipo. sourceAttachmentId queda como texto suelto
+   * (sin relación a Attachment) solo para no copiar dos veces la misma.
+   *
+   * Reglas, en orden:
+   *  1. La orden de la foto tiene que ser VISIBLE para el usuario
+   *     (WorkOrdersService.findOne: el técnico solo alcanza SUS órdenes).
+   *  2. El equipo tiene que estar ENLAZADO a esa orden (WorkOrderEquipment).
+   *  3. Si esa foto ya se copió a este equipo, no se copia otra vez: solo se
+   *     marca como portada.
+   *  4. Mismo tope de 10, bloqueo y borrado compensatorio que add().
+   * Una orden cerrada también sirve: copiar su foto no cambia la orden.
+   */
+  async useOrderPhotoAsCover(
+    user: AuthenticatedUser,
+    equipmentId: string,
+    attachmentId: string,
+  ): Promise<EquipmentPhotoView> {
+    await this.equipmentsService.findOne(user.companyId, equipmentId);
+
+    const attachment = await this.prisma.attachment.findFirst({
+      where: { id: attachmentId, companyId: user.companyId }, // candado
+      select: { id: true, url: true, workOrderId: true },
+    });
+    if (!attachment) {
+      throw new NotFoundException(
+        `Foto de orden ${attachmentId} no encontrada`,
+      );
+    }
+
+    // 1. Visibilidad: 404 si la orden es de otro técnico o de otra empresa.
+    await this.workOrdersService.findOne(user, attachment.workOrderId);
+
+    // 2. El equipo tiene que estar en esa orden.
+    const link = await this.prisma.workOrderEquipment.findFirst({
+      where: {
+        workOrderId: attachment.workOrderId,
+        equipmentId,
+        companyId: user.companyId,
+      },
+      select: { id: true },
+    });
+    if (!link) {
+      throw new BadRequestException(
+        'Ese equipo no está enlazado a la orden de esta foto',
+      );
+    }
+
+    // 3. Ya copiada a este equipo: solo se marca como portada.
+    const alreadyCopied = await this.findCopy(user, equipmentId, attachmentId);
+    if (alreadyCopied) {
+      await this.setCover(user, equipmentId, alreadyCopied.id);
+      return { ...alreadyCopied, isCover: true };
+    }
+
+    // 4. Chequeo previo del tope (sin bloqueo) antes de gastar la copia.
+    const currentCount = await this.prisma.equipmentPhoto.count({
+      where: { equipmentId, companyId: user.companyId },
+    });
+    if (currentCount >= MAX_PHOTOS_PER_EQUIPMENT) {
+      throw new ConflictException(LIMIT_MESSAGE);
+    }
+
+    let copied;
+    try {
+      copied = await this.cloudinary.uploadFromUrl(attachment.url, {
+        folder: `${cloudinaryRootFolder()}/${user.companyId}/equipment/${equipmentId}`,
+        maxDimension: MAX_PHOTO_DIMENSION,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Fallo al copiar la foto de orden ${attachmentId} a Cloudinary (equipo ${equipmentId}): ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new InternalServerErrorException(
+        'No se pudo copiar la foto en nuestro proveedor de imágenes. ' +
+          'Intenta de nuevo en unos minutos; si el problema persiste, contacta al administrador.',
+      );
+    }
+
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        await this.lockEquipment(tx, user.companyId, equipmentId);
+
+        const count = await tx.equipmentPhoto.count({
+          where: { equipmentId, companyId: user.companyId },
+        });
+        if (count >= MAX_PHOTOS_PER_EQUIPMENT) {
+          throw new ConflictException(LIMIT_MESSAGE);
+        }
+
+        const photo = await tx.equipmentPhoto.create({
+          data: {
+            url: copied.secure_url,
+            publicId: copied.public_id,
+            equipmentId,
+            companyId: user.companyId, // candado
+            uploadedById: user.userId,
+            sourceAttachmentId: attachmentId,
+          },
+        });
+
+        // A diferencia de add(), SIEMPRE queda como portada: es para lo que
+        // existe el botón. La foto es de este equipo (se acaba de crear con
+        // su equipmentId), que es la regla que la FK no cubre.
+        await tx.equipment.update({
+          where: { id: equipmentId },
+          data: { coverPhotoId: photo.id },
+        });
+
+        return { ...photo, isCover: true };
+      });
+    } catch (error) {
+      // La copia quedó en Cloudinary pero no en la BD: borrado compensatorio.
+      await this.destroyOrLogOrphan(copied.public_id, equipmentId);
+
+      // Doble clic / dos pestañas: otra petición copió la misma foto entre
+      // el chequeo 3 y esta transacción (P2002 en el @@unique). No es un
+      // error para el usuario: esa copia ya existe y se marca como portada.
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        const winner = await this.findCopy(user, equipmentId, attachmentId);
+        if (winner) {
+          await this.setCover(user, equipmentId, winner.id);
+          return { ...winner, isCover: true };
+        }
+      }
+      throw error;
+    }
+  }
+
+  private findCopy(
+    user: AuthenticatedUser,
+    equipmentId: string,
+    attachmentId: string,
+  ): Promise<EquipmentPhoto | null> {
+    return this.prisma.equipmentPhoto.findFirst({
+      where: {
+        equipmentId,
+        companyId: user.companyId,
+        sourceAttachmentId: attachmentId,
+      },
+    });
   }
 
   async setCover(

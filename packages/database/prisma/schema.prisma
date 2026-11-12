@@ -859,22 +859,32 @@ model EquipmentFile {
 /// compartida tendría que esquivar ese borrado. Cuando una foto viene de
 /// una orden, se COPIA el recurso en Cloudinary (publicId propio).
 model EquipmentPhoto {
-  id           String     @id @default(uuid())
-  url          String
+  id                 String     @id @default(uuid())
+  url                String
   /// @unique: un recurso de Cloudinary pertenece a una sola foto de equipo.
-  publicId     String     @unique
-  equipmentId  String
-  equipment    Equipment  @relation("EquipmentPhotos", fields: [equipmentId], references: [id], onDelete: Cascade)
+  publicId           String     @unique
+  equipmentId        String
+  equipment          Equipment  @relation("EquipmentPhotos", fields: [equipmentId], references: [id], onDelete: Cascade)
   /// Lado inverso de Equipment.coverPhoto (Prisma lo exige; no es columna).
-  coverOf      Equipment? @relation("EquipmentCoverPhoto")
+  coverOf            Equipment? @relation("EquipmentCoverPhoto")
   /// Candado multi-tenant, redundante con equipment.companyId a propósito —
   /// mismo patrón que Attachment / EquipmentFile.
-  companyId    String
-  company      Company    @relation(fields: [companyId], references: [id])
-  uploadedById String?
-  uploadedBy   User?      @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
-  createdAt    DateTime   @default(now())
+  companyId          String
+  company            Company    @relation(fields: [companyId], references: [id])
+  uploadedById       String?
+  uploadedBy         User?      @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  createdAt          DateTime   @default(now())
+  /// Foto de orden (Attachment.id) de la que se COPIÓ esta, si vino de
+  /// «Usar como portada del equipo». Texto suelto, SIN relación a propósito:
+  /// así Attachment no se toca y borrar la orden no arrastra esta foto (el
+  /// recurso de Cloudinary es una copia con su propio publicId). Puede
+  /// quedar apuntando a un adjunto que ya no existe: es solo trazabilidad.
+  sourceAttachmentId String?
 
+  /// La misma foto de orden no se copia dos veces al mismo equipo (ni con
+  /// doble clic). Postgres admite varios NULL en un índice único, así que
+  /// las fotos subidas directamente no chocan entre sí.
+  @@unique([equipmentId, sourceAttachmentId])
   @@index([companyId])
   /// Listado de la galería y «la más reciente que quede» al borrar la portada.
   @@index([equipmentId, createdAt])

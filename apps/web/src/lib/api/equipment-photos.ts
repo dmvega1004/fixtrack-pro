@@ -37,3 +37,17 @@ export function deleteEquipmentPhoto(
     method: "DELETE",
   });
 }
+
+/**
+ * POST /equipments/:id/photos/from-order-photo — copia una foto de una
+ * orden donde está el equipo y la deja como portada (los tres roles).
+ */
+export function setEquipmentCoverFromOrderPhoto(
+  equipmentId: string,
+  attachmentId: string,
+): Promise<EquipmentPhoto> {
+  return serverFetch<EquipmentPhoto>(
+    `/equipments/${equipmentId}/photos/from-order-photo`,
+    { method: "POST", body: { attachmentId } },
+  );
+}

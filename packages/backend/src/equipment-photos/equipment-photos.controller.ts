@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Delete,
   Get,
@@ -16,6 +17,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { MAX_IMAGE_SIZE_BYTES } from '../cloudinary/image-upload.constants';
+import { UseOrderPhotoDto } from './dto/use-order-photo.dto';
 import {
   CoverResult,
   EquipmentPhotosService,
@@ -48,6 +50,24 @@ export class EquipmentPhotosController {
     @UploadedFile() file: Express.Multer.File,
   ): Promise<EquipmentPhotoView> {
     return this.photosService.add(user, equipmentId, file);
+  }
+
+  /**
+   * POST /equipments/:equipmentId/photos/from-order-photo — copia una foto
+   * de una orden en la que está este equipo y la deja como portada. Los tres
+   * roles (mismo criterio que subir y marcar portada).
+   */
+  @Post('from-order-photo')
+  useOrderPhotoAsCover(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('equipmentId', ParseUUIDPipe) equipmentId: string,
+    @Body() dto: UseOrderPhotoDto,
+  ): Promise<EquipmentPhotoView> {
+    return this.photosService.useOrderPhotoAsCover(
+      user,
+      equipmentId,
+      dto.attachmentId,
+    );
   }
 
   /** GET /equipments/:equipmentId/photos — más reciente primero, con isCover */

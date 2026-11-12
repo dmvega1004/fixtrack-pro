@@ -119,6 +119,33 @@ export class CloudinaryService implements OnModuleInit {
   }
 
   /**
+   * Crea un recurso NUEVO copiando una imagen remota: Cloudinary la
+   * descarga él mismo desde `sourceUrl` (los bytes no pasan por nuestro
+   * servidor). El resultado tiene su propio public_id, independiente del
+   * original — borrar uno no afecta al otro. Lo usa «Usar como portada del
+   * equipo» para copiar una foto de orden sin acoplarla al Attachment.
+   */
+  uploadFromUrl(
+    sourceUrl: string,
+    options: UploadImageOptions,
+  ): Promise<UploadApiResponse> {
+    this.ensureConfigured();
+    return cloudinary.uploader.upload(sourceUrl, {
+      folder: options.folder,
+      resource_type: 'image',
+      transformation: options.maxDimension
+        ? [
+            {
+              width: options.maxDimension,
+              height: options.maxDimension,
+              crop: 'limit',
+            },
+          ]
+        : undefined,
+    });
+  }
+
+  /**
    * Borrado en Cloudinary: SIEMPRE best-effort. Si Cloudinary falla acá, no
    * queremos tumbar la operación local (el peor caso es un archivo remoto
    * huérfano, no un registro roto en nuestra base de datos).

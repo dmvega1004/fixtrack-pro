@@ -201,6 +201,7 @@ export default async function OrdenDetallePage({
               orderId={order.id}
               initialPhotos={photos}
               isTerminal={isTerminal}
+              equipments={order.equipments}
             />
           }
           historial={<ActivityTab entries={activityLog} />}

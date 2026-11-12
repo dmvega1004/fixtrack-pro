@@ -11,6 +11,7 @@ import {
 } from "@/lib/api/equipments";
 import {
   deleteEquipmentPhoto,
+  setEquipmentCoverFromOrderPhoto,
   setEquipmentCoverPhoto,
 } from "@/lib/api/equipment-photos";
 
@@ -105,6 +106,29 @@ export async function deleteEquipmentPhotoAction(
     const { coverPhotoId } = await deleteEquipmentPhoto(equipmentId, photoId);
     revalidatePath(`/equipos/${equipmentId}`);
     return { ok: true, coverPhotoId };
+  } catch (error) {
+    const message = toFriendlyActionMessage(error);
+    if (message) {
+      return { ok: false, message };
+    }
+    throw error;
+  }
+}
+
+/**
+ * «Usar como portada del equipo» desde la pestaña Fotos de la orden. El
+ * backend copia la foto en Cloudinary (recurso independiente) y la deja
+ * como portada; si ya se había copiado a ese equipo, solo la marca.
+ */
+export async function setEquipmentCoverFromOrderPhotoAction(
+  equipmentId: string,
+  attachmentId: string,
+): Promise<EquipmentActionResult> {
+  try {
+    await setEquipmentCoverFromOrderPhoto(equipmentId, attachmentId);
+    revalidatePath("/equipos");
+    revalidatePath(`/equipos/${equipmentId}`);
+    return { ok: true };
   } catch (error) {
     const message = toFriendlyActionMessage(error);
     if (message) {
