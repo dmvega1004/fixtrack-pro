@@ -513,37 +513,66 @@ function SocialProof() {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  g) Cómo se cobra — sin cifras                                             */
+/*  g) Cómo se cobra — precio publicado                                       */
 /* -------------------------------------------------------------------------- */
+
+/**
+ * Valores finales: el operador es persona natural no responsable de IVA,
+ * así que no se suma ningún impuesto encima. Si eso cambia, cambia también
+ * la nota del pie de esta sección.
+ */
+const PREPAID_PLANS = [
+  ["Trimestre", "$510.000"],
+  ["Semestre", "$966.000"],
+  ["Año", "$1.718.000"],
+] as const;
 
 function Pricing() {
   return (
     <Section className="bg-card">
       <SectionHeading overline="Cómo se cobra" title="Un valor por empresa, no por función suelta" />
       <div className="mx-auto mt-10 grid max-w-3xl gap-6 sm:grid-cols-3">
-        {[
-          {
-            title: "Se paga por empresa",
-            body: "Un solo valor por empresa, sin importar cuántos técnicos tenga: usuarios ilimitados. No se cobra por módulo ni por documento emitido.",
-          },
-          {
-            title: "La puesta en marcha va acompañada",
-            body: "Carga de sus clientes y equipos, primer lote de etiquetas y capacitación al equipo.",
-          },
-          {
-            title: "El valor se define en la demostración",
-            body: "Cuando ya se vio funcionando con un caso parecido al suyo, se habla de números.",
-          },
-        ].map(({ title, body }) => (
-          <div
-            key={title}
-            className="rounded-xl border border-border bg-background p-6"
-          >
-            <h3 className="font-semibold text-foreground">{title}</h3>
-            <p className="mt-2 text-sm text-muted-foreground">{body}</p>
-          </div>
-        ))}
+        <div className="rounded-xl border border-border bg-background p-6">
+          <h3 className="font-semibold text-foreground">Mes a mes</h3>
+          <p className="mt-2 text-2xl font-bold tracking-tight text-foreground">
+            $179.000
+            <span className="text-sm font-medium text-muted-foreground"> al mes</span>
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Por empresa, con usuarios ilimitados. No se cobra por módulo ni por
+            documento emitido.
+          </p>
+        </div>
+        <div className="rounded-xl border border-border bg-background p-6">
+          <h3 className="font-semibold text-foreground">Pago anticipado, con descuento</h3>
+          <dl className="mt-3 flex flex-col gap-1.5 text-sm">
+            {PREPAID_PLANS.map(([period, price]) => (
+              <div key={period} className="flex items-baseline justify-between gap-3">
+                <dt className="text-muted-foreground">{period}</dt>
+                <dd className="font-semibold text-foreground">{price}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Hasta un 20 % menos que mes a mes.
+          </p>
+        </div>
+        <div className="rounded-xl border border-border bg-background p-6">
+          <h3 className="font-semibold text-foreground">Puesta en marcha, una sola vez</h3>
+          <p className="mt-2 text-2xl font-bold tracking-tight text-foreground">
+            <span className="text-sm font-medium text-muted-foreground">Desde </span>
+            $350.000
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Según cuántos clientes y equipos haya que cargar. Incluye la carga
+            inicial, el primer lote de etiquetas QR impresas y la capacitación
+            del personal.
+          </p>
+        </div>
       </div>
+      <p className="mt-6 text-center text-sm font-medium text-foreground">
+        Valores finales, sin impuestos adicionales.
+      </p>
     </Section>
   );
 }
