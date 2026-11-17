@@ -252,7 +252,7 @@ const STEPS = [
     narrow: true,
     alt: "Un técnico escanea la etiqueta QR de un equipo con el celular",
     title: "Escanear la etiqueta",
-    body: "El técnico llega al sitio y escanea el QR del equipo. En pantalla aparece su ficha y todo lo que se le ha hecho antes.",
+    body: "El técnico llega al sitio y escanea el QR del equipo. Con señal, en pantalla aparece su ficha y todo lo que se le ha hecho antes.",
   },
   {
     img: "/landing/paso-2-orden.png",
@@ -326,14 +326,14 @@ function HowItWorks() {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  d) Lo que nadie más ofrece — cuatro bloques                               */
+/*  d) Lo que lo hace distinto — cuatro bloques                               */
 /* -------------------------------------------------------------------------- */
 
 function Differentiators() {
   return (
     <Section className="bg-card">
       <SectionHeading
-        overline="Lo que nadie más ofrece"
+        overline="Lo que lo hace distinto"
         title="Cuatro cosas que un software genérico no le da"
       />
 
@@ -462,11 +462,11 @@ function Differentiators() {
 const MORE_FEATURES = [
   ["Cotizaciones", "con metodología, observaciones y su documento para el cliente."],
   ["Inventario", "por repuesto, con descuento automático al usarlo en una orden."],
-  ["Mantenimiento preventivo", "programado por equipo, con aviso de lo que se vence."],
+  ["Mantenimiento preventivo", "programado por equipo; lo que se vence se ve en la plataforma."],
   ["Cuenta de cobro", "generada desde las órdenes, sin volver a digitar."],
   ["Retenciones", "aplicadas en el cálculo, no a mano en una calculadora aparte."],
   ["Rentabilidad", "por orden y por cliente: qué deja cada trabajo, no solo cuánto factura."],
-  ["Bitácora de auditoría", "quién hizo qué y cuándo, sobre cada registro."],
+  ["Bitácora de auditoría", "quién hizo qué y cuándo, sobre cada orden de trabajo."],
 ];
 
 function MoreFeatures() {
@@ -498,16 +498,13 @@ function MoreFeatures() {
 function SocialProof() {
   return (
     <Section className="bg-primary text-primary-foreground">
-      <figure className="mx-auto max-w-3xl text-center">
-        <blockquote className="text-xl font-semibold sm:text-2xl">
-          “Esto no es un producto que armamos para vender. Es el sistema con el
-          que trabajamos todos los días.”
-        </blockquote>
-        <figcaption className="mt-6 text-sm text-primary-foreground/80">
-          TAELCO Systems opera con FixTrack Pro en producción — con órdenes
-          reales y cuentas de cobro emitidas.
-        </figcaption>
-      </figure>
+      {/* Sin cita: el dato verificable ocupa el lugar que tenía la frase
+          entre comillas, con el mismo tamaño, para que la franja no quede
+          con una línea suelta en letra pequeña. */}
+      <p className="mx-auto max-w-3xl text-center text-xl font-semibold sm:text-2xl">
+        TAELCO Systems opera con FixTrack Pro en producción — con órdenes
+        reales y cuentas de cobro emitidas.
+      </p>
     </Section>
   );
 }
@@ -644,8 +641,8 @@ function Closing() {
           Véalo con un caso parecido al suyo
         </h2>
         <p className="mt-3 text-muted-foreground">
-          Una demostración corta, sobre datos reales de operación. Después
-          hablamos de números.
+          Una demostración corta, con una empresa de ejemplo y equipos como
+          los suyos.
         </p>
         <div className="mt-8 flex justify-center">
           <WhatsappCta size="lg">Ver una demostración por WhatsApp</WhatsappCta>

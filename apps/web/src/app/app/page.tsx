@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Image from "next/image";
-import { Apple, Download, Share } from "lucide-react";
+import { Apple, Download, Info, Share } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { AppQrCode } from "@/components/app-download/app-qr-code";
 import { APP_DOWNLOAD_PATH, APP_RELEASE } from "@/lib/app-release";
@@ -64,8 +64,18 @@ export default function AppDownloadPage() {
           </p>
         </div>
 
-        {/* 2. Botón de descarga, versión y fecha */}
+        {/* 2. Botón de descarga, versión y fecha. El aviso va ANTES del
+            botón: desde la 1.1.0 la app tiene otro identificador y Android
+            la instala como una app aparte — no reemplaza la anterior. */}
         <div className="flex w-full flex-col items-center gap-1.5">
+          <p className="mb-2 flex w-full gap-2 rounded-xl border border-border bg-muted/50 px-3 py-2.5 text-sm text-muted-foreground">
+            <Info className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+            <span>
+              <strong className="text-foreground">¿Ya tenías la app instalada?</strong>{" "}
+              Esta versión no se actualiza encima de la anterior: instala esta y
+              después desinstala la vieja.
+            </span>
+          </p>
           <a
             href={APP_DOWNLOAD_PATH}
             download
@@ -122,14 +132,13 @@ export default function AppDownloadPage() {
               <h2 className="text-sm font-semibold">¿Tienes iPhone?</h2>
             </div>
             <p className="text-xs text-muted-foreground">
-              Apple no permite instalar aplicaciones fuera de la App Store, pero
-              puedes agregar FixTrack Pro a tu pantalla de inicio y usarla igual
-              que cualquier otra app.
+              En iPhone, FixTrack Pro se usa desde el navegador. Puedes agregarla
+              a tu pantalla de inicio para abrirla con un toque. Imprimir y
+              compartir etiquetas QR solo se puede desde la app de Android.
             </p>
             <ol className="flex flex-col gap-3">
               <Step n={1}>
-                Abre este enlace en <strong className="text-foreground">Safari</strong> — no
-                funciona desde Chrome ni otro navegador.
+                Abre este enlace en <strong className="text-foreground">Safari</strong>.
               </Step>
               <Step n={2}>
                 Toca el ícono de compartir{" "}
