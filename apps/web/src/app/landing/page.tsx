@@ -252,7 +252,7 @@ const STEPS = [
     narrow: true,
     alt: "Un técnico escanea la etiqueta QR de un equipo con el celular",
     title: "Escanear la etiqueta",
-    body: "El técnico llega al sitio y escanea el QR del equipo. En pantalla aparece su ficha y todo lo que se le ha hecho antes.",
+    body: "El técnico llega al sitio y escanea el QR del equipo. Con señal, en pantalla aparece su ficha y todo lo que se le ha hecho antes.",
   },
   {
     img: "/landing/paso-2-orden.png",
@@ -276,7 +276,7 @@ const STEPS = [
     narrow: false,
     alt: "Informe técnico en PDF generado por el sistema",
     title: "Sale el informe",
-    body: "El sistema arma el informe técnico con firma institucional y lo envía. Sin volver a la oficina a transcribir nada.",
+    body: "El sistema arma el informe técnico en PDF, con el membrete de su empresa, listo para compartirlo con el cliente. Sin volver a la oficina a transcribir nada.",
   },
   {
     img: "/landing/paso-5-cobro.png",
@@ -326,14 +326,14 @@ function HowItWorks() {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  d) Lo que nadie más ofrece — cuatro bloques                               */
+/*  d) Lo que lo hace distinto — cuatro bloques                               */
 /* -------------------------------------------------------------------------- */
 
 function Differentiators() {
   return (
     <Section className="bg-card">
       <SectionHeading
-        overline="Lo que nadie más ofrece"
+        overline="Lo que lo hace distinto"
         title="Cuatro cosas que un software genérico no le da"
       />
 
@@ -376,10 +376,11 @@ function Differentiators() {
               Trabaja sin señal
             </h3>
             <p className="mt-2 text-muted-foreground">
-              Cuartos de máquinas, sótanos, fincas. El técnico abre la orden,
-              escribe el hallazgo, registra repuestos y toma la firma sin una
-              barra de señal. Cuando vuelve la conexión, todo se sincroniza solo,
-              en orden y sin duplicados.
+              Cuartos de máquinas, sótanos, fincas. Sin una barra de señal, el
+              técnico consulta sus órdenes abiertas, escribe el hallazgo y cambia
+              el estado. Lo que escribe queda en el celular y sube solo cuando la
+              app vuelve a tener conexión, en orden y sin duplicados. Las fotos,
+              los repuestos y la firma del cliente se registran con señal.
             </p>
           </div>
         </div>
@@ -461,11 +462,11 @@ function Differentiators() {
 const MORE_FEATURES = [
   ["Cotizaciones", "con metodología, observaciones y su documento para el cliente."],
   ["Inventario", "por repuesto, con descuento automático al usarlo en una orden."],
-  ["Mantenimiento preventivo", "programado por equipo, con aviso de lo que se vence."],
+  ["Mantenimiento preventivo", "programado por equipo; lo que se vence se ve en la plataforma."],
   ["Cuenta de cobro", "generada desde las órdenes, sin volver a digitar."],
   ["Retenciones", "aplicadas en el cálculo, no a mano en una calculadora aparte."],
   ["Rentabilidad", "por orden y por cliente: qué deja cada trabajo, no solo cuánto factura."],
-  ["Bitácora de auditoría", "quién hizo qué y cuándo, sobre cada registro."],
+  ["Bitácora de auditoría", "quién hizo qué y cuándo, sobre cada orden de trabajo."],
 ];
 
 function MoreFeatures() {
@@ -497,52 +498,78 @@ function MoreFeatures() {
 function SocialProof() {
   return (
     <Section className="bg-primary text-primary-foreground">
-      <figure className="mx-auto max-w-3xl text-center">
-        <blockquote className="text-xl font-semibold sm:text-2xl">
-          “Esto no es un producto que armamos para vender. Es el sistema con el
-          que trabajamos todos los días.”
-        </blockquote>
-        <figcaption className="mt-6 text-sm text-primary-foreground/80">
-          TAELCO Systems opera con FixTrack Pro en producción — con órdenes
-          reales y cuentas de cobro emitidas.
-        </figcaption>
-      </figure>
+      {/* Sin cita: el dato verificable ocupa el lugar que tenía la frase
+          entre comillas, con el mismo tamaño, para que la franja no quede
+          con una línea suelta en letra pequeña. */}
+      <p className="mx-auto max-w-3xl text-center text-xl font-semibold sm:text-2xl">
+        TAELCO Systems opera con FixTrack Pro en producción — con órdenes
+        reales y cuentas de cobro emitidas.
+      </p>
     </Section>
   );
 }
 
 /* -------------------------------------------------------------------------- */
-/*  g) Cómo se cobra — sin cifras                                             */
+/*  g) Cómo se cobra — precio publicado                                       */
 /* -------------------------------------------------------------------------- */
+
+/**
+ * Valores finales: el operador es persona natural no responsable de IVA,
+ * así que no se suma ningún impuesto encima. Si eso cambia, cambia también
+ * la nota del pie de esta sección.
+ */
+const PREPAID_PLANS = [
+  ["Trimestre", "$510.000"],
+  ["Semestre", "$966.000"],
+  ["Año", "$1.718.000"],
+] as const;
 
 function Pricing() {
   return (
     <Section className="bg-card">
       <SectionHeading overline="Cómo se cobra" title="Un valor por empresa, no por función suelta" />
       <div className="mx-auto mt-10 grid max-w-3xl gap-6 sm:grid-cols-3">
-        {[
-          {
-            title: "Se paga por empresa",
-            body: "Según el tamaño del equipo técnico. No se cobra por módulo ni por documento emitido.",
-          },
-          {
-            title: "La puesta en marcha va acompañada",
-            body: "Carga de sus clientes y equipos, primer lote de etiquetas y capacitación al equipo.",
-          },
-          {
-            title: "El valor se define en la demostración",
-            body: "Cuando ya se vio funcionando con un caso parecido al suyo, se habla de números.",
-          },
-        ].map(({ title, body }) => (
-          <div
-            key={title}
-            className="rounded-xl border border-border bg-background p-6"
-          >
-            <h3 className="font-semibold text-foreground">{title}</h3>
-            <p className="mt-2 text-sm text-muted-foreground">{body}</p>
-          </div>
-        ))}
+        <div className="rounded-xl border border-border bg-background p-6">
+          <h3 className="font-semibold text-foreground">Mes a mes</h3>
+          <p className="mt-2 text-2xl font-bold tracking-tight text-foreground">
+            $179.000
+            <span className="text-sm font-medium text-muted-foreground"> al mes</span>
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Por empresa, con usuarios ilimitados. No se cobra por módulo ni por
+            documento emitido.
+          </p>
+        </div>
+        <div className="rounded-xl border border-border bg-background p-6">
+          <h3 className="font-semibold text-foreground">Pago anticipado, con descuento</h3>
+          <dl className="mt-3 flex flex-col gap-1.5 text-sm">
+            {PREPAID_PLANS.map(([period, price]) => (
+              <div key={period} className="flex items-baseline justify-between gap-3">
+                <dt className="text-muted-foreground">{period}</dt>
+                <dd className="font-semibold text-foreground">{price}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Hasta un 20 % menos que mes a mes.
+          </p>
+        </div>
+        <div className="rounded-xl border border-border bg-background p-6">
+          <h3 className="font-semibold text-foreground">Puesta en marcha, una sola vez</h3>
+          <p className="mt-2 text-2xl font-bold tracking-tight text-foreground">
+            <span className="text-sm font-medium text-muted-foreground">Desde </span>
+            $350.000
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Según cuántos clientes y equipos haya que cargar. Incluye la carga
+            inicial, el primer lote de etiquetas QR impresas y la capacitación
+            del personal.
+          </p>
+        </div>
       </div>
+      <p className="mt-6 text-center text-sm font-medium text-foreground">
+        Valores finales, sin impuestos adicionales.
+      </p>
     </Section>
   );
 }
@@ -558,7 +585,7 @@ const FAQ = [
   },
   {
     q: "Si dejo de pagar, ¿pierdo mi información?",
-    a: "No se borra nada de un día para otro. Si decide no continuar, le entregamos una exportación de sus órdenes, clientes, equipos y cuentas de cobro en un formato que puede abrir y conservar. Sus datos son suyos.",
+    a: "No se borra nada de un día para otro. Si decide no continuar, le entregamos sus órdenes, clientes, equipos y cuentas de cobro en hojas de cálculo que puede abrir y conservar. Sus datos son suyos.",
   },
   {
     q: "¿Cuánto demora ponerlo a andar?",
@@ -570,11 +597,11 @@ const FAQ = [
   },
   {
     q: "¿Qué pasa si en el sitio no hay señal?",
-    a: "Sigue trabajando igual. La orden, las notas, los repuestos y la firma se guardan en el celular y se sincronizan cuando vuelve la conexión, sin duplicar nada. El técnico no tiene que acordarse de “volver a mandarlo” después.",
+    a: "Puede seguir con lo esencial. Sin señal, el técnico consulta sus órdenes abiertas —las que el celular ya había descargado—, escribe el hallazgo, las observaciones y las recomendaciones, y cambia el estado de la orden. Eso queda guardado en el celular y sube solo cuando la app vuelve a tener conexión, en orden y sin duplicar nada; el técnico no tiene que acordarse de “volver a mandarlo”. Lo que no se puede hacer sin señal: tomar fotos, registrar repuestos, recoger la firma del cliente ni crear una orden nueva. Eso se registra cuando hay conexión.",
   },
   {
     q: "¿Puedo usar mi propio formato de informe?",
-    a: "El informe sale con una estructura estándar —hallazgo, trabajo realizado, repuestos, firma del cliente y firma institucional— y con el logo de su empresa. No replicamos cualquier plantilla de Word existente; si su formato actual tiene algo puntual que necesita, se revisa en la demostración.",
+    a: "Sí, de dos maneras. El informe estándar —hallazgo, observaciones, recomendaciones, fotos, firma del técnico y firma del cliente— sale con el membrete de su empresa: su logo, su color y las secciones que usted elija. Y si un cliente le exige su propio formato, se configura para ese cliente: su logo, el título, código, versión y fecha del formato, su color, el pie de página, tres secciones con los nombres que él usa, el registro fotográfico si lo admite y las firmas de quien entrega y quien recibe. Las órdenes de ese cliente salen también en su formato. No se copia un archivo de Word tal cual: el formato se arma con esos elementos.",
   },
 ];
 
@@ -614,8 +641,8 @@ function Closing() {
           Véalo con un caso parecido al suyo
         </h2>
         <p className="mt-3 text-muted-foreground">
-          Una demostración corta, sobre datos reales de operación. Después
-          hablamos de números.
+          Una demostración corta, con una empresa de ejemplo y equipos como
+          los suyos.
         </p>
         <div className="mt-8 flex justify-center">
           <WhatsappCta size="lg">Ver una demostración por WhatsApp</WhatsappCta>

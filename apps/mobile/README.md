@@ -315,7 +315,7 @@ por dos caminos distintos, según dónde corre la misma build de la web
 
 - **Navegador**: `window.print()`, como siempre.
 - **Dentro del APK**: el plugin nativo `Print`
-  (`android/app/src/main/java/com/taelco/fixtrackpro/PrintPlugin.java`),
+  (`android/app/src/main/java/com/innovawebb/fixtrackpro/PrintPlugin.java`),
   que usa `WebView.createPrintDocumentAdapter()` + `PrintManager` — ambos
   parte del SDK de Android, sin ninguna librería de terceros — para abrir
   el diálogo nativo de impresión/guardar PDF con el contenido actual de

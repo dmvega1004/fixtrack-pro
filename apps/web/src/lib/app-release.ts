@@ -5,9 +5,9 @@
  * acá. Ver "Publicar una versión nueva" en apps/mobile/README.md.
  */
 export const APP_RELEASE = {
-  version: "1.0.0",
+  version: "1.1.0",
   /** YYYY-MM-DD, mismo formato que consume formatDateOnly. */
-  releaseDate: "2026-09-01",
+  releaseDate: "2026-11-17",
   fileName: "fixtrackpro.apk",
 } as const;
 
