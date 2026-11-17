@@ -276,7 +276,7 @@ const STEPS = [
     narrow: false,
     alt: "Informe técnico en PDF generado por el sistema",
     title: "Sale el informe",
-    body: "El sistema arma el informe técnico con firma institucional y lo envía. Sin volver a la oficina a transcribir nada.",
+    body: "El sistema arma el informe técnico en PDF, con el membrete de su empresa, listo para compartirlo con el cliente. Sin volver a la oficina a transcribir nada.",
   },
   {
     img: "/landing/paso-5-cobro.png",
@@ -376,10 +376,11 @@ function Differentiators() {
               Trabaja sin señal
             </h3>
             <p className="mt-2 text-muted-foreground">
-              Cuartos de máquinas, sótanos, fincas. El técnico abre la orden,
-              escribe el hallazgo, registra repuestos y toma la firma sin una
-              barra de señal. Cuando vuelve la conexión, todo se sincroniza solo,
-              en orden y sin duplicados.
+              Cuartos de máquinas, sótanos, fincas. Sin una barra de señal, el
+              técnico consulta sus órdenes abiertas, escribe el hallazgo y cambia
+              el estado. Lo que escribe queda en el celular y sube solo cuando la
+              app vuelve a tener conexión, en orden y sin duplicados. Las fotos,
+              los repuestos y la firma del cliente se registran con señal.
             </p>
           </div>
         </div>
@@ -523,7 +524,7 @@ function Pricing() {
         {[
           {
             title: "Se paga por empresa",
-            body: "Según el tamaño del equipo técnico. No se cobra por módulo ni por documento emitido.",
+            body: "Un solo valor por empresa, sin importar cuántos técnicos tenga: usuarios ilimitados. No se cobra por módulo ni por documento emitido.",
           },
           {
             title: "La puesta en marcha va acompañada",
@@ -558,7 +559,7 @@ const FAQ = [
   },
   {
     q: "Si dejo de pagar, ¿pierdo mi información?",
-    a: "No se borra nada de un día para otro. Si decide no continuar, le entregamos una exportación de sus órdenes, clientes, equipos y cuentas de cobro en un formato que puede abrir y conservar. Sus datos son suyos.",
+    a: "No se borra nada de un día para otro. Si decide no continuar, le entregamos sus órdenes, clientes, equipos y cuentas de cobro en hojas de cálculo que puede abrir y conservar. Sus datos son suyos.",
   },
   {
     q: "¿Cuánto demora ponerlo a andar?",
@@ -570,11 +571,11 @@ const FAQ = [
   },
   {
     q: "¿Qué pasa si en el sitio no hay señal?",
-    a: "Sigue trabajando igual. La orden, las notas, los repuestos y la firma se guardan en el celular y se sincronizan cuando vuelve la conexión, sin duplicar nada. El técnico no tiene que acordarse de “volver a mandarlo” después.",
+    a: "Puede seguir con lo esencial. Sin señal, el técnico consulta sus órdenes abiertas —las que el celular ya había descargado—, escribe el hallazgo, las observaciones y las recomendaciones, y cambia el estado de la orden. Eso queda guardado en el celular y sube solo cuando la app vuelve a tener conexión, en orden y sin duplicar nada; el técnico no tiene que acordarse de “volver a mandarlo”. Lo que no se puede hacer sin señal: tomar fotos, registrar repuestos, recoger la firma del cliente ni crear una orden nueva. Eso se registra cuando hay conexión.",
   },
   {
     q: "¿Puedo usar mi propio formato de informe?",
-    a: "El informe sale con una estructura estándar —hallazgo, trabajo realizado, repuestos, firma del cliente y firma institucional— y con el logo de su empresa. No replicamos cualquier plantilla de Word existente; si su formato actual tiene algo puntual que necesita, se revisa en la demostración.",
+    a: "Sí, de dos maneras. El informe estándar —hallazgo, observaciones, recomendaciones, fotos, firma del técnico y firma del cliente— sale con el membrete de su empresa: su logo, su color y las secciones que usted elija. Y si un cliente le exige su propio formato, se configura para ese cliente: su logo, el título, código, versión y fecha del formato, su color, el pie de página, tres secciones con los nombres que él usa, el registro fotográfico si lo admite y las firmas de quien entrega y quien recibe. Las órdenes de ese cliente salen también en su formato. No se copia un archivo de Word tal cual: el formato se arma con esos elementos.",
   },
 ];
 
