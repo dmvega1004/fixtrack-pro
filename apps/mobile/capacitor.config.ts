@@ -4,7 +4,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 // de produccion. Un despliegue en fixtrackpro.com queda disponible dentro
 // de la app sin recompilar ni volver a distribuir el APK.
 const config: CapacitorConfig = {
-  appId: 'com.taelco.fixtrackpro',
+  appId: 'com.innovawebb.fixtrackpro',
   appName: 'FixTrack Pro',
   webDir: 'www',
   server: {

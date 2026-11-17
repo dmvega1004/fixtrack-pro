@@ -13,10 +13,10 @@ if (hasSigningConfig) {
 }
 
 android {
-    namespace = "com.taelco.fixtrackpro"
+    namespace = "com.innovawebb.fixtrackpro"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.taelco.fixtrackpro"
+        applicationId "com.innovawebb.fixtrackpro"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 2
