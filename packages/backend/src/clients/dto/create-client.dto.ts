@@ -168,6 +168,22 @@ export class CreateClientDto {
   })
   reportFormatS3Source?: string;
 
+  // Sección 4 OPCIONAL: a diferencia de S1–S3, `null` es un valor con
+  // significado — «sin sección 4» — y tiene que viajar hasta Prisma para
+  // borrar lo guardado (undefined = no tocar). @IsOptional ya deja pasar null
+  // sin validarlo.
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  reportFormatS4Label?: string | null;
+
+  @IsOptional()
+  @IsIn(REPORT_FORMAT_SOURCES, {
+    message:
+      'reportFormatS4Source debe ser DESCRIPTION, DIAGNOSIS, OBSERVATIONS, SUGGESTIONS o EMPTY',
+  })
+  reportFormatS4Source?: string | null;
+
   @IsOptional()
   @IsBoolean({
     message: 'reportFormatIncludePhotos debe ser verdadero o falso',

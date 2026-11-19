@@ -37,6 +37,9 @@ export interface Client {
   reportFormatS2Source: ReportFormatSource | null;
   reportFormatS3Label: string | null;
   reportFormatS3Source: ReportFormatSource | null;
+  /** Sección 4 opcional: Source null = la sección no existe (no se imprime). */
+  reportFormatS4Label: string | null;
+  reportFormatS4Source: ReportFormatSource | null;
   reportFormatIncludePhotos: boolean;
   reportFormatPhotosLabel: string | null;
 
@@ -70,6 +73,9 @@ export interface ReportFormatInput {
   reportFormatS2Source?: ReportFormatSource;
   reportFormatS3Label?: string;
   reportFormatS3Source?: ReportFormatSource;
+  /** null = vaciar (borra lo guardado); undefined = no tocar. */
+  reportFormatS4Label?: string | null;
+  reportFormatS4Source?: ReportFormatSource | null;
   reportFormatIncludePhotos?: boolean;
   reportFormatPhotosLabel?: string;
 }
