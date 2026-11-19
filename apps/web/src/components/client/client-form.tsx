@@ -233,20 +233,22 @@ export function ClientForm({
       address: address.trim() || undefined,
       city: city.trim() || undefined,
       paymentTermDays: paymentTermDaysValue,
+      // Textos del formato: vacío = null explícito, no undefined — undefined
+      // no viaja en el JSON y el backend dejaría el valor anterior guardado.
       ...(showReportFormat && {
         reportFormatEnabled: reportFormat.enabled,
-        reportFormatTitle: reportFormat.title.trim() || undefined,
-        reportFormatCode: reportFormat.code.trim() || undefined,
-        reportFormatVersion: reportFormat.version.trim() || undefined,
-        reportFormatDate: reportFormat.date.trim() || undefined,
+        reportFormatTitle: reportFormat.title.trim() || null,
+        reportFormatCode: reportFormat.code.trim() || null,
+        reportFormatVersion: reportFormat.version.trim() || null,
+        reportFormatDate: reportFormat.date.trim() || null,
         reportFormatAccentColor: reportFormat.accentColor || undefined,
-        reportFormatFooter: reportFormat.footer.trim() || undefined,
-        reportFormatIssuer: reportFormat.issuer.trim() || undefined,
-        reportFormatS1Label: reportFormat.s1Label.trim() || undefined,
+        reportFormatFooter: reportFormat.footer.trim() || null,
+        reportFormatIssuer: reportFormat.issuer.trim() || null,
+        reportFormatS1Label: reportFormat.s1Label.trim() || null,
         reportFormatS1Source: reportFormat.s1Source,
-        reportFormatS2Label: reportFormat.s2Label.trim() || undefined,
+        reportFormatS2Label: reportFormat.s2Label.trim() || null,
         reportFormatS2Source: reportFormat.s2Source,
-        reportFormatS3Label: reportFormat.s3Label.trim() || undefined,
+        reportFormatS3Label: reportFormat.s3Label.trim() || null,
         reportFormatS3Source: reportFormat.s3Source,
         // null explícito (no undefined): «Sin sección 4» tiene que BORRAR lo
         // guardado. Sin origen tampoco se conserva la etiqueta.
@@ -255,7 +257,7 @@ export function ClientForm({
           ? reportFormat.s4Label.trim() || null
           : null,
         reportFormatIncludePhotos: reportFormat.includePhotos,
-        reportFormatPhotosLabel: reportFormat.photosLabel.trim() || undefined,
+        reportFormatPhotosLabel: reportFormat.photosLabel.trim() || null,
       }),
       ...(canConfigureRetentions && { retentionIds }),
     };

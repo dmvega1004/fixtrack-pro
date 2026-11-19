@@ -358,23 +358,23 @@ export class ClientsService {
   private reportFormatData(dto: CreateClientDto | UpdateClientDto) {
     return {
       reportFormatEnabled: dto.reportFormatEnabled,
-      reportFormatTitle: dto.reportFormatTitle?.trim(),
-      reportFormatCode: dto.reportFormatCode?.trim(),
-      reportFormatVersion: dto.reportFormatVersion?.trim(),
-      reportFormatDate: dto.reportFormatDate?.trim(),
+      reportFormatTitle: clearableText(dto.reportFormatTitle),
+      reportFormatCode: clearableText(dto.reportFormatCode),
+      reportFormatVersion: clearableText(dto.reportFormatVersion),
+      reportFormatDate: clearableText(dto.reportFormatDate),
       reportFormatAccentColor: dto.reportFormatAccentColor,
-      reportFormatFooter: dto.reportFormatFooter?.trim(),
-      reportFormatIssuer: dto.reportFormatIssuer?.trim(),
-      reportFormatS1Label: dto.reportFormatS1Label?.trim(),
+      reportFormatFooter: clearableText(dto.reportFormatFooter),
+      reportFormatIssuer: clearableText(dto.reportFormatIssuer),
+      reportFormatS1Label: clearableText(dto.reportFormatS1Label),
       reportFormatS1Source: dto.reportFormatS1Source,
-      reportFormatS2Label: dto.reportFormatS2Label?.trim(),
+      reportFormatS2Label: clearableText(dto.reportFormatS2Label),
       reportFormatS2Source: dto.reportFormatS2Source,
-      reportFormatS3Label: dto.reportFormatS3Label?.trim(),
+      reportFormatS3Label: clearableText(dto.reportFormatS3Label),
       reportFormatS3Source: dto.reportFormatS3Source,
       reportFormatS4Label: clearableText(dto.reportFormatS4Label),
       reportFormatS4Source: dto.reportFormatS4Source,
       reportFormatIncludePhotos: dto.reportFormatIncludePhotos,
-      reportFormatPhotosLabel: dto.reportFormatPhotosLabel?.trim(),
+      reportFormatPhotosLabel: clearableText(dto.reportFormatPhotosLabel),
     };
   }
 

@@ -58,26 +58,27 @@ export interface Client {
   retentionIds: string[];
 }
 
+/** Textos: null = vaciar (borra lo guardado); undefined = no tocar. */
 export interface ReportFormatInput {
   reportFormatEnabled?: boolean;
-  reportFormatTitle?: string;
-  reportFormatCode?: string;
-  reportFormatVersion?: string;
-  reportFormatDate?: string;
+  reportFormatTitle?: string | null;
+  reportFormatCode?: string | null;
+  reportFormatVersion?: string | null;
+  reportFormatDate?: string | null;
   reportFormatAccentColor?: string;
-  reportFormatFooter?: string;
-  reportFormatIssuer?: string;
-  reportFormatS1Label?: string;
+  reportFormatFooter?: string | null;
+  reportFormatIssuer?: string | null;
+  reportFormatS1Label?: string | null;
   reportFormatS1Source?: ReportFormatSource;
-  reportFormatS2Label?: string;
+  reportFormatS2Label?: string | null;
   reportFormatS2Source?: ReportFormatSource;
-  reportFormatS3Label?: string;
+  reportFormatS3Label?: string | null;
   reportFormatS3Source?: ReportFormatSource;
   /** null = vaciar (borra lo guardado); undefined = no tocar. */
   reportFormatS4Label?: string | null;
   reportFormatS4Source?: ReportFormatSource | null;
   reportFormatIncludePhotos?: boolean;
-  reportFormatPhotosLabel?: string;
+  reportFormatPhotosLabel?: string | null;
 }
 
 export interface CreateClientInput extends ReportFormatInput {
