@@ -350,15 +350,19 @@ model Client {
   reportFormatFooter        String?
   /// Empresa que figura como quien ENTREGA el informe en el bloque de firmas.
   reportFormatIssuer        String?
-  /// Tres secciones configurables: etiqueta + de qué campo de la orden se
-  /// alimenta (DESCRIPTION | DIAGNOSIS | OBSERVATIONS | EMPTY — validado en
-  /// el DTO, no enum de BD por el mismo motivo que documentType).
+  /// Secciones configurables: etiqueta + de qué campo de la orden se
+  /// alimenta (DESCRIPTION | DIAGNOSIS | OBSERVATIONS | SUGGESTIONS | EMPTY —
+  /// validado en el DTO, no enum de BD por el mismo motivo que documentType).
+  /// S1–S3 se imprimen siempre (sin origen = recuadro en blanco); S4 es
+  /// opcional: sin origen (NULL) la sección no existe y no se imprime.
   reportFormatS1Label       String?
   reportFormatS1Source      String?
   reportFormatS2Label       String?
   reportFormatS2Source      String?
   reportFormatS3Label       String?
   reportFormatS3Source      String?
+  reportFormatS4Label       String?
+  reportFormatS4Source      String?
   /// No todos los formatos corporativos admiten fotos — el cliente decide.
   reportFormatIncludePhotos Boolean @default(true)
   /// Etiqueta de la franja del bloque fotográfico. Vacía = "Registro

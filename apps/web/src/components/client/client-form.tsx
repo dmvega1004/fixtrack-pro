@@ -39,6 +39,9 @@ interface ReportFormatFormState {
   s2Source: ReportFormatSource;
   s3Label: string;
   s3Source: ReportFormatSource;
+  s4Label: string;
+  /** "" = sin sección 4 (opcional, a diferencia de S1–S3). */
+  s4Source: ReportFormatSource | "";
   includePhotos: boolean;
   photosLabel: string;
 }
@@ -59,6 +62,9 @@ function toReportFormatState(client?: Client): ReportFormatFormState {
     s2Source: client?.reportFormatS2Source ?? "DIAGNOSIS",
     s3Label: client?.reportFormatS3Label ?? "",
     s3Source: client?.reportFormatS3Source ?? "OBSERVATIONS",
+    s4Label: client?.reportFormatS4Label ?? "",
+    // Sin valor por defecto: la sección 4 solo existe si alguien la elige.
+    s4Source: client?.reportFormatS4Source ?? "",
     includePhotos: client?.reportFormatIncludePhotos ?? true,
     photosLabel: client?.reportFormatPhotosLabel ?? "",
   };
@@ -227,23 +233,31 @@ export function ClientForm({
       address: address.trim() || undefined,
       city: city.trim() || undefined,
       paymentTermDays: paymentTermDaysValue,
+      // Textos del formato: vacío = null explícito, no undefined — undefined
+      // no viaja en el JSON y el backend dejaría el valor anterior guardado.
       ...(showReportFormat && {
         reportFormatEnabled: reportFormat.enabled,
-        reportFormatTitle: reportFormat.title.trim() || undefined,
-        reportFormatCode: reportFormat.code.trim() || undefined,
-        reportFormatVersion: reportFormat.version.trim() || undefined,
-        reportFormatDate: reportFormat.date.trim() || undefined,
+        reportFormatTitle: reportFormat.title.trim() || null,
+        reportFormatCode: reportFormat.code.trim() || null,
+        reportFormatVersion: reportFormat.version.trim() || null,
+        reportFormatDate: reportFormat.date.trim() || null,
         reportFormatAccentColor: reportFormat.accentColor || undefined,
-        reportFormatFooter: reportFormat.footer.trim() || undefined,
-        reportFormatIssuer: reportFormat.issuer.trim() || undefined,
-        reportFormatS1Label: reportFormat.s1Label.trim() || undefined,
+        reportFormatFooter: reportFormat.footer.trim() || null,
+        reportFormatIssuer: reportFormat.issuer.trim() || null,
+        reportFormatS1Label: reportFormat.s1Label.trim() || null,
         reportFormatS1Source: reportFormat.s1Source,
-        reportFormatS2Label: reportFormat.s2Label.trim() || undefined,
+        reportFormatS2Label: reportFormat.s2Label.trim() || null,
         reportFormatS2Source: reportFormat.s2Source,
-        reportFormatS3Label: reportFormat.s3Label.trim() || undefined,
+        reportFormatS3Label: reportFormat.s3Label.trim() || null,
         reportFormatS3Source: reportFormat.s3Source,
+        // null explícito (no undefined): «Sin sección 4» tiene que BORRAR lo
+        // guardado. Sin origen tampoco se conserva la etiqueta.
+        reportFormatS4Source: reportFormat.s4Source || null,
+        reportFormatS4Label: reportFormat.s4Source
+          ? reportFormat.s4Label.trim() || null
+          : null,
         reportFormatIncludePhotos: reportFormat.includePhotos,
-        reportFormatPhotosLabel: reportFormat.photosLabel.trim() || undefined,
+        reportFormatPhotosLabel: reportFormat.photosLabel.trim() || null,
       }),
       ...(canConfigureRetentions && { retentionIds }),
     };
@@ -589,6 +603,37 @@ export function ClientForm({
                       </div>
                     </div>
                   ))}
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="s4Label">
+                        Etiqueta de la sección 4 (opcional)
+                      </Label>
+                      <Input
+                        id="s4Label"
+                        value={reportFormat.s4Label}
+                        onChange={updateReportFormat("s4Label")}
+                        disabled={!reportFormat.s4Source}
+                        placeholder="Ej. Recomendaciones"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="s4Source">Se alimenta de</Label>
+                      <select
+                        id="s4Source"
+                        value={reportFormat.s4Source}
+                        onChange={updateReportFormat("s4Source")}
+                        className="h-9 rounded-lg border border-border bg-background px-2.5 text-sm text-foreground"
+                      >
+                        <option value="">Sin sección 4 (no se imprime)</option>
+                        {REPORT_FORMAT_SOURCES.map((source) => (
+                          <option key={source} value={source}>
+                            {REPORT_FORMAT_SOURCE_LABELS[source]}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-3 border-t border-border pt-3">

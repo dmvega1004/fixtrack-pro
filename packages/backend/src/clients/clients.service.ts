@@ -45,6 +45,20 @@ export type ClientListItem = ClientView & {
   orderCount: number;
 };
 
+/**
+ * Texto que el usuario puede VACIAR: `undefined` = el campo no vino en el
+ * PATCH (Prisma no toca la columna); `null` o solo espacios = el usuario lo
+ * vació (se guarda NULL). Sin esta distinción, vaciar un campo en el
+ * formulario no borraba nada: el valor anterior quedaba guardado.
+ */
+function clearableText(
+  value: string | null | undefined,
+): string | null | undefined {
+  if (value === undefined) return undefined;
+  const trimmed = value?.trim() ?? '';
+  return trimmed === '' ? null : trimmed;
+}
+
 /** Lado máximo del logo del formato del cliente: no necesita alta resolución. */
 const MAX_REPORT_FORMAT_LOGO_DIMENSION = 512;
 
@@ -69,6 +83,8 @@ const REPORT_FORMAT_FIELD_NAMES = [
   'reportFormatS2Source',
   'reportFormatS3Label',
   'reportFormatS3Source',
+  'reportFormatS4Label',
+  'reportFormatS4Source',
   'reportFormatIncludePhotos',
   'reportFormatPhotosLabel',
 ] as const satisfies readonly (keyof CreateClientDto)[];
@@ -342,21 +358,23 @@ export class ClientsService {
   private reportFormatData(dto: CreateClientDto | UpdateClientDto) {
     return {
       reportFormatEnabled: dto.reportFormatEnabled,
-      reportFormatTitle: dto.reportFormatTitle?.trim(),
-      reportFormatCode: dto.reportFormatCode?.trim(),
-      reportFormatVersion: dto.reportFormatVersion?.trim(),
-      reportFormatDate: dto.reportFormatDate?.trim(),
+      reportFormatTitle: clearableText(dto.reportFormatTitle),
+      reportFormatCode: clearableText(dto.reportFormatCode),
+      reportFormatVersion: clearableText(dto.reportFormatVersion),
+      reportFormatDate: clearableText(dto.reportFormatDate),
       reportFormatAccentColor: dto.reportFormatAccentColor,
-      reportFormatFooter: dto.reportFormatFooter?.trim(),
-      reportFormatIssuer: dto.reportFormatIssuer?.trim(),
-      reportFormatS1Label: dto.reportFormatS1Label?.trim(),
+      reportFormatFooter: clearableText(dto.reportFormatFooter),
+      reportFormatIssuer: clearableText(dto.reportFormatIssuer),
+      reportFormatS1Label: clearableText(dto.reportFormatS1Label),
       reportFormatS1Source: dto.reportFormatS1Source,
-      reportFormatS2Label: dto.reportFormatS2Label?.trim(),
+      reportFormatS2Label: clearableText(dto.reportFormatS2Label),
       reportFormatS2Source: dto.reportFormatS2Source,
-      reportFormatS3Label: dto.reportFormatS3Label?.trim(),
+      reportFormatS3Label: clearableText(dto.reportFormatS3Label),
       reportFormatS3Source: dto.reportFormatS3Source,
+      reportFormatS4Label: clearableText(dto.reportFormatS4Label),
+      reportFormatS4Source: dto.reportFormatS4Source,
       reportFormatIncludePhotos: dto.reportFormatIncludePhotos,
-      reportFormatPhotosLabel: dto.reportFormatPhotosLabel?.trim(),
+      reportFormatPhotosLabel: clearableText(dto.reportFormatPhotosLabel),
     };
   }
 

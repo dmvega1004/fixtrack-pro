@@ -83,6 +83,9 @@ export class CreateClientDto {
   paymentTermDays?: number;
 
   // --- Formato de informe propio del cliente ---
+  // Los textos admiten null = «el usuario lo vació» (se guarda NULL);
+  // undefined = no vino en el PATCH (no se toca). Ver clearableText en
+  // ClientsService. @IsOptional deja pasar null sin validarlo.
   // reportFormatLogoUrl NO vive acá: se sube por POST /clients/:id/report-format-logo
   // (mismo patrón que Company.logoUrl vía POST /company/logo), nunca por este DTO.
   // "reportFormatTitle es obligatorio si reportFormatEnabled=true" se valida en
@@ -97,23 +100,23 @@ export class CreateClientDto {
   @IsOptional()
   @IsString()
   @MaxLength(150)
-  reportFormatTitle?: string;
+  reportFormatTitle?: string | null;
 
   @IsOptional()
   @IsString()
   @MaxLength(50)
-  reportFormatCode?: string;
+  reportFormatCode?: string | null;
 
   @IsOptional()
   @IsString()
   @MaxLength(20)
-  reportFormatVersion?: string;
+  reportFormatVersion?: string | null;
 
   /** Texto libre — es la fecha de la VERSIÓN del formato impreso, no una fecha operativa. */
   @IsOptional()
   @IsString()
   @MaxLength(20)
-  reportFormatDate?: string;
+  reportFormatDate?: string | null;
 
   @IsOptional()
   @Matches(HEX_COLOR_REGEX, {
@@ -125,17 +128,17 @@ export class CreateClientDto {
   @IsOptional()
   @IsString()
   @MaxLength(500)
-  reportFormatFooter?: string;
+  reportFormatFooter?: string | null;
 
   @IsOptional()
   @IsString()
   @MaxLength(150)
-  reportFormatIssuer?: string;
+  reportFormatIssuer?: string | null;
 
   @IsOptional()
   @IsString()
   @MaxLength(60)
-  reportFormatS1Label?: string;
+  reportFormatS1Label?: string | null;
 
   @IsOptional()
   @IsIn(REPORT_FORMAT_SOURCES, {
@@ -147,7 +150,7 @@ export class CreateClientDto {
   @IsOptional()
   @IsString()
   @MaxLength(60)
-  reportFormatS2Label?: string;
+  reportFormatS2Label?: string | null;
 
   @IsOptional()
   @IsIn(REPORT_FORMAT_SOURCES, {
@@ -159,7 +162,7 @@ export class CreateClientDto {
   @IsOptional()
   @IsString()
   @MaxLength(60)
-  reportFormatS3Label?: string;
+  reportFormatS3Label?: string | null;
 
   @IsOptional()
   @IsIn(REPORT_FORMAT_SOURCES, {
@@ -167,6 +170,22 @@ export class CreateClientDto {
       'reportFormatS3Source debe ser DESCRIPTION, DIAGNOSIS, OBSERVATIONS, SUGGESTIONS o EMPTY',
   })
   reportFormatS3Source?: string;
+
+  // Sección 4 OPCIONAL: a diferencia de S1–S3, `null` es un valor con
+  // significado — «sin sección 4» — y tiene que viajar hasta Prisma para
+  // borrar lo guardado (undefined = no tocar). @IsOptional ya deja pasar null
+  // sin validarlo.
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  reportFormatS4Label?: string | null;
+
+  @IsOptional()
+  @IsIn(REPORT_FORMAT_SOURCES, {
+    message:
+      'reportFormatS4Source debe ser DESCRIPTION, DIAGNOSIS, OBSERVATIONS, SUGGESTIONS o EMPTY',
+  })
+  reportFormatS4Source?: string | null;
 
   @IsOptional()
   @IsBoolean({
@@ -177,7 +196,7 @@ export class CreateClientDto {
   @IsOptional()
   @IsString()
   @MaxLength(60)
-  reportFormatPhotosLabel?: string;
+  reportFormatPhotosLabel?: string | null;
 
   /**
    * Retenciones que este cliente aplica por defecto ("Retenciones que

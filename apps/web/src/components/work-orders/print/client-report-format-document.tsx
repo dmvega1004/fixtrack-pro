@@ -22,6 +22,17 @@ interface ClientReportFormatDocumentProps {
   photos: Attachment[];
 }
 
+/**
+ * ASIMETRÍA DELIBERADA entre S1–S3 y S4 — no «corregir» sin leer esto:
+ *
+ * - S1–S3 son fijas: se imprimen SIEMPRE. Si su origen es null (el formulario
+ *   nunca lo deja así, pero puede estar en BD), caen en el `default` de abajo
+ *   y salen como recuadro en blanco, igual que EMPTY. Cambiarlo haría que
+ *   formatos ya en uso perdieran secciones al imprimir.
+ * - S4 es opcional: origen null = la sección NO EXISTE, y ni siquiera llega
+ *   aquí (se filtra al armar `sections` en ClientReportFormatDocument). Para
+ *   S4, el recuadro a mano es la elección explícita EMPTY, nunca la ausencia.
+ */
 function sectionContent(order: WorkOrder, source: ReportFormatSource | null): string {
   switch (source) {
     case "DESCRIPTION":
@@ -232,6 +243,17 @@ export function ClientReportFormatDocument({
       label: client.reportFormatS3Label ?? "",
       content: sectionContent(order, client.reportFormatS3Source),
     },
+    // Sección 4 opcional: sin origen no se agrega nada — ni franja, ni
+    // recuadro, ni margen — y el documento sale idéntico al de tres
+    // secciones. EMPTY sí se imprime (recuadro para escribir a mano).
+    ...(client.reportFormatS4Source
+      ? [
+          {
+            label: client.reportFormatS4Label ?? "",
+            content: sectionContent(order, client.reportFormatS4Source),
+          },
+        ]
+      : []),
   ];
 
   const footerText = client.reportFormatFooter ?? "";
@@ -312,7 +334,7 @@ export function ClientReportFormatDocument({
             </div>
           </div>
 
-          {/* 3. Las tres secciones */}
+          {/* 3. Secciones: S1–S3 siempre, S4 solo si tiene origen */}
           <div className="mt-5">
             {sections.map((section, index) => (
               <ReportSection
