@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { clearOfflineCaches } from "@/lib/offline-cache";
-import { clearWorkset } from "@/lib/sync/storage";
+import { logoutEverywhere } from "@/lib/pending-logout";
 
 export function useLogout() {
   const router = useRouter();
@@ -11,20 +10,14 @@ export function useLogout() {
 
   async function logout(): Promise<void> {
     setIsLoading(true);
-    try {
-      await fetch("/api/auth/logout", { method: "POST" });
-    } finally {
-      // Mismo lugar que la caché offline del service worker: dos técnicos
-      // pueden compartir el celular, y el conjunto de trabajo guardado no
-      // debe sobrevivir al cierre de sesión de quien lo dejó ahí.
-      await clearOfflineCaches();
-      await clearWorkset().catch((error) =>
-        console.error("[sync] no se pudo limpiar el almacén local al cerrar sesión", error),
-      );
-      setIsLoading(false);
-      router.push("/login");
-      router.refresh();
-    }
+    // Lo local se borra siempre (dos técnicos pueden compartir el celular,
+    // ver lib/pending-logout.ts). Si el servidor no confirmó, no se navega:
+    // sin señal /login no carga, y PendingLogoutGate ya tapó la pantalla.
+    const confirmed = await logoutEverywhere();
+    setIsLoading(false);
+    if (!confirmed) return;
+    router.push("/login");
+    router.refresh();
   }
 
   return { logout, isLoading };

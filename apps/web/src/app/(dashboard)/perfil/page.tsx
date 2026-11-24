@@ -21,7 +21,7 @@ export default async function PerfilPage() {
             <span className="font-medium">{session.email}</span>
             <span className="text-muted-foreground">{ROLE_LABELS[session.role]}</span>
           </div>
-          <LogoutButton />
+          <LogoutButton userId={session.userId} canShowQueue />
         </CardContent>
       </Card>
 

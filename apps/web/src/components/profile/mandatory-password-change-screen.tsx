@@ -16,7 +16,7 @@ import { LogoutButton } from "@/components/shared/logout-button";
  * barra lateral, sin menú): no hay nada más que hacer acá. El único
  * camino de salida sin cambiar la contraseña es cerrar sesión.
  */
-export function MandatoryPasswordChangeScreen() {
+export function MandatoryPasswordChangeScreen({ userId }: { userId: string }) {
   const router = useRouter();
 
   function handleSuccess() {
@@ -51,7 +51,7 @@ export function MandatoryPasswordChangeScreen() {
           <ChangePasswordForm onSuccess={handleSuccess} />
         </CardContent>
       </Card>
-      <LogoutButton />
+      <LogoutButton userId={userId} />
     </div>
   );
 }

@@ -3,12 +3,15 @@
 import { getSnapshot as getConnectivitySnapshot } from "../connectivity/store";
 import { applyConfirmedWorksetUpdate } from "../sync/storage";
 import { FIELD_BY_OPERATION_TYPE } from "./field-operations";
-import { refreshPendingChanges } from "./pending-changes";
+import { applyPendingChanges } from "./pending-changes";
 import { getOperationRequestBuilder } from "./registry";
 import {
+  discardParkedOperation,
   getNextOperation,
-  getQueueStats,
   insertOperation,
+  listAllOperations,
+  markSupersededOperations,
+  reactivateParkedOperation,
   removeOperation,
   updateOperation,
 } from "./storage";
@@ -55,13 +58,16 @@ function clearRetryTimer(): void {
     clearTimeout(retryTimer);
     retryTimer = null;
   }
+  setQueueState({ nextRetryAt: null });
 }
 
 function scheduleRetry(userId: string, delayMs: number): void {
   clearRetryTimer();
   console.log(`${LOG} próximo reintento en ${Math.round(delayMs / 1000)}s`);
+  setQueueState({ nextRetryAt: new Date(Date.now() + delayMs).toISOString() });
   retryTimer = setTimeout(() => {
     retryTimer = null;
+    setQueueState({ nextRetryAt: null });
     void runQueuePass(userId);
   }, delayMs);
 }
@@ -126,16 +132,51 @@ export async function enqueue(input: EnqueueInput): Promise<PendingOperation> {
 }
 
 /**
- * Refresca tanto los conteos (para la futura pantalla de estado de la
- * cola) como la mezcla "conjunto de trabajo + cambios pendientes" que lee
- * useSyncedOrder (ver ../queue/pending-changes.ts) — SIEMPRE juntos: la
- * mezcla puede haber cambiado en cualquier punto en que los conteos
- * también cambian (encolar, subir, apartar), nunca en uno sin el otro.
+ * «Reintentar ahora» de la pantalla de estado de la cola. Una pasada
+ * COMPLETA en orden estricto — nunca una operación suelta: subir la #3
+ * antes que la #2 rompería el orden de llegada que el motor garantiza.
+ * Si ya hay una pasada en curso no hace nada (esa misma ya está subiendo).
+ */
+export function retryNow(userId: string): void {
+  clearRetryTimer();
+  void runQueuePass(userId);
+}
+
+/** «Descartar» (con confirmación en pantalla): solo operaciones apartadas — ver storage.discardParkedOperation. */
+export async function discardOperation(userId: string, seq: number): Promise<boolean> {
+  const deleted = await discardParkedOperation(seq, userId);
+  if (deleted) console.log(`${LOG} #${seq} descartada por el técnico`);
+  await refreshStats(userId);
+  return deleted;
+}
+
+/** «Volver a intentar» de una operación apartada por tope de reintentos — vuelve a su lugar en la fila y sale una pasada. */
+export async function reactivateOperation(userId: string, seq: number): Promise<boolean> {
+  const updated = await reactivateParkedOperation(seq, userId);
+  if (updated) console.log(`${LOG} #${seq} reactivada por el técnico`);
+  await refreshStats(userId);
+  if (updated) retryNow(userId);
+  return updated;
+}
+
+/**
+ * Refresca, de UNA sola lectura de la cola, los conteos y la lista que
+ * muestra la pantalla de estado, más la mezcla "conjunto de trabajo +
+ * cambios pendientes" que lee useSyncedOrder (ver ./pending-changes.ts) —
+ * SIEMPRE juntos: la mezcla puede haber cambiado en cualquier punto en
+ * que los conteos también cambian (encolar, subir, apartar, descartar).
  */
 async function refreshStats(userId: string): Promise<void> {
-  const stats = await getQueueStats(userId);
-  setQueueState({ pendingCount: stats.pending, parkedCount: stats.parked });
-  await refreshPendingChanges(userId);
+  const all = await listAllOperations();
+  const operations = all.filter((op) => op.userId === userId);
+  const parkedCount = operations.filter((op) => op.parked).length;
+  setQueueState({
+    operations,
+    pendingCount: operations.length - parkedCount,
+    parkedCount,
+    otherUsersCount: all.length - operations.length,
+  });
+  applyPendingChanges(operations);
 }
 
 type AttemptOutcome = "success" | "parked" | "retry-later" | "unauthorized";
@@ -165,13 +206,15 @@ export async function runQueuePass(userId: string): Promise<void> {
         break;
       }
 
+      setQueueState({ uploadingSeq: op.seq });
       const outcome = await attemptUpload(op);
+      setQueueState({ uploadingSeq: null });
       if (outcome === "success" || outcome === "parked") continue;
       break; // retry-later | unauthorized: se detiene la pasada acá
     }
   } finally {
     passInFlight = false;
-    setQueueState({ isUploading: false });
+    setQueueState({ isUploading: false, uploadingSeq: null });
     await refreshStats(userId);
   }
 }
@@ -218,6 +261,13 @@ async function attemptUpload(op: PendingOperation): Promise<AttemptOutcome> {
       });
     }
     await removeOperation(op.seq);
+    const superseded = await markSupersededOperations(op).catch((error) => {
+      console.error(`${LOG} no se pudieron marcar las apartadas reemplazadas`, error);
+      return 0;
+    });
+    if (superseded > 0) {
+      console.log(`${LOG} #${op.seq} reemplaza ${superseded} operación(es) apartada(s) del mismo campo`);
+    }
     setQueueState({ lastError: null });
     return "success";
   }

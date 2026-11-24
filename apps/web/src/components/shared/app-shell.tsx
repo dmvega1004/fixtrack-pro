@@ -16,6 +16,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { PullToRefresh } from "@/components/shared/pull-to-refresh";
+import { QueueStatusIndicator } from "@/components/queue/queue-status-indicator";
 
 const SWIPE_CLOSE_THRESHOLD_PX = 60;
 
@@ -80,6 +81,12 @@ export function AppShell({ session, children }: AppShellProps) {
           />
         </div>
 
+        {/* Arriba, no junto a Perfil/Cerrar sesión: la barra lateral no es
+            fija y ese bloque de abajo solo se ve al final de la página. */}
+        <div className="flex flex-col px-3 pb-3 empty:hidden">
+          <QueueStatusIndicator variant="sidebar" />
+        </div>
+
         <nav className="flex flex-1 flex-col gap-1 px-3">
           {navSections.map((section) => {
             const active = isActive(section.href);
@@ -115,7 +122,7 @@ export function AppShell({ session, children }: AppShellProps) {
             </div>
           </div>
           <ProfileNavLink active={isActive("/perfil")} />
-          <LogoutButton />
+          <LogoutButton userId={session.userId} canShowQueue />
         </div>
       </aside>
 
@@ -208,7 +215,11 @@ export function AppShell({ session, children }: AppShellProps) {
               active={isActive("/perfil")}
               onClick={() => setMenuOpen(false)}
             />
-            <LogoutButton />
+            <LogoutButton
+              userId={session.userId}
+              canShowQueue
+              onShowQueue={() => setMenuOpen(false)}
+            />
           </div>
         </SheetContent>
       </Sheet>

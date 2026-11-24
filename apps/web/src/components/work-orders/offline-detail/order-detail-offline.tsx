@@ -112,6 +112,7 @@ export function OrderDetailOffline({
 
       <OrderStatusChanger
         orderId={order.id}
+        orderNumber={order.orderNumber}
         userId={userId}
         currentStatus={order.status}
         isTerminal={isTerminal}
@@ -122,6 +123,7 @@ export function OrderDetailOffline({
           <div className="flex flex-col gap-6 p-4 md:p-6">
             <DescriptionEditor
               orderId={order.id}
+              orderNumber={order.orderNumber}
               userId={userId}
               initialDescription={order.description}
               isTerminal={isTerminal}
@@ -139,6 +141,7 @@ export function OrderDetailOffline({
 
             <DiagnosisEditor
               orderId={order.id}
+              orderNumber={order.orderNumber}
               userId={userId}
               initialDiagnosis={order.diagnosis}
               isTerminal={isTerminal}
@@ -146,6 +149,7 @@ export function OrderDetailOffline({
 
             <ObservationsEditor
               orderId={order.id}
+              orderNumber={order.orderNumber}
               userId={userId}
               initialObservations={order.observations}
               isTerminal={isTerminal}
@@ -153,6 +157,7 @@ export function OrderDetailOffline({
 
             <SuggestionsEditor
               orderId={order.id}
+              orderNumber={order.orderNumber}
               userId={userId}
               initialSuggestions={order.suggestions}
               isTerminal={isTerminal}

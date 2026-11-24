@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Toaster } from "@/components/ui/sonner";
 import { ServiceWorkerRegister } from "@/components/shared/service-worker-register";
+import { PendingLogoutGate } from "@/components/shared/pending-logout-gate";
 import "./globals.css";
 
 const inter = Inter({
@@ -34,6 +35,7 @@ export default function RootLayout({
         {children}
         <Toaster />
         <ServiceWorkerRegister />
+        <PendingLogoutGate />
         <SpeedInsights />
       </body>
     </html>

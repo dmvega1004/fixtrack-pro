@@ -7,6 +7,8 @@ import { LongTextFieldEditor } from "./long-text-field-editor";
 
 interface DiagnosisEditorProps {
   orderId: string;
+  /** Solo para la pantalla de estado de la cola (ver lib/queue/producers.ts). */
+  orderNumber: number;
   userId: string;
   initialDiagnosis: string | null;
   isTerminal: boolean;
@@ -15,6 +17,7 @@ interface DiagnosisEditorProps {
 /** Etapa 2-C: sin señal, encola en vez de llamar la Server Action de siempre — ver description-editor.tsx. */
 export function DiagnosisEditor({
   orderId,
+  orderNumber,
   userId,
   initialDiagnosis,
   isTerminal,
@@ -34,7 +37,7 @@ export function DiagnosisEditor({
       defaultErrorMessage="No se pudo guardar el diagnóstico"
       onSave={async (value) => {
         if (!isOnline) {
-          await enqueueWorkOrderField(orderId, userId, "diagnosis", value);
+          await enqueueWorkOrderField({ id: orderId, orderNumber }, userId, "diagnosis", value);
           return { ok: true };
         }
         return saveDiagnosisAction(orderId, value);

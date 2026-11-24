@@ -7,6 +7,11 @@ import { OfflineBanner } from "@/components/shared/offline-banner";
 import { SyncEngineRegister } from "@/components/shared/sync-engine-register";
 import { QueueEngineRegister } from "@/components/shared/queue-engine-register";
 import { ShellCacheRefresh } from "@/components/shared/shell-cache-refresh";
+import {
+  OtherUsersQueueNotice,
+  QueueStatusIndicator,
+} from "@/components/queue/queue-status-indicator";
+import { QueuePanel } from "@/components/queue/queue-panel";
 
 export default async function DashboardLayout({
   children,
@@ -36,6 +41,9 @@ export default async function DashboardLayout({
       <QueueEngineRegister userId={session.userId} />
       <ShellCacheRefresh />
       <OfflineBanner />
+      <QueueStatusIndicator variant="strip" />
+      <OtherUsersQueueNotice />
+      <QueuePanel userId={session.userId} />
       <AppShell session={session}>{children}</AppShell>
     </div>
   );

@@ -7,6 +7,8 @@ import { LongTextFieldEditor } from "./long-text-field-editor";
 
 interface SuggestionsEditorProps {
   orderId: string;
+  /** Solo para la pantalla de estado de la cola (ver lib/queue/producers.ts). */
+  orderNumber: number;
   userId: string;
   initialSuggestions: string | null;
   isTerminal: boolean;
@@ -15,6 +17,7 @@ interface SuggestionsEditorProps {
 /** Etapa 2-C: sin señal, encola en vez de llamar la Server Action de siempre — ver description-editor.tsx. */
 export function SuggestionsEditor({
   orderId,
+  orderNumber,
   userId,
   initialSuggestions,
   isTerminal,
@@ -34,7 +37,7 @@ export function SuggestionsEditor({
       defaultErrorMessage="No se pudo guardar las sugerencias"
       onSave={async (value) => {
         if (!isOnline) {
-          await enqueueWorkOrderField(orderId, userId, "suggestions", value);
+          await enqueueWorkOrderField({ id: orderId, orderNumber }, userId, "suggestions", value);
           return { ok: true };
         }
         return saveSuggestionsAction(orderId, value);

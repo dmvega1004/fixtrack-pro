@@ -7,6 +7,8 @@ import { LongTextFieldEditor } from "./long-text-field-editor";
 
 interface ObservationsEditorProps {
   orderId: string;
+  /** Solo para la pantalla de estado de la cola (ver lib/queue/producers.ts). */
+  orderNumber: number;
   userId: string;
   initialObservations: string | null;
   isTerminal: boolean;
@@ -15,6 +17,7 @@ interface ObservationsEditorProps {
 /** Etapa 2-C: sin señal, encola en vez de llamar la Server Action de siempre — ver description-editor.tsx. */
 export function ObservationsEditor({
   orderId,
+  orderNumber,
   userId,
   initialObservations,
   isTerminal,
@@ -34,7 +37,7 @@ export function ObservationsEditor({
       defaultErrorMessage="No se pudo guardar las observaciones"
       onSave={async (value) => {
         if (!isOnline) {
-          await enqueueWorkOrderField(orderId, userId, "observations", value);
+          await enqueueWorkOrderField({ id: orderId, orderNumber }, userId, "observations", value);
           return { ok: true };
         }
         return saveObservationsAction(orderId, value);

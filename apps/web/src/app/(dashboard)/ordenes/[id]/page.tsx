@@ -165,6 +165,7 @@ export default async function OrdenDetallePage({
 
         <OrderStatusChanger
           orderId={order.id}
+          orderNumber={order.orderNumber}
           userId={session.userId}
           currentStatus={order.status}
           isTerminal={isTerminal}
