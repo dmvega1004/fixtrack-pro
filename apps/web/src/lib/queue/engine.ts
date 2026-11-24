@@ -2,6 +2,7 @@
 
 import {
   getSnapshot as getConnectivitySnapshot,
+  onReconnect,
   reportRequestFailure,
   reportRequestSuccess,
 } from "../connectivity/store";
@@ -82,6 +83,11 @@ function scheduleRetry(userId: string, delayMs: number): void {
  * "visibilitychange" — mismos disparadores que el motor de sincronización
  * (ver ../sync/engine.ts) y misma razón: "visibilitychange" es el caso
  * más frecuente en celular, volver a la app no siempre dispara "online".
+ *
+ * Además, el regreso de la señal según la detección PROPIA de la app
+ * (onReconnect): en el APK el evento "online" del sistema no llega, y la
+ * cola se quedaba con sus pendientes hasta recargar. Si ambos disparan,
+ * passInFlight descarta la pasada repetida.
  */
 export function startQueueEngine(userId: string): () => void {
   void refreshStats(userId);
@@ -100,12 +106,20 @@ export function startQueueEngine(userId: string): () => void {
     void runQueuePass(userId);
   };
 
+  const handleReconnect = () => {
+    console.log(`${LOG} la app volvió a detectar señal — subiendo cola pendiente`);
+    clearRetryTimer();
+    void runQueuePass(userId);
+  };
+
   window.addEventListener("online", handleOnline);
   document.addEventListener("visibilitychange", handleVisibilityChange);
+  const stopReconnect = onReconnect(handleReconnect);
 
   return () => {
     window.removeEventListener("online", handleOnline);
     document.removeEventListener("visibilitychange", handleVisibilityChange);
+    stopReconnect();
     clearRetryTimer();
   };
 }
@@ -114,7 +128,8 @@ export function startQueueEngine(userId: string): () => void {
  * Encola una operación y, si hay señal (estado de conectividad verificado
  * de lib/connectivity/store — nunca navigator.onLine en solitario, ver
  * ese módulo), dispara una pasada de inmediato. Sin señal, queda
- * guardada y la sube el próximo disparador ("online", primer plano).
+ * guardada y la sube el próximo disparador (regreso de la señal, primer
+ * plano).
  *
  * Punto único de entrada para encolar — nadie debe llamar a
  * storage.insertOperation() directo, así ningún productor se olvida de
