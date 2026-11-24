@@ -28,6 +28,7 @@ export async function insertOperation(input: EnqueueInput): Promise<PendingOpera
       attempts: 0,
       lastError: null,
       parked: false,
+      ...(input.orderNumber !== undefined ? { orderNumber: input.orderNumber } : {}),
     };
 
     const seq = await new Promise<number>((resolve, reject) => {
@@ -105,6 +106,106 @@ export async function removeOperation(seq: number): Promise<void> {
   }
 }
 
+/**
+ * Borra una operación APARTADA por decisión explícita del técnico (botón
+ * «Descartar» de la pantalla de estado de la cola, con confirmación). Se
+ * niega si la operación no está apartada: una pendiente puede estar
+ * subiendo en este mismo instante, y borrarla por debajo del motor
+ * dejaría la pantalla diciendo algo distinto de lo que llegó al servidor.
+ * Devuelve false si no la borró (no existe o no estaba apartada).
+ */
+export async function discardParkedOperation(seq: number, userId: string): Promise<boolean> {
+  const db = await openDb();
+  try {
+    return await new Promise<boolean>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readwrite");
+      const store = tx.objectStore(STORE_NAME);
+      let deleted = false;
+      const request = store.get(seq);
+      request.onsuccess = () => {
+        const op = request.result as PendingOperation | undefined;
+        if (op && op.userId === userId && op.parked) {
+          store.delete(seq);
+          deleted = true;
+        }
+      };
+      tx.oncomplete = () => resolve(deleted);
+      tx.onerror = () => reject(tx.error);
+    });
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * Vuelve a poner en la fila una operación apartada por tope de reintentos
+ * (fallo temporal que se alargó, no un rechazo) — en su MISMO lugar: `seq`
+ * no cambia, y tampoco `id` (la llave de idempotencia). Se niega si está
+ * reemplazada (ver PendingOperation.superseded).
+ */
+export async function reactivateParkedOperation(seq: number, userId: string): Promise<boolean> {
+  const db = await openDb();
+  try {
+    return await new Promise<boolean>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readwrite");
+      const store = tx.objectStore(STORE_NAME);
+      let updated = false;
+      const request = store.get(seq);
+      request.onsuccess = () => {
+        const op = request.result as PendingOperation | undefined;
+        if (op && op.userId === userId && op.parked && !op.superseded) {
+          store.put({ ...op, parked: false, attempts: 0, lastError: null });
+          updated = true;
+        }
+      };
+      tx.oncomplete = () => resolve(updated);
+      tx.onerror = () => reject(tx.error);
+    });
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * Tras subir con éxito la operación `succeeded`: marca como reemplazadas
+ * las operaciones APARTADAS anteriores (seq menor) del mismo tipo y la
+ * misma orden — su valor ya quedó viejo frente al que acaba de llegar al
+ * servidor. Sin esto, (1) reactivarla pisaría el valor nuevo y (2) la
+ * mezcla de cambios pendientes, que recorre en orden de llegada, volvería
+ * a mostrar el valor viejo rechazado apenas se quite la operación nueva.
+ */
+export async function markSupersededOperations(succeeded: PendingOperation): Promise<number> {
+  const db = await openDb();
+  try {
+    return await new Promise<number>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readwrite");
+      const store = tx.objectStore(STORE_NAME);
+      let marked = 0;
+      const request = store.openCursor(IDBKeyRange.upperBound(succeeded.seq, true));
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (!cursor) return;
+        const op = cursor.value as PendingOperation;
+        if (
+          op.parked &&
+          !op.superseded &&
+          op.userId === succeeded.userId &&
+          op.orderId === succeeded.orderId &&
+          op.type === succeeded.type
+        ) {
+          cursor.update({ ...op, superseded: true });
+          marked += 1;
+        }
+        cursor.continue();
+      };
+      tx.oncomplete = () => resolve(marked);
+      tx.onerror = () => reject(tx.error);
+    });
+  } finally {
+    db.close();
+  }
+}
+
 export interface QueueStats {
   pending: number;
   parked: number;
@@ -140,8 +241,17 @@ export async function getQueueStats(userId: string): Promise<QueueStats> {
   }
 }
 
-/** Vuelco completo de la cola de un usuario, en orden de llegada — solo para inspección/depuración (ver ./debug.ts). */
+/** Vuelco completo de la cola de un usuario, en orden de llegada — lo usan la mezcla de cambios pendientes y la pantalla de estado. */
 export async function listOperations(userId: string): Promise<PendingOperation[]> {
+  return (await listAllOperations()).filter((op) => op.userId === userId);
+}
+
+/**
+ * TODAS las operaciones, de cualquier usuario, en orden de llegada. Solo
+ * para contar las de otros usuarios (aviso de celular compartido) — su
+ * contenido nunca se muestra.
+ */
+export async function listAllOperations(): Promise<PendingOperation[]> {
   const db = await openDb();
   try {
     return await new Promise<PendingOperation[]>((resolve, reject) => {
@@ -155,8 +265,7 @@ export async function listOperations(userId: string): Promise<PendingOperation[]
           resolve(result);
           return;
         }
-        const op = cursor.value as PendingOperation;
-        if (op.userId === userId) result.push(op);
+        result.push(cursor.value as PendingOperation);
         cursor.continue();
       };
       request.onerror = () => reject(request.error);

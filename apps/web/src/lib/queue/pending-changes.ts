@@ -2,7 +2,7 @@
 
 import type { SyncWorkOrder } from "../sync/types";
 import { FIELD_BY_OPERATION_TYPE, type WorkOrderQueuedField } from "./field-operations";
-import { listOperations } from "./storage";
+import type { PendingOperation } from "./types";
 
 /**
  * La mezcla "conjunto de trabajo + cambios pendientes encima" (ver
@@ -23,8 +23,11 @@ import { listOperations } from "./storage";
  *
  * Incluye operaciones APARTADAS (parked) a propósito: un fallo permanente
  * de subida no invalida lo que el técnico escribió en el celular — sigue
- * siendo la única copia de ese cambio hasta que exista una pantalla de
- * estado de la cola (entrega de cierre) donde pueda revisarlo.
+ * siendo la única copia de ese cambio hasta que el técnico lo revise en la
+ * pantalla de estado de la cola (components/queue) y decida descartarlo.
+ * Excepción: las REEMPLAZADAS (ver PendingOperation.superseded) — un
+ * cambio posterior del mismo campo ya llegó al servidor, mostrarlas
+ * taparía ese valor más nuevo con uno viejo.
  */
 export type PendingWorkOrderPatch = Partial<
   Pick<SyncWorkOrder, WorkOrderQueuedField>
@@ -56,15 +59,16 @@ export function getServerSnapshot(): ReadonlyMap<string, PendingWorkOrderPatch> 
  * Recorre TODAS las operaciones del usuario (en orden estricto de
  * llegada, ver storage.listOperations) y arma, por orden, el parche de los
  * campos que tienen algo pendiente — la última operación de cada campo
- * gana, que es exactamente el orden en que se subirán. Se llama junto con
- * refreshStats en engine.ts: cualquier cambio en la cola (encolar, subir,
- * apartar) recalcula esta mezcla.
+ * gana, que es exactamente el orden en que se subirán. Se llama desde
+ * refreshStats en engine.ts, con la cola completa del usuario recién
+ * leída: cualquier cambio en la cola (encolar, subir, apartar, descartar)
+ * recalcula esta mezcla.
  */
-export async function refreshPendingChanges(userId: string): Promise<void> {
-  const ops = await listOperations(userId);
+export function applyPendingChanges(ops: readonly PendingOperation[]): void {
   const next = new Map<string, PendingWorkOrderPatch>();
 
   for (const op of ops) {
+    if (op.superseded) continue;
     const field = FIELD_BY_OPERATION_TYPE[op.type];
     if (!field) continue; // otros tipos (fotos, firma... entregas futuras) no aportan a esta mezcla
 

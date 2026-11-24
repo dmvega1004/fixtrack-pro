@@ -16,6 +16,8 @@ const STATUSES = Object.keys(ORDER_STATUS_LABELS) as OrderStatus[];
 
 interface OrderStatusChangerProps {
   orderId: string;
+  /** Solo para la pantalla de estado de la cola (ver lib/queue/producers.ts). */
+  orderNumber: number;
   userId: string;
   currentStatus: OrderStatus;
   isTerminal: boolean;
@@ -24,6 +26,7 @@ interface OrderStatusChangerProps {
 /** Etapa 2-C: sin señal, encola el cambio en vez de llamar la Server Action de siempre — ver description-editor.tsx. */
 export function OrderStatusChanger({
   orderId,
+  orderNumber,
   userId,
   currentStatus,
   isTerminal,
@@ -55,7 +58,7 @@ export function OrderStatusChanger({
     if (isOnline) {
       result = await changeStatusAction(orderId, selected);
     } else {
-      await enqueueWorkOrderStatus(orderId, userId, selected);
+      await enqueueWorkOrderStatus({ id: orderId, orderNumber }, userId, selected);
       result = { ok: true };
     }
     setIsSaving(false);

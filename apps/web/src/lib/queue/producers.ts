@@ -58,15 +58,26 @@ registerOperationType(STATUS_OPERATION_TYPE, (op) => ({
  * siempre — ver cada uno para el `useOnlineStatus()` que decide cuál de
  * las dos rutas toma.
  */
+/**
+ * `order` lleva el número de OT solo para la pantalla de estado de la cola
+ * (ver PendingOperation.orderNumber) — no forma parte del payload, ningún
+ * builder de arriba lo lee.
+ */
+export interface QueuedOrderRef {
+  id: string;
+  orderNumber: number;
+}
+
 export function enqueueWorkOrderField(
-  orderId: string,
+  order: QueuedOrderRef,
   userId: string,
   field: WorkOrderTextField,
   value: string,
 ): Promise<PendingOperation> {
   return enqueue({
     type: TEXT_FIELD_OPERATION_TYPES[field],
-    orderId,
+    orderId: order.id,
+    orderNumber: order.orderNumber,
     payload: { value } satisfies TextFieldPayload,
     userId,
   });
@@ -74,13 +85,14 @@ export function enqueueWorkOrderField(
 
 /** Encola el cambio de estado — lo llama OrderStatusChanger sin señal. */
 export function enqueueWorkOrderStatus(
-  orderId: string,
+  order: QueuedOrderRef,
   userId: string,
   status: OrderStatus,
 ): Promise<PendingOperation> {
   return enqueue({
     type: STATUS_OPERATION_TYPE,
-    orderId,
+    orderId: order.id,
+    orderNumber: order.orderNumber,
     payload: { value: status } satisfies StatusPayload,
     userId,
   });

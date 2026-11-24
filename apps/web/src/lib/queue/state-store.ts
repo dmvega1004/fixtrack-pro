@@ -8,6 +8,8 @@
  * expone via useSyncExternalStore.
  */
 
+import type { PendingOperation } from "./types";
+
 export type QueueErrorKind = "network" | "http" | "unauthorized" | null;
 
 export interface QueueSnapshot {
@@ -15,6 +17,17 @@ export interface QueueSnapshot {
   pendingCount: number;
   parkedCount: number;
   lastError: QueueErrorKind;
+  /** Operaciones del usuario actual, en orden de llegada — las lista la pantalla de estado de la cola. */
+  operations: readonly PendingOperation[];
+  /** `seq` de la operación que está subiendo en este instante, o null. */
+  uploadingSeq: number | null;
+  /** Cuándo sale el próximo reintento programado (ISO), o null si no hay ninguno. */
+  nextRetryAt: string | null;
+  /**
+   * Operaciones sin subir de OTROS usuarios en este celular (celular
+   * compartido). Solo el número: su contenido nunca se muestra.
+   */
+  otherUsersCount: number;
 }
 
 type Listener = () => void;
@@ -24,6 +37,10 @@ const INITIAL_STATE: QueueSnapshot = {
   pendingCount: 0,
   parkedCount: 0,
   lastError: null,
+  operations: [],
+  uploadingSeq: null,
+  nextRetryAt: null,
+  otherUsersCount: 0,
 };
 
 let state: QueueSnapshot = INITIAL_STATE;

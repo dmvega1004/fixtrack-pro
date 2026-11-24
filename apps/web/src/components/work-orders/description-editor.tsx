@@ -7,6 +7,8 @@ import { LongTextFieldEditor } from "./long-text-field-editor";
 
 interface DescriptionEditorProps {
   orderId: string;
+  /** Solo para la pantalla de estado de la cola (ver lib/queue/producers.ts). */
+  orderNumber: number;
   userId: string;
   initialDescription: string;
   isTerminal: boolean;
@@ -24,6 +26,7 @@ interface DescriptionEditorProps {
  */
 export function DescriptionEditor({
   orderId,
+  orderNumber,
   userId,
   initialDescription,
   isTerminal,
@@ -45,7 +48,7 @@ export function DescriptionEditor({
       requiredErrorMessage="La descripción no puede quedar vacía"
       onSave={async (value) => {
         if (!isOnline) {
-          await enqueueWorkOrderField(orderId, userId, "description", value);
+          await enqueueWorkOrderField({ id: orderId, orderNumber }, userId, "description", value);
           return { ok: true };
         }
         return saveDescriptionAction(orderId, value);

@@ -25,5 +25,5 @@ export default async function CambiarContrasenaPage() {
     redirect("/");
   }
 
-  return <MandatoryPasswordChangeScreen />;
+  return <MandatoryPasswordChangeScreen userId={session.userId} />;
 }
