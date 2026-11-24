@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getSession, ROLE_LABELS } from "@/lib/session";
 import { getMyProfile } from "@/lib/api/users";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,6 +46,13 @@ export default async function PerfilPage() {
           />
         </CardContent>
       </Card>
+
+      <Link
+        href="/perfil/diagnostico"
+        className="self-start text-xs text-muted-foreground underline-offset-2 hover:underline"
+      >
+        Diagnóstico de conexión
+      </Link>
     </div>
   );
 }

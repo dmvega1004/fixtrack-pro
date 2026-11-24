@@ -62,6 +62,20 @@ const HEARTBEAT_TIMEOUT_MS = 10_000;
 const HEARTBEAT_INTERVAL_ONLINE_MS = 60_000;
 const HEARTBEAT_INTERVAL_OFFLINE_MS = 15_000;
 
+/**
+ * VERIFICACIÓN AL TOCAR LA PANTALLA. Dentro del APK el evento «offline»
+ * del sistema no llega (la vista web de Android no avisa cambios de red,
+ * ver la prueba de campo de 2026-11-23), y con el latido de 60 s —que
+ * además se salta si una petición real confirmó hace poco— notar el modo
+ * avión podía tardar ~2 min. Ahora, cuando el técnico toca la pantalla y
+ * la última confirmación tiene más de este tiempo, se verifica en el
+ * acto; como máximo una vez por este mismo intervalo. Solo pasa con
+ * alguien usando la app con la pantalla encendida (la radio suele estar
+ * despierta de todas formas): con el celular quieto no sale nada, que
+ * era el gasto de batería del latido de 20 s.
+ */
+const INTERACTION_CHECK_STALE_MS = 15_000;
+
 const FAILURES_TO_GO_OFFLINE = 2;
 const CONFIRM_DELAY_MS = 3_000;
 const FAILURE_DEDUP_MS = 2_000;
@@ -70,6 +84,7 @@ let isOffline = false;
 let consecutiveFailures = 0;
 let lastFailureAt = 0;
 let lastSuccessAt = 0;
+let lastInteractionCheckAt = 0;
 const listeners = new Set<Listener>();
 let stopHeartbeat: (() => void) | null = null;
 /** Lo instala startHeartbeat; null si nadie está suscrito. */
@@ -143,18 +158,27 @@ function startHeartbeat(): () => void {
     }
   };
 
-  const schedule = (delayMs: number) => {
+  /**
+   * `force`: verificar SIEMPRE, sin el atajo de «una petición real ya
+   * confirmó hace poco». Ese atajo es solo para el latido periódico. Una
+   * pista —evento offline/online, volver a primer plano, tocar la
+   * pantalla— llega justo cuando algo pudo cambiar; si se la salta porque
+   * hubo un éxito hace 40 s, la pista no sirve de nada (pasaba hasta la
+   * prueba de campo del 2026-11-23).
+   */
+  const schedule = (delayMs: number, force = false) => {
     clear();
     if (document.visibilityState !== "visible") return;
-    timer = setTimeout(() => void tick(), delayMs);
+    timer = setTimeout(() => void tick(force), delayMs);
   };
 
   const scheduleNext = () =>
     schedule(isOffline ? HEARTBEAT_INTERVAL_OFFLINE_MS : HEARTBEAT_INTERVAL_ONLINE_MS);
 
-  const tick = async () => {
+  const tick = async (force: boolean) => {
     timer = null;
     const confirmedRecently =
+      !force &&
       !isOffline &&
       consecutiveFailures === 0 &&
       Date.now() - lastSuccessAt < HEARTBEAT_INTERVAL_ONLINE_MS;
@@ -163,7 +187,18 @@ function startHeartbeat(): () => void {
     if (timer === null) scheduleNext();
   };
 
-  const checkNow = () => schedule(0);
+  const checkNow = () => schedule(0, true);
+
+  const onInteraction = () => {
+    if (document.visibilityState !== "visible") return;
+    const now = Date.now();
+    if (now - lastInteractionCheckAt < INTERACTION_CHECK_STALE_MS) return;
+    const confirmedRecently =
+      !isOffline && consecutiveFailures === 0 && now - lastSuccessAt < INTERACTION_CHECK_STALE_MS;
+    if (confirmedRecently || checkInFlight) return;
+    lastInteractionCheckAt = now;
+    checkNow();
+  };
 
   // Pistas para adelantar la siguiente verificación — nunca deciden el
   // estado por sí solas, solo disparan una comprobación real.
@@ -178,6 +213,8 @@ function startHeartbeat(): () => void {
   window.addEventListener("online", checkNow);
   window.addEventListener("offline", checkNow);
   document.addEventListener("visibilitychange", onVisibilityChange);
+  // capture + passive: se entera de cualquier toque sin poder frenarlo.
+  window.addEventListener("pointerdown", onInteraction, { capture: true, passive: true });
 
   return () => {
     clear();
@@ -185,6 +222,7 @@ function startHeartbeat(): () => void {
     window.removeEventListener("online", checkNow);
     window.removeEventListener("offline", checkNow);
     document.removeEventListener("visibilitychange", onVisibilityChange);
+    window.removeEventListener("pointerdown", onInteraction, { capture: true });
   };
 }
 
@@ -209,4 +247,25 @@ export function getSnapshot(): boolean {
 
 export function getServerSnapshot(): boolean {
   return false;
+}
+
+/** Solo lectura, para la página de diagnóstico (/perfil/diagnostico). */
+export interface ConnectivityDiagnostics {
+  isOffline: boolean;
+  consecutiveFailures: number;
+  lastSuccessAt: number | null;
+  lastFailureAt: number | null;
+  heartbeatRunning: boolean;
+  checkInFlight: boolean;
+}
+
+export function getConnectivityDiagnostics(): ConnectivityDiagnostics {
+  return {
+    isOffline,
+    consecutiveFailures,
+    lastSuccessAt: lastSuccessAt || null,
+    lastFailureAt: lastFailureAt || null,
+    heartbeatRunning: stopHeartbeat !== null,
+    checkInFlight,
+  };
 }
