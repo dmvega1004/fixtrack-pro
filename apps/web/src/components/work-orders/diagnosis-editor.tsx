@@ -1,8 +1,8 @@
 "use client";
 
 import { saveDiagnosisAction } from "@/app/(dashboard)/ordenes/[id]/actions";
-import { useOnlineStatus } from "@/hooks/use-online-status";
 import { enqueueWorkOrderField } from "@/lib/queue/producers";
+import { saveDirectOrEnqueue } from "@/lib/queue/save-direct-or-enqueue";
 import { LongTextFieldEditor } from "./long-text-field-editor";
 
 interface DiagnosisEditorProps {
@@ -14,7 +14,7 @@ interface DiagnosisEditorProps {
   isTerminal: boolean;
 }
 
-/** Etapa 2-C: sin señal, encola en vez de llamar la Server Action de siempre — ver description-editor.tsx. */
+/** Sin señal, o si la red falla al guardar, encola — ver lib/queue/save-direct-or-enqueue.ts. */
 export function DiagnosisEditor({
   orderId,
   orderNumber,
@@ -22,8 +22,6 @@ export function DiagnosisEditor({
   initialDiagnosis,
   isTerminal,
 }: DiagnosisEditorProps) {
-  const isOnline = useOnlineStatus();
-
   return (
     <LongTextFieldEditor
       fieldId="diagnosis"
@@ -35,13 +33,14 @@ export function DiagnosisEditor({
       savingButtonLabel="Guardando..."
       successMessage="Diagnóstico guardado"
       defaultErrorMessage="No se pudo guardar el diagnóstico"
-      onSave={async (value) => {
-        if (!isOnline) {
-          await enqueueWorkOrderField({ id: orderId, orderNumber }, userId, "diagnosis", value);
-          return { ok: true };
-        }
-        return saveDiagnosisAction(orderId, value);
-      }}
+      onSave={(value) =>
+        saveDirectOrEnqueue({
+          userId,
+          orderId,
+          direct: () => saveDiagnosisAction(orderId, value),
+          enqueue: () => enqueueWorkOrderField({ id: orderId, orderNumber }, userId, "diagnosis", value),
+        })
+      }
     />
   );
 }

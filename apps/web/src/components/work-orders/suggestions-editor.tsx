@@ -1,8 +1,8 @@
 "use client";
 
 import { saveSuggestionsAction } from "@/app/(dashboard)/ordenes/[id]/actions";
-import { useOnlineStatus } from "@/hooks/use-online-status";
 import { enqueueWorkOrderField } from "@/lib/queue/producers";
+import { saveDirectOrEnqueue } from "@/lib/queue/save-direct-or-enqueue";
 import { LongTextFieldEditor } from "./long-text-field-editor";
 
 interface SuggestionsEditorProps {
@@ -14,7 +14,7 @@ interface SuggestionsEditorProps {
   isTerminal: boolean;
 }
 
-/** Etapa 2-C: sin señal, encola en vez de llamar la Server Action de siempre — ver description-editor.tsx. */
+/** Sin señal, o si la red falla al guardar, encola — ver lib/queue/save-direct-or-enqueue.ts. */
 export function SuggestionsEditor({
   orderId,
   orderNumber,
@@ -22,8 +22,6 @@ export function SuggestionsEditor({
   initialSuggestions,
   isTerminal,
 }: SuggestionsEditorProps) {
-  const isOnline = useOnlineStatus();
-
   return (
     <LongTextFieldEditor
       fieldId="suggestions"
@@ -35,13 +33,14 @@ export function SuggestionsEditor({
       savingButtonLabel="Guardando..."
       successMessage="Sugerencias guardadas"
       defaultErrorMessage="No se pudo guardar las sugerencias"
-      onSave={async (value) => {
-        if (!isOnline) {
-          await enqueueWorkOrderField({ id: orderId, orderNumber }, userId, "suggestions", value);
-          return { ok: true };
-        }
-        return saveSuggestionsAction(orderId, value);
-      }}
+      onSave={(value) =>
+        saveDirectOrEnqueue({
+          userId,
+          orderId,
+          direct: () => saveSuggestionsAction(orderId, value),
+          enqueue: () => enqueueWorkOrderField({ id: orderId, orderNumber }, userId, "suggestions", value),
+        })
+      }
     />
   );
 }
