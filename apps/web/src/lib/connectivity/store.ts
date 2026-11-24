@@ -86,6 +86,13 @@ let lastFailureAt = 0;
 let lastSuccessAt = 0;
 let lastInteractionCheckAt = 0;
 const listeners = new Set<Listener>();
+/**
+ * Avisados en la transición SIN señal → CON señal de la detección propia
+ * (no de navigator.onLine). Aparte de `listeners` a propósito: suscribirse
+ * aquí NO arranca el latido; los motores de cola y sincronización solo
+ * quieren enterarse del regreso, no mantener la verificación encendida.
+ */
+const reconnectListeners = new Set<Listener>();
 let stopHeartbeat: (() => void) | null = null;
 /** Lo instala startHeartbeat; null si nadie está suscrito. */
 let scheduleCheck: ((delayMs: number) => void) | null = null;
@@ -100,7 +107,33 @@ export function reportRequestSuccess(): void {
   if (isOffline) {
     isOffline = false;
     notify();
+    notifyReconnect();
   }
+}
+
+/**
+ * En una tarea aparte: reportRequestSuccess se llama desde dentro de
+ * peticiones de los mismos motores (p. ej. la pasada de la cola), y así un
+ * oyente nunca corre a mitad de la pasada que lo provocó.
+ */
+function notifyReconnect(): void {
+  if (reconnectListeners.size === 0) return;
+  setTimeout(() => {
+    for (const listener of reconnectListeners) listener();
+  }, 0);
+}
+
+/**
+ * Se ejecuta cada vez que la detección propia pasa de SIN señal a CON
+ * señal. Existe porque dentro del APK el evento «online» del sistema no
+ * llega (prueba de campo 2026-11-24): sin esto, la cola se quedaba con
+ * sus pendientes hasta recargar. Devuelve la función para desuscribirse.
+ */
+export function onReconnect(listener: Listener): () => void {
+  reconnectListeners.add(listener);
+  return () => {
+    reconnectListeners.delete(listener);
+  };
 }
 
 export function reportRequestFailure(): void {

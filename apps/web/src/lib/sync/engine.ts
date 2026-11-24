@@ -1,5 +1,6 @@
 "use client";
 
+import { onReconnect } from "../connectivity/store";
 import { SYNC_PAYLOAD_VERSION } from "./payload-version";
 import type { SyncPayload } from "./types";
 import { clearWorkset, loadWorkset, saveWorkset, type StoredWorkset } from "./storage";
@@ -56,10 +57,14 @@ export function startSyncEngine(userId: string): () => void {
 
   window.addEventListener("online", handleOnline);
   document.addEventListener("visibilitychange", handleVisibilityChange);
+  // En el APK el evento "online" no llega: el regreso de la señal según la
+  // detección propia de la app hace lo mismo (ver connectivity/store).
+  const stopReconnect = onReconnect(handleOnline);
 
   return () => {
     window.removeEventListener("online", handleOnline);
     document.removeEventListener("visibilitychange", handleVisibilityChange);
+    stopReconnect();
   };
 }
 

@@ -33,6 +33,8 @@ interface RegistrationInfo {
   active: string | null;
   waiting: string | null;
   installing: string | null;
+  /** Carga anticipada de navegación (sw.js la apaga dentro del APK). */
+  preload: string;
 }
 
 interface CacheInfo {
@@ -74,6 +76,16 @@ function errorText(error: unknown): string {
   return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
 }
 
+async function preloadState(reg: ServiceWorkerRegistration): Promise<string> {
+  if (!reg.navigationPreload) return "sin soporte";
+  try {
+    const state = await reg.navigationPreload.getState();
+    return state.enabled ? "ACTIVA" : "apagada";
+  } catch (error) {
+    return `error: ${errorText(error)}`;
+  }
+}
+
 async function takeSample(): Promise<Sample> {
   const errors: string[] = [];
   const swSupported = "serviceWorker" in navigator;
@@ -85,12 +97,15 @@ async function takeSample(): Promise<Sample> {
     controller = current ? { scriptURL: pathOf(current.scriptURL), state: current.state } : null;
     try {
       const regs = await navigator.serviceWorker.getRegistrations();
-      registrations = regs.map((reg) => ({
-        scope: pathOf(reg.scope),
-        active: reg.active ? `${pathOf(reg.active.scriptURL)} (${reg.active.state})` : null,
-        waiting: reg.waiting ? `${pathOf(reg.waiting.scriptURL)} (${reg.waiting.state})` : null,
-        installing: reg.installing ? `${pathOf(reg.installing.scriptURL)} (${reg.installing.state})` : null,
-      }));
+      registrations = await Promise.all(
+        regs.map(async (reg) => ({
+          scope: pathOf(reg.scope),
+          preload: await preloadState(reg),
+          active: reg.active ? `${pathOf(reg.active.scriptURL)} (${reg.active.state})` : null,
+          waiting: reg.waiting ? `${pathOf(reg.waiting.scriptURL)} (${reg.waiting.state})` : null,
+          installing: reg.installing ? `${pathOf(reg.installing.scriptURL)} (${reg.installing.state})` : null,
+        })),
+      );
     } catch (error) {
       errors.push(`getRegistrations: ${errorText(error)}`);
     }
@@ -158,7 +173,7 @@ function buildReport(sample: Sample, events: LoggedEvent[], environment: Environ
     `Controla esta página: ${sample.controller ? `${sample.controller.scriptURL} (${sample.controller.state})` : "NO"}`,
     ...(sample.registrations ?? []).map(
       (reg) =>
-        `Registro ${reg.scope}: activo=${reg.active ?? "-"} esperando=${reg.waiting ?? "-"} instalando=${reg.installing ?? "-"}`,
+        `Registro ${reg.scope}: activo=${reg.active ?? "-"} esperando=${reg.waiting ?? "-"} instalando=${reg.installing ?? "-"} carga anticipada=${reg.preload}`,
     ),
     ...(sample.registrations?.length === 0 ? ["Registros: NINGUNO"] : []),
     ...(sample.caches ?? []).map(
@@ -284,6 +299,7 @@ export function ConnectionDiagnostics() {
             <div>activo: {reg.active ?? "—"}</div>
             <div>esperando: {reg.waiting ?? "—"}</div>
             <div>instalando: {reg.installing ?? "—"}</div>
+            <div>carga anticipada: {reg.preload}</div>
           </div>
         ))}
       </Section>
