@@ -189,8 +189,24 @@ self.addEventListener("activate", (event) => {
       // lugar de su propio fetch y le aplica exactamente los mismos
       // candados. Sin soporte (navegadores viejos) no pasa nada: se queda
       // el fetch() de siempre.
+      //
+      // ⚠️ APAGADA DENTRO DEL APK (vista web de Android). La carga
+      // anticipada se agregó el 2026-11-10 (commit d0f9ef6) y es la
+      // sospechosa de haber roto la navegación sin señal en el APK: sin
+      // red, la petición anticipada falla, la vista web lo informa como
+      // error de la página principal (onReceivedError) y Capacitor carga
+      // su errorPath ENCIMA de la página que este service worker sí sirvió
+      // desde la caché. En Chrome ese aviso no existe y todo funciona.
+      // Prueba de campo del 2026-11-24 (APK 1.1.0, Android 16). Experimento
+      // en curso: si con esto el APK navega sin señal, queda confirmado.
+      // NO volver a activarla en el APK sin probar en un celular real, en
+      // modo avión, recargar y abrir la app sin señal.
       if (self.registration.navigationPreload) {
-        await self.registration.navigationPreload.enable();
+        if (isAndroidWebView()) {
+          await self.registration.navigationPreload.disable();
+        } else {
+          await self.registration.navigationPreload.enable();
+        }
       }
       await self.clients.claim();
     })(),
@@ -283,6 +299,18 @@ async function navigateNetworkFirst(request, preloadResponse) {
       headers: { "Content-Type": "text/plain; charset=utf-8" },
     });
   }
+}
+
+/**
+ * ¿Corre dentro de la vista web de Android (el APK)? El token `wv` lo pone
+ * Android en el agente de usuario de toda vista web, incluidos los APK
+ * 1.0.0 que no traen `FixTrackApp` (ver capacitor.config.ts y proxy.ts,
+ * isAppWebView). Se revisan los dos por si el service worker no hereda el
+ * agente modificado.
+ */
+function isAndroidWebView() {
+  const ua = self.navigator.userAgent;
+  return /;\s*wv\)/.test(ua) || ua.includes("FixTrackApp");
 }
 
 /** Quita la cadena de consulta de una URL, para usarla como clave de caché. */
