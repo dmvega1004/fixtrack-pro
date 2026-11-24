@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { WandSparkles, WifiOff } from "lucide-react";
 import { toast } from "sonner";
@@ -34,6 +34,25 @@ const HANDWRITE_HINT = "Puedes seguir escribiendo a mano en los campos de abajo.
  */
 const AVAILABILITY_STORAGE_KEY = "fixtrack.assistedDraft.available";
 
+/**
+ * Se lee con useSyncExternalStore, no copiándolo a un useState desde un
+ * efecto: así no hay setState síncrono en el efecto (regla
+ * react-hooks/set-state-in-effect) y tampoco desajuste de hidratación —
+ * el servidor no tiene localStorage, getServerSnapshot devuelve false,
+ * React hidrata con ese mismo valor y recién después pinta el real.
+ */
+const availabilityListeners = new Set<() => void>();
+
+function subscribeAvailability(listener: () => void): () => void {
+  availabilityListeners.add(listener);
+  // Otra pestaña de la app pudo confirmar la disponibilidad.
+  window.addEventListener("storage", listener);
+  return () => {
+    availabilityListeners.delete(listener);
+    window.removeEventListener("storage", listener);
+  };
+}
+
 function readLastKnownAvailability(): boolean {
   try {
     return window.localStorage.getItem(AVAILABILITY_STORAGE_KEY) === "true";
@@ -42,12 +61,17 @@ function readLastKnownAvailability(): boolean {
   }
 }
 
+function serverAvailabilitySnapshot(): boolean {
+  return false;
+}
+
 function rememberAvailability(available: boolean): void {
   try {
     window.localStorage.setItem(AVAILABILITY_STORAGE_KEY, String(available));
   } catch {
     // Almacenamiento bloqueado: sin señal simplemente no se muestra el botón.
   }
+  for (const listener of availabilityListeners) listener();
 }
 
 interface AssistedDraftPanelProps {
@@ -90,15 +114,16 @@ export function AssistedDraftPanel({ orderId, isTerminal, currentValues }: Assis
   const [savingField, setSavingField] = useState<AssistedTextField | null>(null);
   const [confirmingField, setConfirmingField] = useState<AssistedTextField | null>(null);
   const [savedFields, setSavedFields] = useState<Set<AssistedTextField>>(new Set());
-  const [lastKnownAvailable, setLastKnownAvailable] = useState(false);
+  const lastKnownAvailable = useSyncExternalStore(
+    subscribeAvailability,
+    readLastKnownAvailability,
+    serverAvailabilitySnapshot,
+  );
 
   // Con señal: se confirma con el backend antes de mostrar nada. Una
   // consulta fallida cuenta como "no disponible" (el botón no aparece).
   useEffect(() => {
-    if (!isOnline || isTerminal) {
-      setLastKnownAvailable(readLastKnownAvailability());
-      return;
-    }
+    if (!isOnline || isTerminal) return;
     let cancelled = false;
     void getAssistedDraftQuotaAction().then((status) => {
       if (cancelled) return;
