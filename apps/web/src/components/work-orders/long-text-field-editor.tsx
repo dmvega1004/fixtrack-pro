@@ -4,10 +4,9 @@ import { useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { useOnlineStatus } from "@/hooks/use-online-status";
 import { findMissingInfoMarkers } from "@/lib/assisted-draft";
 import { cn } from "@/lib/utils";
-import type { ActionResult } from "@/app/(dashboard)/ordenes/[id]/actions";
+import type { SaveOutcome } from "@/lib/queue/save-direct-or-enqueue";
 
 interface LongTextFieldEditorProps {
   fieldId: string;
@@ -22,7 +21,7 @@ interface LongTextFieldEditorProps {
   /** Diagnóstico y Observaciones pueden quedar vacíos; Descripción no. */
   required?: boolean;
   requiredErrorMessage?: string;
-  onSave: (value: string) => Promise<ActionResult>;
+  onSave: (value: string) => Promise<SaveOutcome>;
 }
 
 /**
@@ -49,7 +48,6 @@ export function LongTextFieldEditor({
   onSave,
 }: LongTextFieldEditorProps) {
   const router = useRouter();
-  const isOnline = useOnlineStatus();
   const [value, setValue] = useState(initialValue ?? "");
   const [isSaving, setIsSaving] = useState(false);
 
@@ -86,8 +84,20 @@ export function LongTextFieldEditor({
     }
 
     setIsSaving(true);
-    const result = await onSave(value);
-    setIsSaving(false);
+    let result: SaveOutcome;
+    try {
+      result = await onSave(value);
+    } catch (error) {
+      // Ya no lo lanza la red (onSave encola en ese caso, ver
+      // lib/queue/save-direct-or-enqueue.ts): queda para lo que no se pudo
+      // ni encolar (almacenamiento del celular bloqueado). El texto sigue
+      // en el campo — el botón tiene que volver para poder reintentar.
+      console.error("[guardar] no se pudo guardar ni encolar", error);
+      toast.error(defaultErrorMessage);
+      return;
+    } finally {
+      setIsSaving(false);
+    }
 
     if (!result.ok) {
       toast.error(result.message ?? defaultErrorMessage);
@@ -95,12 +105,12 @@ export function LongTextFieldEditor({
     }
 
     toast.success(successMessage);
-    // Sin señal, no hay nada que refrescar: `onSave` guardó en la cola
-    // local, no en el servidor, y la vista offline ya se actualiza sola al
+    // Si quedó en la cola no hay nada que refrescar: el servidor todavía
+    // no lo tiene, y sin señal la vista offline ya se actualiza sola al
     // reaccionar al store de la cola (ver hooks/use-synced-order.ts). Un
     // router.refresh() acá solo dispararía una petición RSC condenada a
     // fallar por falta de señal.
-    if (isOnline) router.refresh();
+    if (!result.queued) router.refresh();
   }
 
   const hasChanges = value !== (initialValue ?? "");

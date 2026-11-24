@@ -1,6 +1,10 @@
 "use client";
 
-import { getSnapshot as getConnectivitySnapshot } from "../connectivity/store";
+import {
+  getSnapshot as getConnectivitySnapshot,
+  reportRequestFailure,
+  reportRequestSuccess,
+} from "../connectivity/store";
 import { applyConfirmedWorksetUpdate } from "../sync/storage";
 import { FIELD_BY_OPERATION_TYPE } from "./field-operations";
 import { applyPendingChanges } from "./pending-changes";
@@ -242,9 +246,15 @@ async function attemptUpload(op: PendingOperation): Promise<AttemptOutcome> {
     });
   } catch (error) {
     console.warn(`${LOG} #${op.seq} (${op.type}) fallo de red — se reintenta con espera creciente`, error);
+    // Una subida real que no obtuvo respuesta es la señal más fresca para
+    // la detección de conexión (ver lib/connectivity/store).
+    reportRequestFailure();
     setQueueState({ lastError: "network" });
     return retryOrPark(op, "network");
   }
+
+  // Cualquier respuesta, incluso un rechazo: el servidor se alcanzó.
+  reportRequestSuccess();
 
   if (response.ok) {
     console.log(`${LOG} #${op.seq} (${op.type}) subida — ${response.status}`);
