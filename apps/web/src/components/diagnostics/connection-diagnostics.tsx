@@ -5,7 +5,9 @@ import { Capacitor } from "@capacitor/core";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { getConnectivityDiagnostics, type ConnectivityDiagnostics } from "@/lib/connectivity/store";
+import { getQueueEngineDiagnostics } from "@/lib/queue/engine";
 import { getSnapshot as getQueueSnapshot } from "@/lib/queue/state-store";
+import { getSyncEngineDiagnostics, type SyncEngineDiagnostics } from "@/lib/sync/engine";
 
 /**
  * Diagnóstico de conexión y del armazón sin señal (/perfil/diagnostico).
@@ -50,7 +52,8 @@ interface Sample {
   navigatorOnLine: boolean;
   visibility: DocumentVisibilityState;
   connectivity: ConnectivityDiagnostics;
-  queue: { pending: number; parked: number; uploading: boolean };
+  queue: { pending: number; parked: number; uploading: boolean; passStartedAt: number | null };
+  sync: SyncEngineDiagnostics;
   swSupported: boolean;
   controller: { scriptURL: string; state: string } | null;
   registrations: RegistrationInfo[] | null;
@@ -135,7 +138,13 @@ async function takeSample(): Promise<Sample> {
     navigatorOnLine: navigator.onLine,
     visibility: document.visibilityState,
     connectivity: getConnectivityDiagnostics(),
-    queue: { pending: queue.pendingCount, parked: queue.parkedCount, uploading: queue.isUploading },
+    queue: {
+      pending: queue.pendingCount,
+      parked: queue.parkedCount,
+      uploading: queue.isUploading,
+      passStartedAt: getQueueEngineDiagnostics().passStartedAt,
+    },
+    sync: getSyncEngineDiagnostics(),
     swSupported,
     controller,
     registrations,
@@ -154,6 +163,16 @@ function ago(ms: number | null, now: number): string {
   return `${formatTime(ms)} (hace ${Math.max(0, Math.round((now - ms) / 1000))} s)`;
 }
 
+/** «en curso desde HH:MM:SS (hace N s)» o «no», para ver un cuelgue sin cable. */
+function inFlight(since: number | null, now: number): string {
+  return since === null ? "no" : `SÍ, desde ${ago(since, now)}`;
+}
+
+function lastSyncText(last: SyncEngineDiagnostics["last"], now: number): string {
+  if (!last) return "ninguna desde que se abrió la app";
+  return `${last.result}, tardó ${(last.durationMs / 1000).toFixed(1)} s, terminó ${ago(last.finishedAt, now)}`;
+}
+
 function yesNo(value: boolean): string {
   return value ? "sí" : "no";
 }
@@ -169,6 +188,9 @@ function buildReport(sample: Sample, events: LoggedEvent[], environment: Environ
     `Último fallo: ${ago(sample.connectivity.lastFailureAt, sample.at)}`,
     `Latido activo: ${yesNo(sample.connectivity.heartbeatRunning)}`,
     `Cola: ${sample.queue.pending} por subir, ${sample.queue.parked} detenidas`,
+    `Pasada de la cola en curso: ${inFlight(sample.queue.passStartedAt, sample.at)}`,
+    `Sincronización en curso: ${inFlight(sample.sync.inFlightSince, sample.at)}`,
+    `Última sincronización: ${lastSyncText(sample.sync.last, sample.at)}`,
     `Service worker soportado: ${yesNo(sample.swSupported)}`,
     `Controla esta página: ${sample.controller ? `${sample.controller.scriptURL} (${sample.controller.state})` : "NO"}`,
     ...(sample.registrations ?? []).map(
@@ -325,6 +347,20 @@ export function ConnectionDiagnostics() {
         <Row label="Por subir" value={String(sample.queue.pending)} />
         <Row label="Detenidas" value={String(sample.queue.parked)} />
         <Row label="Subiendo ahora" value={yesNo(sample.queue.uploading)} />
+        <Row
+          label="Pasada en curso"
+          value={inFlight(sample.queue.passStartedAt, sample.at)}
+          strong={sample.queue.passStartedAt !== null}
+        />
+      </Section>
+
+      <Section title="Sincronización">
+        <Row
+          label="En curso"
+          value={inFlight(sample.sync.inFlightSince, sample.at)}
+          strong={sample.sync.inFlightSince !== null}
+        />
+        <Row label="Última" value={lastSyncText(sample.sync.last, sample.at)} />
       </Section>
 
       <Section title="Eventos (el más reciente arriba)">

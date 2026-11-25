@@ -6,6 +6,7 @@ import {
   reportRequestFailure,
   reportRequestSuccess,
 } from "../connectivity/store";
+import { runSync } from "../sync/engine";
 import { applyConfirmedWorksetUpdate } from "../sync/storage";
 import { FIELD_BY_OPERATION_TYPE } from "./field-operations";
 import { applyPendingChanges } from "./pending-changes";
@@ -54,8 +55,27 @@ function backoffDelayMs(attempts: number): number {
   return Math.min(BACKOFF_BASE_MS * 2 ** Math.max(attempts - 1, 0), BACKOFF_MAX_MS);
 }
 
-/** Nunca dos pasadas a la vez, sin importar qué disparador la pidió. */
-let passInFlight = false;
+/**
+ * Tiempo límite de UNA subida. Sin él, una petición colgada en una
+ * conexión muerta (señal que parece estar pero no pasa nada) dejaba la
+ * pasada «en curso» para siempre, y toda pasada nueva se descartaba hasta
+ * recargar. Mismo valor que el guardado directo (DIRECT_SAVE_TIMEOUT_MS):
+ * con datos lentos pero vivos, una edición de texto sobra con 20 s. Al
+ * vencer cuenta como fallo de red; el reintento es seguro porque el
+ * servidor deduplica por la llave de idempotencia (op.id).
+ */
+const UPLOAD_TIMEOUT_MS = 20_000;
+
+/**
+ * La pasada en curso, si hay una. Nunca dos pasadas a la vez, sin
+ * importar qué disparador la pidió: quien pide otra mientras corre recibe
+ * ESTA misma promesa (antes se descartaba y volvía de inmediato) — así
+ * quien necesita «después de subir la cola» (ver onSignalBack) espera de
+ * verdad a que termine.
+ */
+let currentPass: Promise<void> | null = null;
+/** Para el diagnóstico: desde cuándo corre la pasada actual. */
+let passStartedAt: number | null = null;
 let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
 function clearRetryTimer(): void {
@@ -87,17 +107,28 @@ function scheduleRetry(userId: string, delayMs: number): void {
  * Además, el regreso de la señal según la detección PROPIA de la app
  * (onReconnect): en el APK el evento "online" del sistema no llega, y la
  * cola se quedaba con sus pendientes hasta recargar. Si ambos disparan,
- * passInFlight descarta la pasada repetida.
+ * la segunda llamada se suma a la pasada en curso.
+ *
+ * Al volver la señal, PRIMERO la cola y DESPUÉS la sincronización, y esta
+ * SIN forzar: respeta el mínimo de 5 minutos (MIN_SYNC_INTERVAL_MS en
+ * ../sync/engine.ts). Antes se forzaba en el mismo instante que la cola:
+ * cada sincronización son ~100 llamadas al backend, y con datos móviles
+ * que caen y vuelven, cada vuelta repetía una — compitiendo con la
+ * pantalla que el técnico está abriendo (congelamiento de la prueba de
+ * campo 2026-11-24). Con esto hay como máximo una por ventana de 5 min.
  */
 export function startQueueEngine(userId: string): () => void {
   void refreshStats(userId);
   void runQueuePass(userId);
 
-  const handleOnline = () => {
-    console.log(`${LOG} conexión recuperada — subiendo cola pendiente`);
+  const onSignalBack = async (reason: string) => {
+    console.log(`${LOG} ${reason} — subiendo cola pendiente`);
     clearRetryTimer();
-    void runQueuePass(userId);
+    await runQueuePass(userId);
+    void runSync(userId);
   };
+
+  const handleOnline = () => void onSignalBack("conexión recuperada (evento online)");
 
   const handleVisibilityChange = () => {
     if (document.visibilityState !== "visible") return;
@@ -106,11 +137,7 @@ export function startQueueEngine(userId: string): () => void {
     void runQueuePass(userId);
   };
 
-  const handleReconnect = () => {
-    console.log(`${LOG} la app volvió a detectar señal — subiendo cola pendiente`);
-    clearRetryTimer();
-    void runQueuePass(userId);
-  };
+  const handleReconnect = () => void onSignalBack("la app volvió a detectar señal");
 
   window.addEventListener("online", handleOnline);
   document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -207,13 +234,20 @@ type AttemptOutcome = "success" | "parked" | "retry-later" | "unauthorized";
  * (scheduleRetry). Una operación apartada (permanente o tope alcanzado)
  * NO detiene la pasada: sigue con las que quedan.
  */
-export async function runQueuePass(userId: string): Promise<void> {
-  if (passInFlight) {
-    console.log(`${LOG} ya hay una pasada en curso — se descarta esta`);
-    return;
+export function runQueuePass(userId: string): Promise<void> {
+  if (currentPass) {
+    console.log(`${LOG} ya hay una pasada en curso — se espera esa`);
+    return currentPass;
   }
+  passStartedAt = Date.now();
+  currentPass = doQueuePass(userId).finally(() => {
+    currentPass = null;
+    passStartedAt = null;
+  });
+  return currentPass;
+}
 
-  passInFlight = true;
+async function doQueuePass(userId: string): Promise<void> {
   setQueueState({ isUploading: true });
 
   try {
@@ -232,7 +266,6 @@ export async function runQueuePass(userId: string): Promise<void> {
       break; // retry-later | unauthorized: se detiene la pasada acá
     }
   } finally {
-    passInFlight = false;
     setQueueState({ isUploading: false, uploadingSeq: null });
     await refreshStats(userId);
   }
@@ -253,19 +286,32 @@ async function attemptUpload(op: PendingOperation): Promise<AttemptOutcome> {
   const { url, method, body } = builder(op);
   let response: Response;
 
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
   try {
     response = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json", "Idempotency-Key": op.id },
       body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
     });
   } catch (error) {
-    console.warn(`${LOG} #${op.seq} (${op.type}) fallo de red — se reintenta con espera creciente`, error);
+    const reason = controller.signal.aborted
+      ? `sin respuesta en ${UPLOAD_TIMEOUT_MS / 1000}s`
+      : "fallo de red";
+    console.warn(`${LOG} #${op.seq} (${op.type}) ${reason} — se reintenta con espera creciente`, error);
     // Una subida real que no obtuvo respuesta es la señal más fresca para
     // la detección de conexión (ver lib/connectivity/store).
     reportRequestFailure();
     setQueueState({ lastError: "network" });
     return retryOrPark(op, "network");
+  } finally {
+    // Solo hasta recibir las cabeceras, A PROPÓSITO: más abajo el cuerpo
+    // de un 409 se lee con .catch(() => null), y si el tiempo límite lo
+    // cortara a mitad de lectura ese null se tomaría como un 409 de
+    // negocio y la operación se apartaría por error. Con las cabeceras ya
+    // llegadas el servidor respondió; esos cuerpos son de pocos bytes.
+    clearTimeout(timer);
   }
 
   // Cualquier respuesta, incluso un rechazo: el servidor se alcanzó.
@@ -384,4 +430,9 @@ async function readErrorMessage(response: Response): Promise<string> {
   const message = (data as { message?: string | string[] } | null)?.message;
   if (Array.isArray(message)) return message.join("; ");
   return message ?? response.statusText ?? "Error";
+}
+
+/** Solo lectura, para la página de diagnóstico (/perfil/diagnostico). */
+export function getQueueEngineDiagnostics(): { passStartedAt: number | null } {
+  return { passStartedAt };
 }
