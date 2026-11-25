@@ -1,6 +1,5 @@
 "use client";
 
-import { onReconnect } from "../connectivity/store";
 import { SYNC_PAYLOAD_VERSION } from "./payload-version";
 import type { SyncPayload } from "./types";
 import { clearWorkset, loadWorkset, saveWorkset, type StoredWorkset } from "./storage";
@@ -16,11 +15,26 @@ const LOG = "[sync]";
  * no dispare veinte sincronizaciones (cada una son hasta ~100 llamadas
  * al backend: hasta 3 para listar + 2 por orden para fotos/repuestos, ver
  * route.ts), y bastante corto para que los datos no se sientan viejos
- * durante una jornada de trabajo activa. El disparo por "conexión
- * recuperada" (evento online) SÍ se lo salta a propósito — se llama con
- * force=true — porque ahí sincronizar de inmediato es justo el punto.
+ * durante una jornada de trabajo activa.
+ *
+ * El regreso de la señal (evento online o detección propia) YA NO se lo
+ * salta: lo dispara el motor de la cola DESPUÉS de subir lo pendiente y
+ * sin forzar (ver onSignalBack en ../queue/engine.ts). Forzarlo hacía que
+ * cada caída y vuelta de los datos móviles costara ~100 llamadas al
+ * backend (prueba de campo 2026-11-24). Solo «deslizar para refrescar»
+ * fuerza, porque es el técnico pidiéndolo explícitamente.
  */
 const MIN_SYNC_INTERVAL_MS = 5 * 60 * 1000;
+
+/**
+ * Tiempo límite de una sincronización completa, cuerpo incluido. Sin él,
+ * con señal que parece estar pero no pasa nada, la petición quedaba
+ * colgada y syncInFlight en true hasta recargar: ninguna otra
+ * sincronización volvía a correr. 30 s porque la respuesta es grande
+ * (hasta 50 órdenes con fotos y repuestos) y el servidor hace ~100
+ * llamadas al backend para armarla.
+ */
+const SYNC_TIMEOUT_MS = 30_000;
 
 /**
  * Nunca dos sincronizaciones a la vez: si ya hay una en curso, la nueva
@@ -31,12 +45,23 @@ let syncInFlight = false;
 /** Instante del último INTENTO (no solo los exitosos) — ver MIN_SYNC_INTERVAL_MS. */
 let lastAttemptAt = 0;
 
+/** Para el diagnóstico (/perfil/diagnostico): solo lectura. */
+export interface SyncEngineDiagnostics {
+  inFlightSince: number | null;
+  last: { finishedAt: number; durationMs: number; result: string } | null;
+}
+let inFlightSince: number | null = null;
+let lastResult: SyncEngineDiagnostics["last"] = null;
+
+export function getSyncEngineDiagnostics(): SyncEngineDiagnostics {
+  return { inFlightSince, last: lastResult };
+}
+
 /**
  * Arranca el motor para `userId`: valida lo guardado (dueño + versión),
- * dispara la sincronización inicial, y engancha los eventos "online" y
- * "visibilitychange" (este último es el caso más frecuente en celular —
- * volver a la app desde segundo plano no dispara "online" si la señal
- * nunca se perdió del todo).
+ * dispara la sincronización inicial, y engancha "visibilitychange" (volver
+ * a la app desde segundo plano). El regreso de la señal lo maneja el
+ * motor de la cola — ver MIN_SYNC_INTERVAL_MS.
  *
  * Sincrónico a propósito: se puede llamar directo desde un useEffect sin
  * encadenar promesas para obtener la función de limpieza.
@@ -44,27 +69,16 @@ let lastAttemptAt = 0;
 export function startSyncEngine(userId: string): () => void {
   void bootstrap(userId);
 
-  const handleOnline = () => {
-    console.log(`${LOG} conexión recuperada — resincronizando (sin importar el intervalo mínimo)`);
-    void runSync(userId, { force: true });
-  };
-
   const handleVisibilityChange = () => {
     if (document.visibilityState !== "visible") return;
     console.log(`${LOG} app en primer plano — evaluando resincronización`);
     void runSync(userId);
   };
 
-  window.addEventListener("online", handleOnline);
   document.addEventListener("visibilitychange", handleVisibilityChange);
-  // En el APK el evento "online" no llega: el regreso de la señal según la
-  // detección propia de la app hace lo mismo (ver connectivity/store).
-  const stopReconnect = onReconnect(handleOnline);
 
   return () => {
-    window.removeEventListener("online", handleOnline);
     document.removeEventListener("visibilitychange", handleVisibilityChange);
-    stopReconnect();
   };
 }
 
@@ -112,7 +126,7 @@ async function bootstrap(userId: string): Promise<void> {
  * reintenta en bucle (no hay ningún setTimeout de reintento acá).
  *
  * `force` salta el intervalo mínimo (MIN_SYNC_INTERVAL_MS) — lo usa
- * únicamente el disparo por "conexión recuperada". El guard de
+ * únicamente «deslizar para refrescar». El guard de
  * concurrencia (syncInFlight) NUNCA se salta, con o sin force.
  */
 export async function runSync(userId: string, options: { force?: boolean } = {}): Promise<void> {
@@ -134,13 +148,22 @@ export async function runSync(userId: string, options: { force?: boolean } = {})
 
   lastAttemptAt = Date.now();
   syncInFlight = true;
+  inFlightSince = lastAttemptAt;
   setSyncState({ isSyncing: true });
 
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), SYNC_TIMEOUT_MS);
+  let result = "desconocido";
+
   try {
-    const response = await fetch("/api/sincronizacion", { cache: "no-store" });
+    const response = await fetch("/api/sincronizacion", {
+      cache: "no-store",
+      signal: controller.signal,
+    });
 
     if (response.status === 401) {
       console.warn(`${LOG} sesión vencida (401) — no se reintenta, se conserva lo guardado`);
+      result = "sesión vencida (401)";
       setSyncState({ isSyncing: false, lastError: "unauthorized" });
       return;
     }
@@ -149,11 +172,15 @@ export async function runSync(userId: string, options: { force?: boolean } = {})
       console.warn(
         `${LOG} respuesta ${response.status} del servidor — se conserva lo guardado`,
       );
+      result = `error del servidor (${response.status})`;
       setSyncState({ isSyncing: false, lastError: "http" });
       return;
     }
 
+    // Dentro del tiempo límite también: el cuerpo es grande y es justo lo
+    // que se queda a medias en una conexión que se muere.
     const payload = (await response.json()) as SyncPayload;
+    clearTimeout(timer);
 
     const record: StoredWorkset = {
       userId,
@@ -166,6 +193,7 @@ export async function runSync(userId: string, options: { force?: boolean } = {})
     console.log(
       `${LOG} guardado — ${payload.orders.length} órdenes, syncedAt=${payload.syncedAt}`,
     );
+    result = `ok (${payload.orders.length} órdenes)`;
     setSyncState({
       isSyncing: false,
       lastSyncedAt: payload.syncedAt,
@@ -173,9 +201,17 @@ export async function runSync(userId: string, options: { force?: boolean } = {})
       lastError: null,
     });
   } catch (error) {
-    console.warn(`${LOG} fallo al sincronizar — se conserva lo guardado`, error);
-    setSyncState({ isSyncing: false, lastError: "network" });
+    const timedOut = controller.signal.aborted;
+    result = timedOut
+      ? `sin respuesta en ${SYNC_TIMEOUT_MS / 1000}s`
+      : `falló (${error instanceof Error ? error.name : "error"})`;
+    console.warn(`${LOG} ${result} al sincronizar — se conserva lo guardado`, error);
+    setSyncState({ isSyncing: false, lastError: timedOut ? "timeout" : "network" });
   } finally {
+    clearTimeout(timer);
     syncInFlight = false;
+    const finishedAt = Date.now();
+    lastResult = { finishedAt, durationMs: finishedAt - (inFlightSince ?? finishedAt), result };
+    inFlightSince = null;
   }
 }

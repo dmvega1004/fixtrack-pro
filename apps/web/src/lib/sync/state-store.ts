@@ -11,7 +11,7 @@ import type { SyncPayload } from "./types";
  * useSyncExternalStore.
  */
 
-export type SyncErrorKind = "network" | "unauthorized" | "http" | null;
+export type SyncErrorKind = "network" | "timeout" | "unauthorized" | "http" | null;
 
 export interface SyncSnapshot {
   isSyncing: boolean;
