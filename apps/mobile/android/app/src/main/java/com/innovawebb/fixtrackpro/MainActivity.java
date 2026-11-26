@@ -17,6 +17,17 @@ public class MainActivity extends BridgeActivity {
 
         super.onCreate(savedInstanceState);
 
+        // Manejador de errores propio (1.1.1): reintenta la primera
+        // navegación sin señal y no manda los 4xx/5xx a «sin conexión».
+        // Ver FixTrackWebViewClient. Se instala antes de que la vista web
+        // entregue el primer aviso de la carga que pidió super.onCreate.
+        // Fondo #FAFAFA (el de la app) para que la espera de los reintentos,
+        // con la vista web oculta, no se vea negra ni parpadee en blanco.
+        if (bridge != null) {
+            bridge.setWebViewClient(new FixTrackWebViewClient(bridge));
+            bridge.getWebView().setBackgroundColor(0xFFFAFAFA);
+        }
+
         // El boton fisico de "atras" debe navegar dentro del historial de
         // la web cargada, no cerrar la app. Solo se deja cerrar cuando ya
         // no hay a donde volver.

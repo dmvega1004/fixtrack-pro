@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Fondo de la app (el mismo #FAFAFA de la web y de offline.html). -->
+    <color name="fixtrack_fondo">#FAFAFA</color>
+</resources>

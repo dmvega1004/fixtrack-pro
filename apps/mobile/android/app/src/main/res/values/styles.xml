@@ -13,6 +13,9 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <!-- Lo que se ve detrás de la vista web mientras está oculta
+             (reintentos de FixTrackWebViewClient): el fondo de la app. -->
+        <item name="android:windowBackground">@color/fixtrack_fondo</item>
     </style>
 
 

@@ -11,7 +11,6 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
 import com.getcapacitor.Bridge;
-import com.getcapacitor.BridgeWebViewClient;
 
 /**
  * SOLO variante debug. Registra en logcat (etiqueta FixTrackDebug) lo que
@@ -23,9 +22,12 @@ import com.getcapacitor.BridgeWebViewClient;
  * de consulta (las URL se escriben solo como origen + ruta). Nada de esto
  * identifica al técnico ni a sus clientes.
  *
- * NO cambia el comportamiento: hereda de BridgeWebViewClient y llama a
- * super en cada método; el cliente del service worker delega igual que el
- * de Capacitor (Bridge.loadWebView) en getLocalServer().
+ * NO cambia el comportamiento: hereda de FixTrackWebViewClient (el manejador
+ * real de la app, que a su vez hereda del de Capacitor) y llama a super en
+ * cada método; el cliente del service worker delega igual que el de
+ * Capacitor (Bridge.loadWebView) en getLocalServer(). Las decisiones del
+ * manejador (reintentos, contador) salen con la etiqueta
+ * Capacitor/FixTrackWebViewClient.
  */
 final class DebugWebViewLogger {
 
@@ -63,7 +65,7 @@ final class DebugWebViewLogger {
         return url == null ? "null" : safe(Uri.parse(url));
     }
 
-    private static final class LoggingClient extends BridgeWebViewClient {
+    private static final class LoggingClient extends FixTrackWebViewClient {
 
         LoggingClient(Bridge bridge) {
             super(bridge);
@@ -83,7 +85,7 @@ final class DebugWebViewLogger {
 
         @Override
         public void onPageFinished(WebView view, String url) {
-            Log.i(TAG, "página-fin " + safe(url) + " progreso=" + view.getProgress());
+            Log.i(TAG, "página-fin " + safe(url) + " progreso=" + view.getProgress() + " vista=" + (view.getVisibility() == android.view.View.VISIBLE ? "visible" : "OCULTA"));
             super.onPageFinished(view, url);
         }
 
@@ -91,7 +93,7 @@ final class DebugWebViewLogger {
         public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
             Log.w(
                 TAG,
-                "ERROR " + (request.isForMainFrame() ? "PRINCIPAL" : "secundario") + " " + safe(request.getUrl()) + " código=" + error.getErrorCode() + " «" + error.getDescription() + "»" + (request.isForMainFrame() ? " → Capacitor carga errorPath" : "")
+                "ERROR " + (request.isForMainFrame() ? "PRINCIPAL" : "secundario") + " " + safe(request.getUrl()) + " código=" + error.getErrorCode() + " «" + error.getDescription() + "»" + (request.isForMainFrame() ? (isConnectivityError(error.getErrorCode()) ? " (conectividad)" : " (no es de conectividad)") : "")
             );
             super.onReceivedError(view, request, error);
         }
@@ -100,7 +102,7 @@ final class DebugWebViewLogger {
         public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse response) {
             Log.w(
                 TAG,
-                "HTTP " + response.getStatusCode() + " " + (request.isForMainFrame() ? "PRINCIPAL" : "secundario") + " " + safe(request.getUrl()) + (request.isForMainFrame() ? " → Capacitor carga errorPath" : "")
+                "HTTP " + response.getStatusCode() + " " + (request.isForMainFrame() ? "PRINCIPAL" : "secundario") + " " + safe(request.getUrl())
             );
             super.onReceivedHttpError(view, request, response);
         }
@@ -108,7 +110,7 @@ final class DebugWebViewLogger {
         @Override
         public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
             boolean handled = super.shouldOverrideUrlLoading(view, request);
-            Log.i(TAG, "navegar " + safe(request.getUrl()) + (request.isRedirect() ? " (redirección)" : "") + (handled ? " → fuera de la app" : ""));
+            Log.i(TAG, "navegar " + safe(request.getUrl()) + (request.isRedirect() ? " (redirección)" : "") + (request.hasGesture() ? " (gesto)" : "") + (handled ? " → fuera de la app" : ""));
             return handled;
         }
 

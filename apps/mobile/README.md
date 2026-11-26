@@ -207,6 +207,22 @@ está firmado con la MISMA llave que el publicado (sin la misma llave no se
 instala encima y el técnico pierde sesión y datos guardados). También
 lista qué archivos cambian frente al publicado: revisar que tenga sentido.
 
+### Al actualizar Capacitor: revisar FixTrackWebViewClient
+
+`android/app/src/main/java/com/innovawebb/fixtrackpro/FixTrackWebViewClient.java`
+hereda de `BridgeWebViewClient` y reemplaza su manejo de errores (reintentos
+ante errores de conectividad; 4xx/5xx sin errorPath). Con cada versión nueva
+de `@capacitor/android`:
+
+1. Comparar `BridgeWebViewClient.java` de la versión nueva con la anterior
+   (`onReceivedError`, `onReceivedHttpError`, `onPageStarted`,
+   `onPageFinished`, `onPageCommitVisible`).
+2. Buscar quién llama a `addWebViewListener`: hoy solo SystemBars, y solo usa
+   `onPageCommitVisible`. Si aparece un oyente de errores, el manejador
+   tendría que avisarle (hoy no lo hace, la lista es privada).
+3. Repetir la ronda de pruebas con la variante .debug: arranque en frío sin
+   señal, sin caché, con señal, navegación sin señal, 404.
+
 ## Subir el número de versión
 
 Antes de compilar una versión nueva para distribuir, edita

@@ -34,6 +34,14 @@
     <uses-permission android:name="android.permission.INTERNET" />
 
     <!--
+      Estado de la red: sin este permiso la vista web no se entera de los
+      cambios de red (navigator.onLine no cambia y no llegan los eventos
+      online/offline). Confirmado en la prueba de campo de 2026-11-24. La
+      detección propia de la app sigue mandando; esto solo la adelanta.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!--
       Camara: la necesita el escaner de codigos QR y la captura de fotos
       desde la web. No basta con este permiso: la vista web tambien debe
       conceder la solicitud (ver BridgeWebChromeClient, ya incluido por
