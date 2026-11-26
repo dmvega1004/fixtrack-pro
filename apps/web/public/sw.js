@@ -357,12 +357,57 @@ async function navigateNetworkFirst(request, preloadResponse) {
 
     // Último recurso si ni siquiera offline.html se pudo precachear
     // (instalación del service worker sin ninguna conexión previa).
-    return new Response("Sin conexión", {
-      status: 503,
-      statusText: "Offline",
-      headers: { "Content-Type": "text/plain; charset=utf-8" },
-    });
+    return lastResortOfflineResponse();
   }
+}
+
+/**
+ * Página sin conexión de ÚLTIMO RECURSO, armada aquí mismo: no depende de
+ * nada guardado ni de la red. Antes era el texto plano «Sin conexión»;
+ * desde el APK 1.1.1 los 5xx de navegación ya no se cambian por la página
+ * sin conexión de la app (ver FixTrackWebViewClient en apps/mobile), así
+ * que este 503 se ve tal cual, igual que en Chrome. Sigue siendo 503
+ * (no es la página pedida). Todo en la misma respuesta: estilos en línea,
+ * sin imágenes ni archivos externos. Mismo texto que
+ * apps/mobile/www/offline.html.
+ */
+const LAST_RESORT_OFFLINE_HTML = `<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sin señal — FixTrack Pro</title>
+<style>
+  :root { color-scheme: light; }
+  html, body { height: 100%; margin: 0; }
+  body { display: flex; align-items: center; justify-content: center; padding: 32px 24px; box-sizing: border-box;
+    background: #fafafa; color: #1f1f1f;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  main { max-width: 360px; text-align: center; }
+  .marca { font-size: 22px; font-weight: 700; color: #1f1f1f; margin: 0 0 24px; }
+  h1 { font-size: 20px; font-weight: 600; margin: 0 0 12px; }
+  p { font-size: 15px; line-height: 1.5; color: #555; margin: 0 0 28px; }
+  button { appearance: none; border: none; border-radius: 10px; background: #0d6efd; color: #fff;
+    font-size: 16px; font-weight: 600; padding: 14px 32px; cursor: pointer; }
+  button:active { opacity: 0.85; }
+</style>
+</head>
+<body>
+<main>
+  <p class="marca">FixTrack Pro</p>
+  <h1>No se pudo abrir sin señal</h1>
+  <p>No se pudo abrir FixTrack Pro sin señal. Si ya usaste la app con internet en este celular, toca Reintentar.</p>
+  <button type="button" onclick="location.reload()">Reintentar</button>
+</main>
+</body>
+</html>`;
+
+function lastResortOfflineResponse() {
+  return new Response(LAST_RESORT_OFFLINE_HTML, {
+    status: 503,
+    statusText: "Offline",
+    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
+  });
 }
 
 /**
