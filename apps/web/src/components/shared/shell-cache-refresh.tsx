@@ -23,16 +23,16 @@ import { useEffect } from "react";
  * offline.html sin conexión, sin importar cuánto tiempo lleve instalada
  * la app.
  *
- * Se dispara en CADA carga del panel (no solo "justo después del
- * login") — barato si ya estaba todo bien precacheado (unas pocas
- * peticiones que Chrome puede resolver de caché HTTP) y es lo que
- * resuelve, sin lógica aparte, los casos reales: sesión que caduca y se
- * vuelve a iniciar, o un celular compartido entre dos técnicos — cada
- * vez que alguien entra con su propia sesión, el armazón se refresca con
- * los datos de ESA sesión, nunca se queda pegado a la de quien lo usó
- * antes.
+ * El aviso sale en CADA carga del panel, pero el service worker solo
+ * precachea si la huella cambió o pasaron 12 h (W5, ver el listener de
+ * "message" en sw.js): antes eran tres páginas completas con sus archivos
+ * en cada carga, con datos móviles. La huella es id de usuario + commit
+ * publicado, así que siguen cubiertos los casos reales: otro técnico entra
+ * en el mismo celular (cambia el usuario) o se publica una versión nueva
+ * (cambia el commit). Sin huella (`fingerprint` null, p. ej. sin
+ * VERCEL_GIT_COMMIT_SHA) el service worker precachea siempre, como antes.
  */
-export function ShellCacheRefresh() {
+export function ShellCacheRefresh({ fingerprint }: { fingerprint: string | null }) {
   useEffect(() => {
     if (process.env.NODE_ENV !== "production") return;
     if (!("serviceWorker" in navigator)) return;
@@ -45,13 +45,13 @@ export function ShellCacheRefresh() {
     // avisar nada; la próxima carga del panel lo vuelve a intentar.
     navigator.serviceWorker.ready.then((registration) => {
       if (cancelled) return;
-      registration.active?.postMessage({ type: "fixtrack-refresh-shell-cache" });
+      registration.active?.postMessage({ type: "fixtrack-refresh-shell-cache", fingerprint });
     });
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [fingerprint]);
 
   return null;
 }

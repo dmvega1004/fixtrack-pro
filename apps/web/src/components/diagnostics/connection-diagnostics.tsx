@@ -58,6 +58,8 @@ interface Sample {
   controller: { scriptURL: string; state: string } | null;
   registrations: RegistrationInfo[] | null;
   caches: CacheInfo[] | null;
+  /** Registro de la huella del armazón (W5, sw.js) — sin el id de usuario. */
+  shellMeta: { commit: string; cacheName: string; at: number } | null;
   errors: string[];
 }
 
@@ -131,6 +133,21 @@ async function takeSample(): Promise<Sample> {
     }
   }
 
+  let shellMeta: Sample["shellMeta"] = null;
+  if (typeof caches !== "undefined") {
+    try {
+      const stored = await (await caches.open("fixtrack-meta")).match("/__fixtrack-meta/armazon");
+      if (stored) {
+        const record = (await stored.json()) as { fingerprint: string; cacheName: string; at: number };
+        // Solo el commit (lo que va después de «:»): el id de usuario no se muestra.
+        const commit = record.fingerprint.split(":").pop() ?? "";
+        shellMeta = { commit: commit.slice(0, 7), cacheName: record.cacheName, at: record.at };
+      }
+    } catch (error) {
+      errors.push(`fixtrack-meta: ${errorText(error)}`);
+    }
+  }
+
   const queue = getQueueSnapshot();
 
   return {
@@ -149,6 +166,7 @@ async function takeSample(): Promise<Sample> {
     controller,
     registrations,
     caches: cacheInfo,
+    shellMeta,
     errors,
   };
 }
@@ -170,7 +188,27 @@ function inFlight(since: number | null, now: number): string {
 
 function lastSyncText(last: SyncEngineDiagnostics["last"], now: number): string {
   if (!last) return "ninguna desde que se abrió la app";
-  return `${last.result}, tardó ${(last.durationMs / 1000).toFixed(1)} s, terminó ${ago(last.finishedAt, now)}`;
+  return `${last.result} (${last.trigger}), tardó ${(last.durationMs / 1000).toFixed(1)} s, terminó ${ago(last.finishedAt, now)}`;
+}
+
+function lastSkippedText(skipped: SyncEngineDiagnostics["lastSkipped"], now: number): string {
+  if (!skipped) return "ninguna";
+  return `${skipped.reason} (${skipped.trigger}), ${ago(skipped.at, now)}`;
+}
+
+function syncInFlightText(sync: SyncEngineDiagnostics, now: number): string {
+  const text = inFlight(sync.inFlightSince, now);
+  return sync.inFlightTrigger ? `${text} (${sync.inFlightTrigger})` : text;
+}
+
+function windowText(until: number | null, now: number): string {
+  if (until === null) return "libre";
+  return `bloqueada hasta ${formatTime(until)} (faltan ${Math.ceil((until - now) / 1000)} s)`;
+}
+
+function shellMetaText(meta: Sample["shellMeta"], now: number): string {
+  if (!meta) return "sin registro (se precachea en la próxima carga)";
+  return `${ago(meta.at, now)} · commit ${meta.commit} · ${meta.cacheName}`;
 }
 
 function yesNo(value: boolean): string {
@@ -189,8 +227,11 @@ function buildReport(sample: Sample, events: LoggedEvent[], environment: Environ
     `Latido activo: ${yesNo(sample.connectivity.heartbeatRunning)}`,
     `Cola: ${sample.queue.pending} por subir, ${sample.queue.parked} detenidas`,
     `Pasada de la cola en curso: ${inFlight(sample.queue.passStartedAt, sample.at)}`,
-    `Sincronización en curso: ${inFlight(sample.sync.inFlightSince, sample.at)}`,
+    `Sincronización en curso: ${syncInFlightText(sample.sync, sample.at)}`,
     `Última sincronización: ${lastSyncText(sample.sync.last, sample.at)}`,
+    `Última descartada: ${lastSkippedText(sample.sync.lastSkipped, sample.at)}`,
+    `Ventana de 5 min: ${windowText(sample.sync.windowUntil, sample.at)}`,
+    `Último precacheo completo del armazón: ${shellMetaText(sample.shellMeta, sample.at)}`,
     `Service worker soportado: ${yesNo(sample.swSupported)}`,
     `Controla esta página: ${sample.controller ? `${sample.controller.scriptURL} (${sample.controller.state})` : "NO"}`,
     ...(sample.registrations ?? []).map(
@@ -328,6 +369,7 @@ export function ConnectionDiagnostics() {
 
       <Section title="Caché del armazón">
         {!shellCache && <Row label="fixtrack-shell-*" value="NO EXISTE" strong />}
+        <Row label="Último precacheo completo" value={shellMetaText(sample.shellMeta, sample.at)} />
         {sample.caches?.map((cache) => (
           <div key={cache.name} className="flex flex-col gap-1">
             <span className="font-medium">
@@ -357,10 +399,12 @@ export function ConnectionDiagnostics() {
       <Section title="Sincronización">
         <Row
           label="En curso"
-          value={inFlight(sample.sync.inFlightSince, sample.at)}
+          value={syncInFlightText(sample.sync, sample.at)}
           strong={sample.sync.inFlightSince !== null}
         />
         <Row label="Última" value={lastSyncText(sample.sync.last, sample.at)} />
+        <Row label="Última descartada" value={lastSkippedText(sample.sync.lastSkipped, sample.at)} />
+        <Row label="Ventana de 5 min" value={windowText(sample.sync.windowUntil, sample.at)} />
       </Section>
 
       <Section title="Eventos (el más reciente arriba)">

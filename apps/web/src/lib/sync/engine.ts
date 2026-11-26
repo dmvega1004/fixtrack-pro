@@ -4,6 +4,7 @@ import { SYNC_PAYLOAD_VERSION } from "./payload-version";
 import type { SyncPayload } from "./types";
 import { clearWorkset, loadWorkset, saveWorkset, type StoredWorkset } from "./storage";
 import { setSyncState } from "./state-store";
+import { getSnapshot as getConnectivitySnapshot } from "../connectivity/store";
 
 /** Prefijo fijo para poder filtrar la consola por "[sync]" al verificar. */
 const LOG = "[sync]";
@@ -42,19 +43,54 @@ const SYNC_TIMEOUT_MS = 30_000;
  */
 let syncInFlight = false;
 
-/** Instante del último INTENTO (no solo los exitosos) — ver MIN_SYNC_INTERVAL_MS. */
+/**
+ * Inicio del último intento que CUENTA para la ventana de
+ * MIN_SYNC_INTERVAL_MS: los que llegaron a tener respuesta (éxito, 401,
+ * 5xx, cuerpo cortado) y los que agotaron el tiempo límite. NO cuenta el
+ * fallo de red inmediato (fetch rechaza antes de cualquier respuesta, p.
+ * ej. modo avión): no le costó nada al servidor, y contarlo bloqueaba la
+ * sincronización al volver la señal hasta 5 min (prueba de campo
+ * 2026-11-24: fallo a las 22:57:14, la buena recién a las 23:05:27).
+ * El tiempo agotado SÍ cuenta: la petición pudo llegar y el servidor
+ * hacer sus ~100 llamadas aunque la respuesta no volviera.
+ */
 let lastAttemptAt = 0;
 
 /** Para el diagnóstico (/perfil/diagnostico): solo lectura. */
+/**
+ * Quién pidió la sincronización — solo para el diagnóstico (prueba de
+ * campo 2026-11-24: no había forma de saber qué disparó un intento).
+ */
+export type SyncTrigger = "arranque" | "primer plano" | "regreso de señal" | "deslizar";
+
 export interface SyncEngineDiagnostics {
   inFlightSince: number | null;
-  last: { finishedAt: number; durationMs: number; result: string } | null;
+  inFlightTrigger: SyncTrigger | null;
+  last: { finishedAt: number; durationMs: number; result: string; trigger: SyncTrigger } | null;
+  /** Último pedido descartado SIN llamar al servidor (sin señal, ventana, en curso). */
+  lastSkipped: { at: number; trigger: SyncTrigger; reason: string } | null;
+  /** Hasta cuándo una sincronización SIN forzar se descarta; null = libre. */
+  windowUntil: number | null;
 }
 let inFlightSince: number | null = null;
+let inFlightTrigger: SyncTrigger | null = null;
 let lastResult: SyncEngineDiagnostics["last"] = null;
+let lastSkipped: SyncEngineDiagnostics["lastSkipped"] = null;
+
+function skip(trigger: SyncTrigger, reason: string): void {
+  console.log(`${LOG} (${trigger}) ${reason} — se descarta`);
+  lastSkipped = { at: Date.now(), trigger, reason };
+}
 
 export function getSyncEngineDiagnostics(): SyncEngineDiagnostics {
-  return { inFlightSince, last: lastResult };
+  const until = lastAttemptAt + MIN_SYNC_INTERVAL_MS;
+  return {
+    inFlightSince,
+    inFlightTrigger,
+    last: lastResult,
+    lastSkipped,
+    windowUntil: until > Date.now() ? until : null,
+  };
 }
 
 /**
@@ -72,7 +108,7 @@ export function startSyncEngine(userId: string): () => void {
   const handleVisibilityChange = () => {
     if (document.visibilityState !== "visible") return;
     console.log(`${LOG} app en primer plano — evaluando resincronización`);
-    void runSync(userId);
+    void runSync(userId, { trigger: "primer plano" });
   };
 
   document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -115,7 +151,7 @@ async function bootstrap(userId: string): Promise<void> {
   }
 
   console.log(`${LOG} sincronizando al cargar la aplicación`);
-  await runSync(userId);
+  await runSync(userId, { trigger: "arranque" });
 }
 
 /**
@@ -125,30 +161,46 @@ async function bootstrap(userId: string): Promise<void> {
  * sesión vencida, no un fallo de red: se registra aparte y no se
  * reintenta en bucle (no hay ningún setTimeout de reintento acá).
  *
- * `force` salta el intervalo mínimo (MIN_SYNC_INTERVAL_MS) — lo usa
- * únicamente «deslizar para refrescar». El guard de
- * concurrencia (syncInFlight) NUNCA se salta, con o sin force.
+ * Sin forzar, tampoco se intenta si la detección propia ya dice «sin
+ * señal» (lib/connectivity/store): no hay nada que ganar, y antes cada
+ * vuelta al primer plano sin señal salía igual a la red. Ojo: justo
+ * después de perder la señal la app todavía no lo sabe (hacen falta 2
+ * fallos); ese intento falla en el acto y, como fallo de red, no consume
+ * la ventana (ver lastAttemptAt).
+ *
+ * `force` salta el intervalo mínimo (MIN_SYNC_INTERVAL_MS) y la
+ * comprobación de señal — lo usa únicamente «deslizar para refrescar», que
+ * ya revisa la señal por su cuenta. El guard de concurrencia
+ * (syncInFlight) NUNCA se salta, con o sin force.
  */
-export async function runSync(userId: string, options: { force?: boolean } = {}): Promise<void> {
+export async function runSync(
+  userId: string,
+  options: { force?: boolean; trigger: SyncTrigger },
+): Promise<void> {
+  const { trigger } = options;
+
   if (syncInFlight) {
-    console.log(`${LOG} ya hay una sincronización en curso — se descarta esta`);
+    skip(trigger, "ya hay una sincronización en curso");
     return;
   }
 
   if (!options.force) {
+    if (getConnectivitySnapshot()) {
+      skip(trigger, "la app sabe que está sin señal");
+      return;
+    }
     const elapsedMs = Date.now() - lastAttemptAt;
     if (elapsedMs < MIN_SYNC_INTERVAL_MS) {
       const remainingS = Math.ceil((MIN_SYNC_INTERVAL_MS - elapsedMs) / 1000);
-      console.log(
-        `${LOG} última sincronización hace ${Math.round(elapsedMs / 1000)}s, faltan ${remainingS}s para el mínimo — se descarta`,
-      );
+      skip(trigger, `ventana de 5 min (faltan ${remainingS} s)`);
       return;
     }
   }
 
-  lastAttemptAt = Date.now();
+  const startedAt = Date.now();
   syncInFlight = true;
-  inFlightSince = lastAttemptAt;
+  inFlightSince = startedAt;
+  inFlightTrigger = trigger;
   setSyncState({ isSyncing: true });
 
   const controller = new AbortController();
@@ -160,6 +212,9 @@ export async function runSync(userId: string, options: { force?: boolean } = {})
       cache: "no-store",
       signal: controller.signal,
     });
+    // Hubo respuesta: el servidor hizo el trabajo, cuenta para la ventana
+    // pase lo que pase después (401, 5xx, cuerpo cortado).
+    lastAttemptAt = startedAt;
 
     if (response.status === 401) {
       console.warn(`${LOG} sesión vencida (401) — no se reintenta, se conserva lo guardado`);
@@ -202,6 +257,8 @@ export async function runSync(userId: string, options: { force?: boolean } = {})
     });
   } catch (error) {
     const timedOut = controller.signal.aborted;
+    // Tiempo agotado cuenta (ver lastAttemptAt); el fallo de red inmediato no.
+    if (timedOut) lastAttemptAt = startedAt;
     result = timedOut
       ? `sin respuesta en ${SYNC_TIMEOUT_MS / 1000}s`
       : `falló (${error instanceof Error ? error.name : "error"})`;
@@ -211,7 +268,8 @@ export async function runSync(userId: string, options: { force?: boolean } = {})
     clearTimeout(timer);
     syncInFlight = false;
     const finishedAt = Date.now();
-    lastResult = { finishedAt, durationMs: finishedAt - (inFlightSince ?? finishedAt), result };
+    lastResult = { finishedAt, durationMs: finishedAt - startedAt, result, trigger };
     inFlightSince = null;
+    inFlightTrigger = null;
   }
 }

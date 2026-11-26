@@ -125,7 +125,7 @@ export function startQueueEngine(userId: string): () => void {
     console.log(`${LOG} ${reason} — subiendo cola pendiente`);
     clearRetryTimer();
     await runQueuePass(userId);
-    void runSync(userId);
+    void runSync(userId, { trigger: "regreso de señal" });
   };
 
   const handleOnline = () => void onSignalBack("conexión recuperada (evento online)");
