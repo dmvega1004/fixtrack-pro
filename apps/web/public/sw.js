@@ -62,18 +62,78 @@ self.addEventListener("install", (event) => {
  * detalle de cualquier orden nunca visitada cae en offline.html sin
  * conexión.
  *
- * Mismo `precacheShell()` de siempre — vuelve a intentar las tres
- * direcciones, con la sesión que haya AHORA (la cookie viaja sola en el
- * fetch same-origin), y sigue descartando lo que redirija. Se puede
- * llamar las veces que haga falta sin reinstalar el service worker ni
- * cambiar CACHE_VERSION — completa lo que falte de la instalación
- * existente, nunca empieza de cero.
+ * HUELLA (W5): antes esto corría en CADA carga del panel — tres páginas
+ * completas más sus archivos, con datos móviles, compitiendo con la
+ * pantalla que el técnico abre. Ahora la página manda una huella (id del
+ * usuario + commit publicado) y se SALTA el precacheo si la última vez que
+ * las TRES páginas pasaron el candado fue con la misma huella, el mismo
+ * CACHE_NAME y hace menos de SHELL_REFRESH_MAX_AGE_MS, y las tres siguen
+ * en la caché. Cualquier duda (sin huella, huella distinta, registro
+ * ilegible, alguna página que no pasó) ⇒ se precachea como antes: el
+ * peor caso es gastar datos, nunca quedarse con un armazón viejo o ajeno.
  */
 self.addEventListener("message", (event) => {
   if (event.data && event.data.type === "fixtrack-refresh-shell-cache") {
-    event.waitUntil(precacheShell());
+    const fingerprint =
+      typeof event.data.fingerprint === "string" && event.data.fingerprint
+        ? event.data.fingerprint
+        : null;
+    event.waitUntil(refreshShellIfStale(fingerprint));
   }
 });
+
+/**
+ * Caché APARTE para el registro de la huella: no empieza con CACHE_PREFIX,
+ * así que la limpieza de "activate" no la borra, y no se mezcla con las
+ * pantallas. Si CACHE_NAME cambia, el registro deja de coincidir (guarda
+ * el CACHE_NAME con el que se hizo) y se precachea de nuevo.
+ */
+const META_CACHE_NAME = "fixtrack-meta";
+const META_SHELL_KEY = "/__fixtrack-meta/armazon";
+/** 12 h: una jornada; al día siguiente se refresca aunque nada cambie. */
+const SHELL_REFRESH_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+
+async function refreshShellIfStale(fingerprint) {
+  if (fingerprint && (await shellIsFresh(fingerprint))) {
+    console.log("[sw] armazón al día para esta huella — no se precachea");
+    return;
+  }
+  const allPassed = await precacheShell();
+  if (!fingerprint || !allPassed) return;
+  try {
+    const meta = await caches.open(META_CACHE_NAME);
+    await meta.put(
+      META_SHELL_KEY,
+      new Response(JSON.stringify({ fingerprint, cacheName: CACHE_NAME, at: Date.now() }), {
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+  } catch (error) {
+    // Sin registro, la próxima carga simplemente vuelve a precachear.
+    console.error("[sw] No se pudo guardar la huella del armazón", error);
+  }
+}
+
+async function shellIsFresh(fingerprint) {
+  try {
+    const meta = await caches.open(META_CACHE_NAME);
+    const stored = await meta.match(META_SHELL_KEY);
+    if (!stored) return false;
+    const record = await stored.json();
+    if (record.fingerprint !== fingerprint) return false;
+    if (record.cacheName !== CACHE_NAME) return false;
+    const age = Date.now() - record.at;
+    if (!(age >= 0 && age < SHELL_REFRESH_MAX_AGE_MS)) return false;
+    // Las tres páginas tienen que seguir ahí (el navegador puede desalojar).
+    const cache = await caches.open(CACHE_NAME);
+    for (const url of SHELL_URLS) {
+      if (!(await cache.match(url))) return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Precachea el armazón mínimo: la pantalla de "sin conexión" propia (no
@@ -92,13 +152,15 @@ async function precacheShell() {
     console.error("[sw] No se pudo precachear offline.html", error);
   }
 
-  await Promise.all(SHELL_URLS.map((url) => precacheShellUrl(cache, url)));
+  const results = await Promise.all(SHELL_URLS.map((url) => precacheShellUrl(cache, url)));
+  // true solo si las TRES pasaron el candado y se guardaron (ver W5 arriba).
+  return results.every(Boolean);
 }
 
 async function precacheShellUrl(cache, shellUrl) {
   try {
     const shellResponse = await fetch(shellUrl);
-    if (!shellResponse.ok) return;
+    if (!shellResponse.ok) return false;
 
     // "/", "/ordenes" y "/ordenes/detalle-offline" exigen sesión (las
     // sirve (dashboard)/layout.tsx, que redirige a /login sin una). Si el
@@ -114,7 +176,7 @@ async function precacheShellUrl(cache, shellUrl) {
     // esa misma dirección con sesión (ver navigateNetworkFirst).
     if (shellResponse.redirected) {
       console.warn(`[sw] ${shellUrl} redirigió al precachear (sin sesión válida) — no se guarda`);
-      return;
+      return false;
     }
 
     // Confirmación POSITIVA antes de guardar: proxy.ts marca con
@@ -132,7 +194,7 @@ async function precacheShellUrl(cache, shellUrl) {
       console.warn(
         `[sw] ${shellUrl} sin la marca de armazón autenticado (x-fixtrack-shell) — no se guarda`,
       );
-      return;
+      return false;
     }
 
     const html = await shellResponse.clone().text();
@@ -150,12 +212,14 @@ async function precacheShellUrl(cache, shellUrl) {
         }
       }),
     );
+    return true;
   } catch (error) {
     // Sin red durante la instalación (ej. primera apertura del APK sin
     // señal): no hay nada que precachear todavía más allá de
     // offline.html. La próxima navegación exitosa completa la caché —
     // ver navigateNetworkFirst más abajo.
     console.error(`[sw] No se pudo precachear ${shellUrl}`, error);
+    return false;
   }
 }
 

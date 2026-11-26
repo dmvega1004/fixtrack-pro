@@ -35,11 +35,17 @@ export default async function DashboardLayout({
     redirect("/cambiar-contrasena");
   }
 
+  // Huella del armazón sin señal (W5, ver ShellCacheRefresh): usuario +
+  // commit publicado. Sin commit (local) no hay huella y se precachea en
+  // cada carga, como antes.
+  const commit = process.env.VERCEL_GIT_COMMIT_SHA;
+  const shellFingerprint = commit ? `${session.userId}:${commit}` : null;
+
   return (
     <div className="flex min-h-svh flex-1 flex-col">
       <SyncEngineRegister userId={session.userId} />
       <QueueEngineRegister userId={session.userId} />
-      <ShellCacheRefresh />
+      <ShellCacheRefresh fingerprint={shellFingerprint} />
       <OfflineBanner />
       <QueueStatusIndicator variant="strip" />
       <OtherUsersQueueNotice />
