@@ -72,6 +72,9 @@ Esto ejecuta Gradle y genera el archivo en:
 apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
+Se instala como una app aparte, «FixTrack PRUEBA» — ver «Compilación de
+prueba .debug» más abajo.
+
 Para instalarlo en un celular conectado por USB con depuración habilitada:
 
 ```bash
@@ -80,6 +83,40 @@ adb install -r apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
 
 O simplemente copia el `.apk` al celular y ábrelo (hay que permitir
 "instalar apps de orígenes desconocidos" la primera vez).
+
+## Compilación de prueba .debug (diagnóstico, NO se distribuye)
+
+La variante debug ya no es una copia de la app real: se instala como otra
+app, **«FixTrack PRUEBA»** (`com.innovawebb.fixtrackpro.debug`), al lado de
+FixTrack Pro sin tocar su sesión ni su cola. Trae un registrador de la
+vista web que escribe en logcat con la etiqueta `FixTrackDebug`: inicio y
+fin de cada página, errores de la página principal (y si Capacitor salta a
+su `errorPath`), errores HTTP de navegación, y las peticiones que pasan por
+el service worker.
+
+- **Qué NO registra:** cookies, cabeceras, cuerpos ni cadenas de consulta
+  (las URL van solo como origen + ruta).
+- **Dónde vive:** solo en `android/app/src/debug/` (`DebugApp`,
+  `DebugWebViewLogger`, nombre y manifiesto propios). `src/main` no cambia,
+  así que la release no lo trae. Lo comprueba
+  `scripts/verificar-release.sh` (ver «Compilar una versión firmada»).
+
+- **Ojo:** como toda compilación debug, es depurable (Capacitor activa la
+  inspección de la vista web y `adb` puede leer sus datos). Por eso se
+  entra con un usuario de prueba, no con el de un técnico, no se
+  distribuye, y se desinstala al terminar.
+- Mismos permisos que la release 1.1.0 (sin `ACCESS_NETWORK_STATE`), a
+  propósito: tiene que reproducir lo que pasa en la app real.
+
+Leer el registro con el celular conectado:
+
+```bash
+adb logcat -c
+adb logcat -s FixTrackDebug Capacitor Capacitor/Console
+```
+
+Al terminar: `adb uninstall com.innovawebb.fixtrackpro.debug` y apagar la
+depuración USB en el celular.
 
 ## Generar la llave de firma (una sola vez, la primera vez)
 
@@ -155,6 +192,20 @@ apps/mobile/android/app/build/outputs/apk/release/app-release.apk
 
 Este es el que se distribuye fuera de Google Play (instalación directa,
 enlace de descarga, etc.).
+
+### Paso OBLIGATORIO antes de publicar: verificar-release.sh
+
+```bash
+apps/mobile/scripts/verificar-release.sh
+```
+
+Revisa el APK de release recién compilado contra el que se descarga hoy
+(`apps/web/public/app/fixtrackpro.apk`) y **no se publica si dice «NO
+publicar»**. Falla si trae algo de la variante de prueba .debug, si es
+depurable, si el applicationId no es `com.innovawebb.fixtrackpro`, o si no
+está firmado con la MISMA llave que el publicado (sin la misma llave no se
+instala encima y el técnico pierde sesión y datos guardados). También
+lista qué archivos cambian frente al publicado: revisar que tenga sentido.
 
 ## Subir el número de versión
 

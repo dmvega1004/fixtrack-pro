@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SOLO variante debug (com.innovawebb.fixtrackpro.debug, «FixTrack PRUEBA»).
+  Se fusiona con src/main/AndroidManifest.xml únicamente al compilar debug:
+  la release no tiene clase Application propia ni registrador.
+  Ver DebugApp.java y apps/mobile/README.md («Compilación de prueba .debug»).
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:name=".DebugApp" />
+</manifest>

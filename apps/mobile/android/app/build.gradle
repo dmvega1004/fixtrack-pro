@@ -39,6 +39,14 @@ android {
         }
     }
     buildTypes {
+        // Compilación de PRUEBA (ronda 1 del diagnóstico sin señal): otro
+        // appId para instalarla AL LADO de la app real sin tocarla, y nombre
+        // «FixTrack PRUEBA» (src/debug/res). El registrador vive solo en
+        // src/debug. No se distribuye; se desinstala al terminar. Ver README.
+        debug {
+            applicationIdSuffix ".debug"
+            versionNameSuffix "-debug"
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'

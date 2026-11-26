@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!-- SOLO debug: nombre distinto para no confundirla con la app real en el celular. -->
+<resources>
+    <string name="app_name">FixTrack PRUEBA</string>
+    <string name="title_activity_main">FixTrack PRUEBA</string>
+</resources>
