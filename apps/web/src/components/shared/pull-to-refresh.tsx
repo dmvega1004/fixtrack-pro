@@ -117,7 +117,7 @@ export function PullToRefresh({ userId, children }: PullToRefreshProps) {
 
     try {
       router.refresh();
-      await Promise.allSettled([runSync(userId, { force: true }), runQueuePass(userId)]);
+      await Promise.allSettled([runSync(userId, { force: true, trigger: "deslizar" }), runQueuePass(userId)]);
     } finally {
       updatePhase("idle");
       updatePull(0);
